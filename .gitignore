@@ -1,0 +1,34 @@
+# --- Dépendances ---
+# Ignore node_modules dans client/ et server/
+node_modules/
+.pnpm-store/
+
+# --- Environnement (TRÈS IMPORTANT) ---
+# Ne jamais push tes clés API ou tes accès DB PostgreSQL
+.env
+*.local
+.env.test
+.env.sample
+
+# --- Build & Output ---
+# Pour Vite (client)
+dist/
+dist-ssr/
+*.gz
+
+# --- Prisma (Spécifique au serveur) ---
+# Ignore le dossier de génération si nécessaire, mais garde le schéma !
+/server/prisma/generated-client
+
+# --- Logs ---
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# --- OS & IDE ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
