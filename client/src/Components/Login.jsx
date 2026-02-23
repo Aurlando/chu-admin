@@ -27,7 +27,7 @@ const LoginPage = () => {
 
     try {
       // On envoie la requête à l'API
-      const response = await fetch('http://localhost:3000/login', {
+      const response = await fetch('http://localhost:3000/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

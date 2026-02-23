@@ -1,11 +1,12 @@
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 const authModels = require('../models/authModels');
 
 async function login(req, res) {
     const { username, password } = req.body;
 
     if(!username || !password) {
-        return res.status(400).json({message: "Champs manquqnts"});
+        return res.status(400).json({message: "Champs manquants"});
     }
 
     try {
@@ -15,7 +16,9 @@ async function login(req, res) {
             return res.status(401).json({message: "Utilisateur introuvable"});
         }
 
-        if(user.password_hash !== password) {
+        const isMatch = await bcrypt.compare(password, user.password_hash)
+
+        if(!isMatch) {
             return res.status(401).json({message: "Mot de passe incorrect"});
         }
         
