@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { User, Lock, Eye, EyeOff, LogIn, ShieldCheck } from 'lucide-react';
 import logoHospital from '../assets/image/chu-anosiala-logo.png'
 
-const LoginPage = () => {
+function Login() {
   // --- 1. LES ÉTATS (LA MÉMOIRE DU COMPOSANT) ---
   
   // Stocke ce que l'utilisateur écrit dans les champs
@@ -138,8 +138,8 @@ const LoginPage = () => {
         </form>
       </div>
   
-    </div>
+  </div>
   );
 };
 
-export default LoginPage;
+export default Login;
