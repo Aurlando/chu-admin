@@ -1,5 +1,16 @@
 import { useState } from "react";
 
+// ════════════════════════════════════════════════════
+// Sidebar.jsx — Barre de navigation latérale fixe
+// Props reçues :
+//   - activeNav / setActiveNav : page active
+//   - mobileOpen / setMobileOpen : ouverture mobile
+//   - onCollapse : informe Dashboard de l'état réduit/étendu
+//   - dark : thème sombre ou clair
+//   - onLogout : fonction de déconnexion venant de Dashboard
+//     → qui vient elle-même de App.jsx (voir App.jsx → handleLogout)
+// ════════════════════════════════════════════════════
+
 const navItems = [
   {
     label: "Dashboard",
@@ -51,7 +62,16 @@ const navItems = [
   },
 ];
 
-export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobileOpen, onCollapse, dark }) {
+// Icône déconnexion (SVG inline pour éviter une dépendance)
+function LogoutIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+    </svg>
+  );
+}
+
+export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobileOpen, onCollapse, dark, onLogout }) {
   const [collapsed, setCollapsed] = useState(false);
 
   const handleCollapse = (val) => {
@@ -59,28 +79,21 @@ export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobile
     if (onCollapse) onCollapse(val);
   };
 
-  // Thème sidebar
-  const bg = dark ? "bg-[#0d1526] border-white/5" : "bg-white border-slate-200";
-  const logoText = dark ? "text-white" : "text-slate-800";
-  const logoSub = dark ? "text-slate-500" : "text-slate-400";
-  const navActive = dark
-    ? "bg-blue-600/20 text-blue-400 border-blue-500/20"
-    : "bg-blue-50 text-blue-600 border-blue-200";
-  const navInactive = dark
-    ? "text-slate-400 hover:text-white hover:bg-white/5 border-transparent"
-    : "text-slate-500 hover:text-slate-800 hover:bg-slate-100 border-transparent";
-  const userBg = dark ? "bg-white/5" : "bg-slate-100";
-  const userName = dark ? "text-white" : "text-slate-800";
-  const userSub = dark ? "text-slate-500" : "text-slate-400";
-  const toggleBtn = dark
-    ? "bg-white/5 hover:bg-white/10 border-white/10 text-slate-400 hover:text-white"
-    : "bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-500 hover:text-slate-800";
-  const expandBtn = dark
-    ? "bg-[#0d1526] border-white/10 text-slate-400 hover:text-white"
-    : "bg-white border-slate-200 text-slate-500 hover:text-slate-800";
+  // ── Tokens de thème : classes Tailwind selon dark/light
+  const bg         = dark ? "bg-[#0d1526] border-white/5"  : "bg-white border-slate-200";
+  const logoText   = dark ? "text-white"                   : "text-slate-800";
+  const logoSub    = dark ? "text-slate-500"               : "text-slate-400";
+  const navActive  = dark ? "bg-blue-600/20 text-blue-400 border-blue-500/20"       : "bg-blue-50 text-blue-600 border-blue-200";
+  const navInactive= dark ? "text-slate-400 hover:text-white hover:bg-white/5 border-transparent" : "text-slate-500 hover:text-slate-800 hover:bg-slate-100 border-transparent";
+  const userBg     = dark ? "bg-white/5"                   : "bg-slate-100";
+  const userName   = dark ? "text-white"                   : "text-slate-800";
+  const userSub    = dark ? "text-slate-500"               : "text-slate-400";
+  const toggleBtn  = dark ? "bg-white/5 hover:bg-white/10 border-white/10 text-slate-400 hover:text-white" : "bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-500 hover:text-slate-800";
+  const expandBtn  = dark ? "bg-[#0d1526] border-white/10 text-slate-400 hover:text-white" : "bg-white border-slate-200 text-slate-500 hover:text-slate-800";
 
   return (
     <>
+      {/* Overlay sombre (mobile) — clique dessus pour fermer le menu */}
       {mobileOpen && (
         <div
           className="fixed inset-0 bg-black/60 z-20 lg:hidden"
@@ -97,7 +110,7 @@ export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobile
           ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
-        {/* Header */}
+        {/* ── En-tête logo ── */}
         <div className={`relative flex items-center border-b h-[57px] ${dark ? "border-white/5" : "border-slate-200"} ${collapsed ? "justify-center px-3" : "justify-between px-4"}`}>
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-9 h-9 flex-shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-sm font-bold shadow-lg shadow-blue-500/20 text-white">
@@ -111,22 +124,15 @@ export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobile
             )}
           </div>
 
+          {/* Bouton réduire (desktop) */}
           {!collapsed ? (
-            <button
-              onClick={() => handleCollapse(true)}
-              className={`hidden lg:flex w-7 h-7 rounded-lg border items-center justify-center transition-all flex-shrink-0 ${toggleBtn}`}
-              title="Réduire le menu"
-            >
+            <button onClick={() => handleCollapse(true)} className={`hidden lg:flex w-7 h-7 rounded-lg border items-center justify-center transition-all flex-shrink-0 ${toggleBtn}`} title="Réduire le menu">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
               </svg>
             </button>
           ) : (
-            <button
-              onClick={() => handleCollapse(false)}
-              className={`hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border items-center justify-center transition-all shadow-md ${expandBtn}`}
-              title="Agrandir le menu"
-            >
+            <button onClick={() => handleCollapse(false)} className={`hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border items-center justify-center transition-all shadow-md ${expandBtn}`} title="Agrandir le menu">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
               </svg>
@@ -134,7 +140,7 @@ export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobile
           )}
         </div>
 
-        {/* Nav */}
+        {/* ── Navigation ── */}
         <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
           {navItems.map((item) => {
             const isActive = activeNav === item.label;
@@ -156,28 +162,58 @@ export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobile
           })}
         </nav>
 
-        {/* User footer */}
-        <div className={`border-t ${dark ? "border-white/5" : "border-slate-200"} ${collapsed ? "p-2 flex flex-col items-center gap-2" : "p-3"}`}>
+        {/* ── Footer utilisateur + Déconnexion ── */}
+        <div className={`border-t ${dark ? "border-white/5" : "border-slate-200"} ${collapsed ? "p-2 flex flex-col items-center gap-2" : "p-3 space-y-2"}`}>
+
           {!collapsed ? (
-            <div className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${userBg}`}>
-              <div className="w-7 h-7 flex-shrink-0 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs font-bold text-white">J</div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-xs font-medium truncate ${userName}`}>James Miller</div>
-                <div className={`text-[10px] truncate ${userSub}`}>Administrateur</div>
-              </div>
-              <button className={`transition-colors flex-shrink-0 ${dark ? "text-slate-500 hover:text-rose-400" : "text-slate-400 hover:text-rose-500"}`} title="Déconnexion">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
-            </div>
-          ) : (
             <>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs font-bold text-white cursor-default" title="James Miller — Administrateur">J</div>
-              <button className={`w-8 h-8 flex items-center justify-center transition-colors rounded-lg ${dark ? "text-slate-500 hover:text-rose-400 hover:bg-white/5" : "text-slate-400 hover:text-rose-500 hover:bg-slate-100"}`} title="Déconnexion">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
+              {/* Infos utilisateur */}
+              <div className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${userBg}`}>
+                <div className="w-7 h-7 flex-shrink-0 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs font-bold text-white">
+                  A
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-xs font-medium truncate ${userName}`}>Administrateur</div>
+                  <div className={`text-[10px] truncate ${userSub}`}>CHU Anosiala</div>
+                </div>
+              </div>
+
+              {/* ── Bouton Déconnexion — stylisé ── */}
+              {/* onLogout vient de Dashboard → App → handleLogout */}
+              <button
+                onClick={onLogout}
+                className={`
+                  w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+                  transition-all duration-200 border group
+                  ${dark
+                    ? "text-slate-400 border-transparent hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20"
+                    : "text-slate-500 border-transparent hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200"
+                  }
+                `}
+              >
+                <span className="flex-shrink-0 transition-transform duration-200 group-hover:translate-x-0.5">
+                  <LogoutIcon />
+                </span>
+                <span>Se déconnecter</span>
+              </button>
+            </>
+          ) : (
+            /* Mode réduit : avatar + bouton déco compacts */
+            <>
+              <div
+                className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs font-bold text-white cursor-default"
+                title="Administrateur — CHU Anosiala"
+              >
+                A
+              </div>
+              <button
+                onClick={onLogout}
+                title="Se déconnecter"
+                className={`w-8 h-8 flex items-center justify-center transition-colors rounded-lg ${
+                  dark ? "text-slate-500 hover:text-rose-400 hover:bg-rose-500/10" : "text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                }`}
+              >
+                <LogoutIcon />
               </button>
             </>
           )}
