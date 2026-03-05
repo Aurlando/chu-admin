@@ -1,12 +1,5 @@
 import { useState, useEffect } from "react";
 
-// ════════════════════════════════════════════════════
-// Login.jsx — Page de connexion
-// Props reçues depuis App.jsx :
-//   - onLoginSuccess(token) : fonction à appeler quand
-//     la connexion réussit, en passant le token au parent
-// ════════════════════════════════════════════════════
-
 export default function Login({ onLoginSuccess }) {
   const [darkMode, setDarkMode]       = useState(false);
   const [username, setUsername]       = useState("");
@@ -15,7 +8,6 @@ export default function Login({ onLoginSuccess }) {
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState("");
 
-  // ── useEffect : déclenche une animation d'entrée après le montage
   //    "mounted" sert juste à faire apparaître la carte (opacity + translateY)
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -41,26 +33,21 @@ export default function Login({ onLoginSuccess }) {
       const data = await res.json();
 
       if (res.ok) {
-        // ✅ Connexion réussie : on remonte le token vers App.jsx
-        //    App.jsx va le stocker dans localStorage et afficher le Dashboard
-        //    Voir App.jsx → handleLoginSuccess(token)
         onLoginSuccess(data.token);
       } else {
-        // ❌ Le back renvoie une erreur (ex: mot de passe incorrect)
         setError(data.message || "Identifiants incorrects.");
       }
     } catch (err) {
-      // ❌ Le serveur est injoignable (éteint, CORS, réseau...)
       setError("Impossible de joindre le serveur.");
     } finally {
-      setLoading(false); // Dans tous les cas, on arrête le spinner
+      setLoading(false);
     }
   };
 
   return (
     <div
       className={`min-h-screen flex items-center justify-center transition-colors duration-500 ${
-        darkMode ? "bg-gray-950" : "bg-gradient-to-br from-slate-200 via-blue-100 to-indigo-200"
+        darkMode ? "bg-gray-950" : "bg-linear-to-br from-slate-200 via-blue-100 to-indigo-200"
       }`}
     >
       {/* ── Bouton Toggle Nuit/Jour — coin supérieur droit ── */}
@@ -97,8 +84,8 @@ export default function Login({ onLoginSuccess }) {
         <div
           className={`hidden md:flex flex-col items-center justify-center w-2/5 p-10 relative overflow-hidden ${
             darkMode
-              ? "bg-gradient-to-br from-indigo-900 to-blue-950"
-              : "bg-gradient-to-br from-indigo-400 to-blue-500"
+              ? "bg-linear-to-br from-indigo-900 to-blue-950"
+              : "bg-linear-to-br from-indigo-400 to-blue-500"
           }`}
         >
           {/* Cercles décoratifs */}
@@ -207,7 +194,7 @@ export default function Login({ onLoginSuccess }) {
               <p className={`text-xs px-3 py-2 rounded-lg flex items-center gap-2 ${
                 darkMode ? "text-red-400 bg-red-950/40 border border-red-800/40" : "text-red-500 bg-red-50 border border-red-200"
               }`}>
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
                 {error}

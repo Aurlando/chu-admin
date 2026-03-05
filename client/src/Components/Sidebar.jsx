@@ -1,16 +1,5 @@
 import { useState } from "react";
 
-// ════════════════════════════════════════════════════
-// Sidebar.jsx — Barre de navigation latérale fixe
-// Props reçues :
-//   - activeNav / setActiveNav : page active
-//   - mobileOpen / setMobileOpen : ouverture mobile
-//   - onCollapse : informe Dashboard de l'état réduit/étendu
-//   - dark : thème sombre ou clair
-//   - onLogout : fonction de déconnexion venant de Dashboard
-//     → qui vient elle-même de App.jsx (voir App.jsx → handleLogout)
-// ════════════════════════════════════════════════════
-
 const navItems = [
   {
     label: "Dashboard",
@@ -62,7 +51,7 @@ const navItems = [
   },
 ];
 
-// Icône déconnexion (SVG inline pour éviter une dépendance)
+// ── [EXISTANT] Icône SVG de déconnexion (inline = pas de dépendance externe)
 function LogoutIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -71,15 +60,19 @@ function LogoutIcon() {
   );
 }
 
+// ════════════════════════════════════════════════════
+// Composant Sidebar
+// ════════════════════════════════════════════════════
 export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobileOpen, onCollapse, dark, onLogout }) {
+
   const [collapsed, setCollapsed] = useState(false);
 
   const handleCollapse = (val) => {
     setCollapsed(val);
-    if (onCollapse) onCollapse(val);
+    if (onCollapse) onCollapse(val); // onCollapse = setSidebarCollapsed dans Dashboard
   };
 
-  // ── Tokens de thème : classes Tailwind selon dark/light
+  // ── [EXISTANT] Tokens de thème Tailwind selon dark/light
   const bg         = dark ? "bg-[#0d1526] border-white/5"  : "bg-white border-slate-200";
   const logoText   = dark ? "text-white"                   : "text-slate-800";
   const logoSub    = dark ? "text-slate-500"               : "text-slate-400";
@@ -93,7 +86,7 @@ export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobile
 
   return (
     <>
-      {/* Overlay sombre (mobile) — clique dessus pour fermer le menu */}
+      {/* ── [EXISTANT] Overlay mobile : fond sombre derrière le menu sur mobile */}
       {mobileOpen && (
         <div
           className="fixed inset-0 bg-black/60 z-20 lg:hidden"
@@ -106,14 +99,14 @@ export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobile
           fixed top-0 left-0 h-full z-30 border-r flex flex-col
           transition-all duration-300 ease-in-out
           ${bg}
-          ${collapsed ? "w-[68px]" : "w-64"}
+          ${collapsed ? "w-17" : "w-64"}
           ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
       >
         {/* ── En-tête logo ── */}
-        <div className={`relative flex items-center border-b h-[57px] ${dark ? "border-white/5" : "border-slate-200"} ${collapsed ? "justify-center px-3" : "justify-between px-4"}`}>
+        <div className={`relative flex items-center border-b h-14.25 ${dark ? "border-white/5" : "border-slate-200"} ${collapsed ? "justify-center px-3" : "justify-between px-4"}`}>
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-9 h-9 flex-shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-sm font-bold shadow-lg shadow-blue-500/20 text-white">
+            <div className="w-9 h-9 shrink-0 rounded-xl bg-linear-to-br from-blue-500 to-blue-700 flex items-center justify-center text-sm font-bold shadow-lg shadow-blue-500/20 text-white">
               H
             </div>
             {!collapsed && (
@@ -124,9 +117,9 @@ export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobile
             )}
           </div>
 
-          {/* Bouton réduire (desktop) */}
+          {/* Bouton réduire/agrandir le sidebar (desktop seulement) */}
           {!collapsed ? (
-            <button onClick={() => handleCollapse(true)} className={`hidden lg:flex w-7 h-7 rounded-lg border items-center justify-center transition-all flex-shrink-0 ${toggleBtn}`} title="Réduire le menu">
+            <button onClick={() => handleCollapse(true)} className={`hidden lg:flex w-7 h-7 rounded-lg border items-center justify-center transition-all shrink-0 ${toggleBtn}`} title="Réduire le menu">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
               </svg>
@@ -140,36 +133,39 @@ export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobile
           )}
         </div>
 
-        {/* ── Navigation ── */}
+        {/* ── Navigation principale ── */}
         <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
+
           {navItems.map((item) => {
             const isActive = activeNav === item.label;
             return (
               <button
                 key={item.label}
+  
                 onClick={() => { setActiveNav(item.label); setMobileOpen(false); }}
-                title={collapsed ? item.label : undefined}
+                title={collapsed ? item.label : undefined} // tooltip si sidebar réduit
                 className={`
                   w-full flex items-center rounded-xl text-sm transition-all duration-200 text-left border
                   ${collapsed ? "justify-center px-0 py-3 gap-0" : "gap-3 px-3 py-2.5"}
                   ${isActive ? navActive : navInactive}
                 `}
               >
-                <span className="flex-shrink-0">{item.icon}</span>
+                <span className="shrink-0">{item.icon}</span>
+                {/* Le texte est masqué quand le sidebar est réduit */}
                 {!collapsed && <span className="leading-none truncate">{item.label}</span>}
               </button>
             );
           })}
         </nav>
 
-        {/* ── Footer utilisateur + Déconnexion ── */}
+        {/* ── Footer : infos utilisateur + bouton déconnexion ── */}
         <div className={`border-t ${dark ? "border-white/5" : "border-slate-200"} ${collapsed ? "p-2 flex flex-col items-center gap-2" : "p-3 space-y-2"}`}>
 
           {!collapsed ? (
             <>
-              {/* Infos utilisateur */}
+              {/* Carte utilisateur */}
               <div className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${userBg}`}>
-                <div className="w-7 h-7 flex-shrink-0 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs font-bold text-white">
+                <div className="w-7 h-7 shrink-0 rounded-full bg-linear-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs font-bold text-white">
                   A
                 </div>
                 <div className="flex-1 min-w-0">
@@ -178,8 +174,6 @@ export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobile
                 </div>
               </div>
 
-              {/* ── Bouton Déconnexion — stylisé ── */}
-              {/* onLogout vient de Dashboard → App → handleLogout */}
               <button
                 onClick={onLogout}
                 className={`
@@ -191,21 +185,22 @@ export default function Sidebar({ activeNav, setActiveNav, mobileOpen, setMobile
                   }
                 `}
               >
-                <span className="flex-shrink-0 transition-transform duration-200 group-hover:translate-x-0.5">
+                <span className="shrink-0 transition-transform duration-200 group-hover:translate-x-0.5">
                   <LogoutIcon />
                 </span>
                 <span>Se déconnecter</span>
               </button>
             </>
           ) : (
-            /* Mode réduit : avatar + bouton déco compacts */
+            /* Mode réduit : avatar compact + icône déconnexion */
             <>
               <div
-                className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs font-bold text-white cursor-default"
+                className="w-8 h-8 rounded-full bg-linear-to-br from-blue-400 to-blue-600 flex items-center justify-center text-xs font-bold text-white cursor-default"
                 title="Administrateur — CHU Anosiala"
               >
                 A
               </div>
+              {/* Même logique que le bouton ci-dessus, version icône seule */}
               <button
                 onClick={onLogout}
                 title="Se déconnecter"
