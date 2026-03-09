@@ -7,15 +7,15 @@ async function getDashboardStats() {
             COUNT(*) FILTER (WHERE fonction = 'Médecin traitant') AS total_medecin,
             COUNT(*) FILTER (WHERE fonction = 'Sage Femme') AS total_sage_femme,
             COUNT(*) FILTER (WHERE fonction NOT IN ('Médecin traitant', 'Sage Femme')) AS total_admin
-        FROM chu.medecin_traitant;
+        FROM chu.personnel;
     `;
 
     const distributionQuery = `
         SELECT
             s.code AS code_service,
-            COUNT(m.id) AS id_medecin
+            COUNT(p.id) AS id_medecin
         FROM ref.service s
-        LEFT JOIN chu.medecin_traitant m ON s.id = m.service_id
+        LEFT JOIN chu.personnel p ON s.id = p.service_id
         GROUP BY s.code;    
     `;
 

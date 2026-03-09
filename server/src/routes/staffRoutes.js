@@ -11,4 +11,7 @@ router.get('/departments', staffControllers.getDepartments);
 // liste des job titles pour le dropdown
 router.get('/fonctions',   staffControllers.getFonctions);
 
+// route pour la page profil d'un personnel
+router.get('/profile/:id', staffControllers.getStaffProfile)
+
 module.exports = router;

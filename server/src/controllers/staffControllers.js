@@ -1,3 +1,4 @@
+const { json } = require('express');
 const staffModels = require('../models/staffModels');
 
 // Paramètres acceptés dans l'URL (query string) :
@@ -69,8 +70,33 @@ async function getFonctions(req, res) {
     }
 }
 
+// ------------------------------------------------------------------
+// Prends tous les donnees pour le profil
+// ------------------------------------------------------------------
+async function getStaffProfile(req, res) {
+    const { id } = req.params;
+
+    try {
+        const profile = await staffModels.getStaffById(id)
+
+        if(!profile) {
+            return res.status(404).json({ message: 'Personnel introuvable' });
+        }
+
+        res.status(200).json({
+            message: 'Profil récupéré avec succès', 
+            data: profile
+        });
+    } catch (error) {
+        console.error('[getStaffPtofile] Erreur :', error);
+        res.status(500),json({ message: 'Erreur interne du serveur' });
+        
+    }
+}
+
 module.exports = {
     getStaff,
     getDepartments,
     getFonctions,
+    getStaffProfile,
 };

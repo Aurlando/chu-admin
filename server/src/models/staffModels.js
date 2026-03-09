@@ -39,20 +39,15 @@ async function getAllStaff({ search = '', department = '', fonction = '', page =
 
     const staffsQuery = `
         SELECT
-            m.nom,
-            m.prenoms,
-            m.im               AS matricule,
+            p.nom,
+            p.prenoms,
+            p.im               AS matricule,
             INITCAP(s.libelle) AS departement,
-            m.fonction         AS service
-            -- INITCAP() transforme "CHIRURGIE" → "Chirurgie" (capital case)
-            -- m.fonction est renommé "service" pour correspondre au mockup
-            -- AS renomme la colonne dans le résultat JSON renvoyé au front
-        FROM chu.medecin_traitant m
-        LEFT JOIN ref.service s ON s.id = m.service_id
-        -- LEFT JOIN : garde les médecins même si service_id ne correspond à rien
+            p.fonction         AS service
+        FROM chu.personnel p
+        LEFT JOIN ref.service s ON s.id = p.service_id
         ${whereClause}
-        ORDER BY m.nom ASC, m.prenoms ASC
-        -- Tri alphabétique stable pour que la pagination soit cohérente
+        ORDER BY p.nom ASC, p.prenoms ASC
         LIMIT  $${limitIdx}
         OFFSET $${offsetIdx}
     `;
@@ -61,8 +56,8 @@ async function getAllStaff({ search = '', department = '', fonction = '', page =
     const countParams = params.slice(0, params.length - 2); // retire les 2 derniers (limit, offset)
     const countQuery = `
         SELECT COUNT(*) AS total
-        FROM chu.medecin_traitant m
-        LEFT JOIN ref.service s ON s.id = m.service_id
+        FROM chu.personnel p
+        LEFT JOIN ref.service s ON s.id = p.service_id
         ${whereClause}
     `;
 
@@ -104,16 +99,49 @@ async function getDistinctDepartments() {
 // ------------------------------------------------------------------
 async function getDistinctFonctions() {
     const result = await pool.query(`
-        SELECT DISTINCT m.fonction AS job_title
-        FROM chu.medecin_traitant m
-        WHERE m.fonction IS NOT NULL
+        SELECT DISTINCT p.fonction AS job_title
+        FROM chu.personnel p
+        WHERE p.fonction IS NOT NULL
         ORDER BY job_title ASC
     `);
     return result.rows.map(r => r.job_title);
+}
+
+// ------------------------------------------------------------------
+//  page profil d'un personnel
+// ------------------------------------------------------------------
+async function getStaffById(id) {
+    const query = `
+        SELECT
+            p.nom,
+            p.prenoms,
+            p.im AS matricule,
+            TO_CHAR(p.date_naissance, 'DD/MM/YYYY') AS date_naissance,
+            CAST(DATE_PART('year', AGE(p.date_naissance)) AS INT) AS age,
+            p.diplome,
+            p.categorie, 
+            p.classe, 
+            p.echelon,
+            TO_CHAR(p.date_entree_admin, 'DD/MM/YYYY') AS date_entree_admin,
+            CAST(DATE_PART('year', AGE(CURRENT_DATE, p.date_entree_admin)) AS INT) AS annees_exercice,
+            p.specialite,
+            p.fonction AS service,
+            COALESCE(p.autres_diplomes, 'Aucun') AS autres_diplomes,
+            p.telephone,
+            p.email,
+            INITCAP(s.libelle) AS departement
+        FROM chu.personnel p
+        LEFT JOIN ref.service s ON s.id = p.service_id
+        WHERE p.id = $1
+    `;
+
+    const result = await pool.query(query, [id]);
+    return result.rows[0];
 }
 
 module.exports = {
     getAllStaff,
     getDistinctDepartments,
     getDistinctFonctions,
+    getStaffById,
 };
