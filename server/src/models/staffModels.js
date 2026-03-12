@@ -39,6 +39,7 @@ async function getAllStaff({ search = '', department = '', fonction = '', page =
 
     const staffsQuery = `
         SELECT
+            p.id,
             p.nom,
             p.prenoms,
             p.im               AS matricule,
@@ -113,6 +114,7 @@ async function getDistinctFonctions() {
 async function getStaffById(id) {
     const query = `
         SELECT
+            p.id,
             p.nom,
             p.prenoms,
             p.im AS matricule,
