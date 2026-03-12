@@ -13,9 +13,9 @@ async function getAllStaff({ search = '', department = '', fonction = '', page =
         params.push(`%${search}%`);              
         const idx = params.length;                    
         conditions.push(`(
-            m.nom     ILIKE $${idx} OR
-            m.prenoms ILIKE $${idx} OR
-            CAST(m.im AS TEXT) ILIKE $${idx}
+            p.nom     ILIKE $${idx} OR
+            p.prenoms ILIKE $${idx} OR
+            CAST(p.im AS TEXT) ILIKE $${idx}
         )`);
     }
 
@@ -26,7 +26,7 @@ async function getAllStaff({ search = '', department = '', fonction = '', page =
 
     if (fonction) {
         params.push(`%${fonction}%`);
-        conditions.push(`m.fonction ILIKE $${params.length}`);
+        conditions.push(`p.fonction ILIKE $${params.length}`);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -129,7 +129,9 @@ async function getStaffById(id) {
             COALESCE(p.autres_diplomes, 'Aucun') AS autres_diplomes,
             p.telephone,
             p.email,
-            INITCAP(s.libelle) AS departement
+            INITCAP(s.libelle) AS departement,
+            p.statut,
+            CONCAT('/uploads/', p.photo_profil) AS photo_profil
         FROM chu.personnel p
         LEFT JOIN ref.service s ON s.id = p.service_id
         WHERE p.id = $1

@@ -74,7 +74,11 @@ async function getFonctions(req, res) {
 // Prends tous les donnees pour le profil
 // ------------------------------------------------------------------
 async function getStaffProfile(req, res) {
-    const { id } = req.params;
+    const id = parseInt(req.params.id, 10);
+
+    if (isNaN(id) || id <= 0) {
+        return res.status(400).json({ message: 'ID invalide' });
+    }
 
     try {
         const profile = await staffModels.getStaffById(id)
@@ -89,7 +93,7 @@ async function getStaffProfile(req, res) {
         });
     } catch (error) {
         console.error('[getStaffPtofile] Erreur :', error);
-        res.status(500),json({ message: 'Erreur interne du serveur' });
+        res.status(500).json({ message: 'Erreur interne du serveur' });
         
     }
 }
