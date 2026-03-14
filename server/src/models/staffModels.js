@@ -118,22 +118,43 @@ async function getStaffById(id) {
             p.nom,
             p.prenoms,
             p.im AS matricule,
+            CONCAT('/uploads/', p.photo_profil) AS photo_profil,
+
             TO_CHAR(p.date_naissance, 'DD/MM/YYYY') AS date_naissance,
             CAST(DATE_PART('year', AGE(p.date_naissance)) AS INT) AS age,
-            p.diplome,
+            
             p.categorie, 
             p.classe, 
             p.echelon,
+
+            
             TO_CHAR(p.date_entree_admin, 'DD/MM/YYYY') AS date_entree_admin,
             CAST(DATE_PART('year', AGE(CURRENT_DATE, p.date_entree_admin)) AS INT) AS annees_exercice,
+            
             p.specialite,
             p.fonction AS service,
-            COALESCE(p.autres_diplomes, 'Aucun') AS autres_diplomes,
             p.telephone,
             p.email,
             INITCAP(s.libelle) AS departement,
             p.statut,
-            CONCAT('/uploads/', p.photo_profil) AS photo_profil
+            
+            COALESCE(
+                (
+                    SELECT JSON_AGG(
+                        JSON_BUILD_OBJECT(
+                            'id',              d.id,
+                            'libelle',         d.libelle,
+                            'etablissement',   d.etablissement,
+                            'annee_obtention', d.annee_obtention,
+                            'est_principal',   d.est_principal
+                        )
+                        ORDER BY d.est_principal DESC    
+                    )
+                    FROM ref.diplome d   
+                    WHERE p.id = d.id_personnel 
+                ), '[]'::json
+            ) AS diplomes
+
         FROM chu.personnel p
         LEFT JOIN ref.service s ON s.id = p.service_id
         WHERE p.id = $1
@@ -142,6 +163,12 @@ async function getStaffById(id) {
     const result = await pool.query(query, [id]);
     return result.rows[0];
 }
+/*  -- JSON_AGG() agrège plusieurs lignes en un tableau JSON
+    -- JSON_BUILD_OBJECT() construit un objet JSON clé/valeur
+    -- COALESCE(..., '[]'::json) : si le personnel n'a AUCUN diplôme,
+    JSON_AGG retourne NULL — on le remplace par un tableau JSON vide []
+    pour que le front reçoive toujours un tableau (jamais null)
+*/
 
 module.exports = {
     getAllStaff,
