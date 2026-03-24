@@ -170,9 +170,83 @@ async function getStaffById(id) {
     pour que le front reçoive toujours un tableau (jamais null)
 */
 
+// ------------------------------------------------------------------
+//  ajout de personnel
+// ------------------------------------------------------------------
+async function addPersonnel({
+    nom, prenoms, im, date_naissance,
+    categorie, classe, echelon,
+    specialite, telephone, email,
+    service_id, fonction_id, statut,
+    photo_profil,
+    diplomes = [],
+    donner_acces = false,
+    username, password_hash
+}) {
+    
+    const client = await pool.connect(); // reserver une connexion du pool permettant de faire plusieurs requetes dans la même transaction, avy eo BEGIN-COMMIT-ROLLBACK
+
+    try {
+        await client.query('BEGIN'); // debut de la transaction
+
+        const personnelResult = await client.query(
+            `INSERT INTO chu.personnel (
+                nom, prenoms, im, date_naissance, 
+                categorie, classe, echelon,
+                date_entree_admin,
+                specialite, telephone, email,
+                service_id, fonction_id, statut, photo_profil
+            ) 
+            VALUES (
+                $1, $2, $3, $4,
+                $5, $6, $7,
+                CURRENT_DATE,
+                $8, $9, $10,
+                $11, $12, $13, $14
+            )
+            RETURNING id, im`,
+            [
+                nom, prenoms, im, date_naissance,
+                categorie, classe, echelon,
+                specialite, telephone, email,
+                service_id, fonction_id, statut, photo_profil
+            ]
+        );
+
+        const { id: personnelId, im: personnelIm } = personnelResult.rows[0]; // prends id et im du RETURNING et on renomme avec personnelId et personnelIm
+
+        for(const diplome of diplomes) {
+            await client.query(
+                `INSERT INTO ref.diplome (
+                    libelle, etablissement, annee_obtention, est_principal, id_personnel
+                )
+                VALUES ($1, $2, $3, $4, $5)`,
+                [
+                    diplome.libelle,
+                    diplome.etablissement,
+                    diplome.annee_obtention,
+                    diplome.est_principal ?? false,
+                    personnelId
+                ]
+            );
+        };
+
+        await client.query('COMMIT'); // validation des transactions si aucune erreur
+        
+        return { personnelId, personnelIm }; 
+        
+    } catch (error) {
+        await client.query('ROLLBACK'); // annulation de toutes les requetes si une erreur survient
+        throw error; // relance l'erreur pour que le controller la gère
+    } finally {
+        client.release(); // toujours libérer la connexion, que la transaction réussisse ou échoue
+    }
+}
+
 module.exports = {
     getAllStaff,
     getDistinctDepartments,
     getDistinctFonctions,
     getStaffById,
+    addPersonnel,
 };

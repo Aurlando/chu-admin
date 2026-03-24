@@ -2,6 +2,38 @@ const express    = require('express');
 const router     = express.Router();  
 const staffControllers = require('../controllers/staffControllers');
 
+const multer = require('multer');
+const path = require('path');
+
+// Configuration du stockage pour multer
+const storage = multer.diskStorage({
+    destination: function(req, file, cb) {
+        cb(null, path.join(__dirname, '..', '..', 'uploads'))
+    },
+    filename: function(req, file, cb) {
+        const ext = path.extname(file.originalname).toLowerCase();
+        const tempName = `temp-${Date.now()}${ext}`;
+        cb(null, tempName);
+    }
+});
+
+// Filtre de type de fichier
+const fileFilter = function(req, file, cb) {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Seuls les formats JPEG, PNG et WEBP sont autorisés.'), false);
+    }
+};
+
+// Instance multer prete a l'emploi
+const upload = multer({
+    storage,
+    fileFilter,
+    limits: { fileSize: 10_000_000 } // limite de 10 Mo => 10 * 1024 * 1024 octets
+});
+
 // ?search=  &department=  &service=  &fonction=  &page=  &limit=
 router.get('/show-all',    staffControllers.getStaff);
 
@@ -13,5 +45,8 @@ router.get('/fonctions',   staffControllers.getFonctions);
 
 // route pour la page profil d'un personnel
 router.get('/profile/:id', staffControllers.getStaffProfile)
+
+// route ajouter personnel
+router.post('/add', upload.single('photo'), staffControllers.addStaff);
 
 module.exports = router;
