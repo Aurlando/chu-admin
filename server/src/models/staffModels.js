@@ -1,17 +1,22 @@
-const pool = require('../config/db');
+const pool = require("../config/db");
 
-async function getAllStaff({ search = '', department = '', fonction = '', page = 1, limit = 10 } = {}) {
-
+async function getAllStaff({
+    search = "",
+    department = "",
+    fonction = "",
+    page = 1,
+    limit = 10,
+} = {}) {
     // -- PARAMÈTRES DE PAGINATION ----------------------------------
-    const offset = (page - 1) * limit;    // ligne 1 de la page N = (N-1) * taille_page
+    const offset = (page - 1) * limit; // ligne 1 de la page N = (N-1) * taille_page
 
     // -- CONSTRUCTION DYNAMIQUE DE LA REQUÊTE ----------------------
-    const conditions = [];   // ["m.nom ILIKE $1", "s.libelle = $2"]
-    const params = [];       // ["%rakoto%", "Chirurgie"]
+    const conditions = []; // ["m.nom ILIKE $1", "s.libelle = $2"]
+    const params = []; // ["%rakoto%", "Chirurgie"]
 
     if (search) {
-        params.push(`%${search}%`);              
-        const idx = params.length;                    
+        params.push(`%${search}%`);
+        const idx = params.length;
         conditions.push(`(
             p.nom     ILIKE $${idx} OR
             p.prenoms ILIKE $${idx} OR
@@ -29,13 +34,14 @@ async function getAllStaff({ search = '', department = '', fonction = '', page =
         conditions.push(`p.fonction ILIKE $${params.length}`);
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const whereClause =
+        conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     // -- REQUÊTE PRINCIPALE (avec pagination) ----------------------
-    params.push(limit);                       // $N   → nb lignes à retourner
-    params.push(offset);                      // $N+1 → nb lignes à sauter
-    const limitIdx  = params.length - 1;      // index du $limit  dans params
-    const offsetIdx = params.length;          // index du $offset dans params
+    params.push(limit); // $N   → nb lignes à retourner
+    params.push(offset); // $N+1 → nb lignes à sauter
+    const limitIdx = params.length - 1; // index du $limit  dans params
+    const offsetIdx = params.length; // index du $offset dans params
 
     const staffsQuery = `
         SELECT
@@ -53,7 +59,7 @@ async function getAllStaff({ search = '', department = '', fonction = '', page =
         OFFSET $${offsetIdx}
     `;
 
-    // -- REQUÊTE DE COMPTAGE (pour calculer le total de pages) ------  
+    // -- REQUÊTE DE COMPTAGE (pour calculer le total de pages) ------
     const countParams = params.slice(0, params.length - 2); // retire les 2 derniers (limit, offset)
     const countQuery = `
         SELECT COUNT(*) AS total
@@ -66,20 +72,20 @@ async function getAllStaff({ search = '', department = '', fonction = '', page =
     // Promise.all([...]) lance les deux requêtes EN MÊME TEMPS
     const [staffResult, countResult] = await Promise.all([
         pool.query(staffsQuery, params),
-        pool.query(countQuery,  countParams)
+        pool.query(countQuery, countParams),
     ]);
 
-    const total      = parseInt(countResult.rows[0].total, 10); 
-    const totalPages = Math.ceil(total / limit);                
+    const total = parseInt(countResult.rows[0].total, 10);
+    const totalPages = Math.ceil(total / limit);
 
     return {
-        data:       staffResult.rows, 
+        data: staffResult.rows,
         pagination: {
-            total,         
-            page,           
-            limit,          
-            totalPages,     
-        }
+            total,
+            page,
+            limit,
+            totalPages,
+        },
     };
 }
 
@@ -92,7 +98,7 @@ async function getDistinctDepartments() {
         FROM ref.service s
         ORDER BY departement ASC
     `);
-    return result.rows.map(r => r.departement); // retourne un tableau de strings
+    return result.rows.map((r) => r.departement); // retourne un tableau de strings
 }
 
 // ------------------------------------------------------------------
@@ -105,7 +111,7 @@ async function getDistinctFonctions() {
         WHERE p.fonction IS NOT NULL
         ORDER BY job_title ASC
     `);
-    return result.rows.map(r => r.job_title);
+    return result.rows.map((r) => r.job_title);
 }
 
 // ------------------------------------------------------------------
@@ -174,20 +180,29 @@ async function getStaffById(id) {
 //  ajout de personnel
 // ------------------------------------------------------------------
 async function addPersonnel({
-    nom, prenoms, im, date_naissance,
-    categorie, classe, echelon,
-    specialite, telephone, email,
-    service_id, fonction_id, statut,
+    nom,
+    prenoms,
+    im,
+    date_naissance,
+    categorie,
+    classe,
+    echelon,
+    specialite,
+    telephone,
+    email,
+    service_id,
+    fonction_id,
+    statut,
     photo_profil,
     diplomes = [],
     donner_acces = false,
-    username, password_hash
+    username,
+    password_hash,
 }) {
-    
     const client = await pool.connect(); // reserver une connexion du pool permettant de faire plusieurs requetes dans la même transaction, avy eo BEGIN-COMMIT-ROLLBACK
 
     try {
-        await client.query('BEGIN'); // debut de la transaction
+        await client.query("BEGIN"); // debut de la transaction
 
         const personnelResult = await client.query(
             `INSERT INTO chu.personnel (
@@ -206,16 +221,33 @@ async function addPersonnel({
             )
             RETURNING id, im`,
             [
-                nom, prenoms, im, date_naissance,
-                categorie, classe, echelon,
-                specialite, telephone, email,
-                service_id, fonction_id, statut, photo_profil
-            ]
+                nom,
+                prenoms,
+                im,
+                date_naissance,
+                categorie,
+                classe,
+                echelon,
+                specialite,
+                telephone,
+                email,
+                service_id,
+                fonction_id,
+                statut,
+                photo_profil,
+            ],
         );
 
         const { id: personnelId, im: personnelIm } = personnelResult.rows[0]; // prends id et im du RETURNING et on renomme avec personnelId et personnelIm
 
-        for(const diplome of diplomes) {
+        for (const diplome of diplomes) {
+            // Respect des types et des champs optionnels pour éviter les erreurs SQL
+            const anneeObtention = Number.isFinite(
+                Number(diplome.annee_obtention),
+            )
+                ? Number(diplome.annee_obtention)
+                : null;
+
             await client.query(
                 `INSERT INTO ref.diplome (
                     libelle, etablissement, annee_obtention, est_principal, id_personnel
@@ -223,20 +255,19 @@ async function addPersonnel({
                 VALUES ($1, $2, $3, $4, $5)`,
                 [
                     diplome.libelle,
-                    diplome.etablissement,
-                    diplome.annee_obtention,
-                    diplome.est_principal ?? false,
-                    personnelId
-                ]
+                    diplome.etablissement || null,
+                    anneeObtention,
+                    Boolean(diplome.est_principal),
+                    personnelId,
+                ],
             );
-        };
+        }
 
-        await client.query('COMMIT'); // validation des transactions si aucune erreur
-        
-        return { personnelId, personnelIm }; 
-        
+        await client.query("COMMIT"); // validation des transactions si aucune erreur
+
+        return { personnelId, personnelIm };
     } catch (error) {
-        await client.query('ROLLBACK'); // annulation de toutes les requetes si une erreur survient
+        await client.query("ROLLBACK"); // annulation de toutes les requetes si une erreur survient
         throw error; // relance l'erreur pour que le controller la gère
     } finally {
         client.release(); // toujours libérer la connexion, que la transaction réussisse ou échoue
