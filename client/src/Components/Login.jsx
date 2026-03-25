@@ -37,7 +37,7 @@ export default function Login({ onLoginSuccess }) {
       } else {
         setError(data.message || "Identifiants incorrects.");
       }
-    } catch (err) {
+    } catch {
       setError("Impossible de joindre le serveur.");
     } finally {
       setLoading(false);
@@ -115,14 +115,7 @@ export default function Login({ onLoginSuccess }) {
           }`}
         >
           {/* Sélecteur de langue (décoratif) */}
-          <div className="flex justify-end mb-4">
-            <span className={`text-xs flex items-center gap-1 ${darkMode ? "text-gray-400" : "text-gray-400"}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-              </svg>
-              Français (FR) ▾
-            </span>
-          </div>
+        
 
           {/* Titre */}
           <h1 className={`text-2xl font-bold mb-1 ${darkMode ? "text-white" : "text-gray-800"}`} style={{ fontFamily: "'Georgia', serif" }}>

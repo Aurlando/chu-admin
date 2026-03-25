@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Sidebar from "./SideBar";
 import PersonnelDirectory from "./PersonnelDirectory";
+import AddPersonnel from "./AddPersonnel"; // [NOUVEAU] page d'ajout de personnel
 
 const API_URL = "http://localhost:3000/dashboard";
 
@@ -74,7 +75,9 @@ function BarChart({ data, dark }) {
 
 // ── Contenu de la page d'accueil Dashboard (stats + graphique + logs)
 // Extrait en sous-composant pour garder Dashboard() lisible
-function DashboardHome({ dark, T }) {
+// onNavigate : fonction reçue depuis Dashboard() pour changer de page
+//              → appelée par le bouton "Ajouter un personnel" du banner
+function DashboardHome({ dark, T, onNavigate }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
@@ -155,7 +158,9 @@ function DashboardHome({ dark, T }) {
                 <h3 className="text-lg font-bold text-white">Besoin d'agrandir l'équipe médicale ?</h3>
                 <p className="text-blue-200 text-sm mt-1">Intégrez facilement médecins, sages-femmes et personnel administratif dans le HIS.</p>
               </div>
-              <button className="shrink-0 bg-white text-blue-700 font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-blue-50 transition-all shadow-lg hover:shadow-blue-900/40 hover:-translate-y-0.5 flex items-center gap-2">
+              <button
+                onClick={() => onNavigate("Ajouter un personnel")}
+                className="shrink-0 bg-white text-blue-700 font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-blue-50 transition-all shadow-lg hover:shadow-blue-900/40 hover:-translate-y-0.5 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
                 Ajouter un personnel
               </button>
@@ -192,11 +197,16 @@ export default function Dashboard({ onLogout }) {
   const renderPage = () => {
     switch (activeNav) {
       case "Répertoire du personnel":
-        // Passe dark pour que PersonnelDirectory adapte son thème
-        return <PersonnelDirectory dark={dark} />;
+        // onNavigate permet au bouton "Ajouter un personnel" du répertoire
+        // de changer de page sans passer par le Sidebar
+        return <PersonnelDirectory dark={dark} onNavigate={setActiveNav} />;
+      case "Ajouter un personnel":
+        // onAnnuler : bouton Annuler dans le formulaire → retour au répertoire
+        return <AddPersonnel dark={dark} onAnnuler={() => setActiveNav("Répertoire du personnel")} />;
       case "Dashboard":
       default:
-        return <DashboardHome dark={dark} T={T} />;
+        // onNavigate passe setActiveNav à DashboardHome pour son bouton "Ajouter"
+        return <DashboardHome dark={dark} T={T} onNavigate={setActiveNav} />;
     }
   };
 

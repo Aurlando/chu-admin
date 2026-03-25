@@ -1,6 +1,29 @@
 import { useState, useEffect, useCallback } from "react";
 import StaffProfile from "./StaffProfile";
+import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
 
+// ════════════════════════════════════════════════════════════════════
+// PersonnelDirectory.jsx — Page "Répertoire du personnel"
+//
+// RÔLE : Affiche la liste du personnel (tableau + filtres + pagination)
+//        ET gère la navigation vers le profil détail d'un membre.
+//
+// NAVIGATION INTERNE AU COMPOSANT :
+//   - selectedMatricule === null  → affiche le tableau (vue liste)
+//   - selectedMatricule = "293780" → affiche <StaffProfile> (vue détail)
+//
+//   C'est le même pattern que Dashboard.jsx avec activeNav :
+//   un state contrôle quelle "sous-vue" est affichée.
+//
+// PROPS reçues depuis Dashboard.jsx :
+//   - dark : booléen thème sombre/clair
+//
+// ROUTES API utilisées :
+//   GET /staff/show-all?search=&department=&fonction=&page=&limit=
+//   GET /staff/departments
+//   GET /staff/fonctions
+//   GET /staff/profile/:id  ← utilisé par StaffProfile.jsx (id = p.id de la réponse JSON)
+// ════════════════════════════════════════════════════════════════════
 
 const API_BASE = "http://localhost:3000";
 const LIMIT    = 10;
@@ -54,25 +77,62 @@ function EditIcon() {
 // ════════════════════════════════════════════════════════════════════
 // Composant principal
 // ════════════════════════════════════════════════════════════════════
-export default function PersonnelDirectory({ dark }) {
+export default function PersonnelDirectory({ dark, onNavigate }) {
 
+  // selectedId : null = liste, valeur = vue profil détail
   const [selectedId, setSelectedId] = useState(null);
 
+  // [NOUVEAU] selectedIdUpdate : null = pas de modal ouvert
+  //           valeur = id du membre dont on veut modifier les infos
+  //           Le modal UpdateModal est monté PAR-DESSUS la liste (pas à la place)
+  const [selectedIdUpdate, setSelectedIdUpdate] = useState(null);
+
+  // Vue profil — remplace toute la page
   if (selectedId !== null) {
     return (
       <StaffProfile
         id={selectedId}
         dark={dark}
-        onBack={() => setSelectedId(null)} // retour à la liste
+        onBack={() => setSelectedId(null)}
       />
     );
   }
 
-  // ── Si selectedId === null, on affiche normalement le tableau
-  return <PersonnelList dark={dark} onSelectId={setSelectedId} />;
+  // Vue liste — avec le modal superposé si selectedIdUpdate != null
+  return (
+    <>
+      {/* [NOUVEAU] Modal de mise à jour
+          Monté par-dessus la liste (position:fixed dans UpdateModal)
+          onClose → ferme le modal sans rien changer
+          onSaved → ferme le modal (la liste se rafraîchit via fetchPersonnel) */}
+      {selectedIdUpdate !== null && (
+        <UpdateModal
+          id={selectedIdUpdate}
+          dark={dark}
+          onClose={() => setSelectedIdUpdate(null)}
+          onSaved={() => setSelectedIdUpdate(null)}
+        />
+      )}
+      <PersonnelList
+        dark={dark}
+        onSelectId={setSelectedId}
+        onSelectIdUpdate={setSelectedIdUpdate}
+        onNavigate={onNavigate}
+      />
+    </>
+  );
 }
 
-function PersonnelList({ dark, onSelectId }) {
+// ════════════════════════════════════════════════════════════════════
+// Sous-composant : tableau de la liste du personnel
+//
+// PROPS :
+//   - dark           : thème sombre/clair
+//   - onSelectId     : clic "Voir" → affiche StaffProfile
+//   - onSelectIdUpdate : clic "Mis à jour" → ouvre UpdateModal
+//   - onNavigate     : clic "Ajouter" → change de page dans Dashboard
+// ════════════════════════════════════════════════════════════════════
+function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
 
   // ── États des données
   const [personnel,  setPersonnel]  = useState([]);
@@ -92,6 +152,8 @@ function PersonnelList({ dark, onSelectId }) {
 
   const token = localStorage.getItem("token"); // voir App.jsx ligne 28
 
+  // ── fetchPersonnel : useCallback pour éviter la boucle infinie dans useEffect
+  // Se recréé uniquement quand search/filterDept/filterFonc/page changent
   const fetchPersonnel = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -148,7 +210,7 @@ function PersonnelList({ dark, onSelectId }) {
     input:      dark ? "bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-500/50" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-blue-400",
     select:     dark ? "bg-white/5 border-white/10 text-slate-300 focus:border-blue-500/50" : "bg-white border-slate-200 text-slate-700 focus:border-blue-400",
     thHead:     dark ? "text-slate-500 border-white/8 bg-white/3" : "text-slate-400 border-slate-200 bg-slate-50",
-    trHover:    dark ? "hover:bg-white/3 border-white/5 cursor-pointer" : "hover:bg-slate-50/80 border-slate-100 cursor-pointer",
+    trHover:    dark ? "hover:bg-white/3 border-white/5 " : "hover:bg-slate-50/80 border-slate-100",
     tdText:     dark ? "text-slate-200"          : "text-slate-700",
     tdSub:      dark ? "text-slate-500"          : "text-slate-400",
     pagBtn:     dark ? "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50",
@@ -187,7 +249,9 @@ function PersonnelList({ dark, onSelectId }) {
             {pagination.total > 0 && <span className="ml-2 font-medium">{pagination.total} membres</span>}
           </p>
         </div>
-        <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-600/20 hover:-translate-y-0.5 shrink-0">
+        <button
+          onClick={() => onNavigate?.("Ajouter un personnel")}
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-600/20 hover:-translate-y-0.5 shrink-0">
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
           </svg>
@@ -200,7 +264,7 @@ function PersonnelList({ dark, onSelectId }) {
         <div className="flex flex-wrap gap-3 items-center">
 
           {/* Barre de recherche → ?search= → cherche nom, prenoms, matricule */}
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-50">
             <svg className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${T.iconColor}`}
               fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -269,11 +333,11 @@ function PersonnelList({ dark, onSelectId }) {
             <thead>
               <tr className={`border-b text-left text-[11px] font-bold uppercase tracking-wider ${T.thHead}`}>
                 <th className="px-5 py-3.5">Nom</th>
-                <th className="px-5 py-3.5">Matricule</th>
+                <th className="px-5 py-3.5">Imatricule</th>
                 <th className="px-5 py-3.5 hidden md:table-cell">Département</th>
                 <th className="px-5 py-3.5 hidden lg:table-cell">Service</th>
                 <th className="px-5 py-3.5">Statut</th>
-                <th className="px-5 py-3.5 text-right">Actions</th>
+                <th className="px-5 py-3.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -295,7 +359,7 @@ function PersonnelList({ dark, onSelectId }) {
                     {/* Nom + avatar */}
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${AVATAR_COLORS[i % AVATAR_COLORS.length]} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
+                        <div className={`w-8 h-8 rounded-full bg-linear-to-br ${AVATAR_COLORS[i % AVATAR_COLORS.length]} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
                           {getInitiales(p.nom, p.prenoms)}
                         </div>
                         <div className={`font-semibold leading-tight ${T.tdText}`}>
@@ -328,6 +392,11 @@ function PersonnelList({ dark, onSelectId }) {
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-end gap-2">
 
+                        {/* Bouton "Voir" — fonctionnel
+                            onClick → onSelectId(p.id)
+                            → setSelectedId(p.id) dans le parent
+                            → PersonnelDirectory affiche <StaffProfile>
+                            → StaffProfile appelle GET /staff/profile/:id */}
                         <button
                           onClick={(e) => {
                             e.stopPropagation(); // évite de propager le clic à la <tr>
@@ -337,13 +406,21 @@ function PersonnelList({ dark, onSelectId }) {
                           title="Voir le profil"
                         >
                           <EyeIcon />
-                          <span className="hidden sm:inline">Voir</span>
+                          <span className="hidden sm:inline cursor-pointer">Voir</span>
                         </button>
 
-                        {/* Bouton "Modifier" — non fonctionnel, prévu pour la suite */}
-                        <button className={T.actionEdit} title="Mettre à jour">
+                        {/* Bouton "Mis à jour" — ouvre UpdateModal avec l'id du membre */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectIdUpdate(p.id);
+                          }}
+                          className={T.actionEdit}
+                          title="Mettre à jour"
+                        >
                           <EditIcon />
-                          <span className="hidden sm:inline">Modifier</span>
+                          <span className="hidden sm:inline cursor-pointer w-full">Mis à jour</span>
+                          
                         </button>
                       </div>
                     </td>
