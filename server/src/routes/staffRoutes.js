@@ -49,4 +49,7 @@ router.get('/profile/:id', staffControllers.getStaffProfile)
 // route ajouter personnel
 router.post('/add', upload.single('photo'), staffControllers.addStaff);
 
+// route update personnel
+router.patch('/update/:id', upload.single('photo'), staffControllers.updateStaff);
+
 module.exports = router;

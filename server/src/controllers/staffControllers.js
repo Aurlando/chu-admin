@@ -2,11 +2,13 @@ const path = require("path");
 const fs = require("fs");
 const bcrypt = require("bcrypt");
 const staffModels = require("../models/staffModels");
+const validators = require("../validators/staffValidators");
+const console = require("console");
 
 // Paramètres acceptés dans l'URL (query string) :
 //   ?search=dupont&department=Chirurgie&page=2&limit=10
 //   GET /staff/show-all?search=sarah&department=Cardiology&fonction=Medecin&page=1&limit=10
-// ------------------------------------------------------------------
+// ── LISTE ─────────────────────────────────────────────────────────
 async function getStaff(req, res) {
     try {
         const search = req.query.search || ""; // || '' = valeur par défaut si absent
@@ -45,8 +47,10 @@ async function getStaff(req, res) {
     }
 }
 
+// ── DROPDOWNS ─────────────────────────────────────────────────────
+
 // ------------------------------------------------------------------
-// Renvoie la liste des départements uniques pour le dropdown front
+//   Departements
 // ------------------------------------------------------------------
 async function getDepartments(req, res) {
     try {
@@ -59,7 +63,7 @@ async function getDepartments(req, res) {
 }
 
 // ------------------------------------------------------------------
-// Renvoie la liste des fonctions/job titles uniques pour le dropdown
+//   Fonctions
 // ------------------------------------------------------------------
 async function getFonctions(req, res) {
     try {
@@ -71,9 +75,7 @@ async function getFonctions(req, res) {
     }
 }
 
-// ------------------------------------------------------------------
-// Prends tous les donnees pour le profil
-// ------------------------------------------------------------------
+// ── PROFIL ────────────────────────────────────────────────────────
 async function getStaffProfile(req, res) {
     const id = parseInt(req.params.id, 10);
 
@@ -98,11 +100,16 @@ async function getStaffProfile(req, res) {
     }
 }
 
-// ------------------------------------------------------------------
-// Creer un nouveau personnel
-// ------------------------------------------------------------------
+// ── AJOUT ─────────────────────────────────────────────────────────
 async function addStaff(req, res) {
-    // 1-- Validation des champs obligatoires (Tous arrivent en string, conversion a faire si besoin)
+    const cheminFichier = req.file?.path; // raccourci pour nettoyage en cas d'erreur
+
+    // Helper pour repondre avec erreur 400 et supprimer le fichier, eviter repetition du verification
+    const erreur400 = (message) => {
+        validators.supprimerFichierSiExiste(cheminFichier);
+        return res.status(400).json({ message });
+    }
+    // ── 1. Champs obligatoires ────────────────────────────────────
     const {
         nom,
         prenoms,
@@ -132,6 +139,7 @@ async function addStaff(req, res) {
         categorie,
         classe,
         echelon,
+        telephone,
         service_id,
         fonction_id,
         statut,
@@ -150,115 +158,262 @@ async function addStaff(req, res) {
         });
     }
 
-    // 2-- Validation acces SIH (conversion du string "true"/"false" en boolean)
+    // ── 2. Validations métier ─────────────────────────────────────
+    const erreurIM = validators.validerIM(im);
+    if(erreurIM) return erreur400(erreurIM);
+
+    const erreurAge = validators.validerAge(date_naissance);
+    if(erreurAge) return erreur400(erreurAge);
+
+    const erreurTel = validators.validerTelephone(telephone);
+    if(erreurTel) return erreur400(erreurTel);
+
+    const erreurEmail = validators.validerEmail(email);
+    if(erreurEmail) return erreur400(erreurEmail);
+
+    // ── 3. Accès SIH ──────────────────────────────────────────────
     const accesBoolean = donner_access === "true";
-    if (accesBoolean) {
-        if (!username || !password) {
-            if (req.file) fs.unlinkSync(req.file.path);
-            return res.status(400).json({
-                message:
-                    "username et password sont requis pour donner accès au SIH.",
-            });
-        }
+    const erreurSIH = validators.validerAccesSIH({
+        donner_acces: accesBoolean, username, password,
+        aDejaUnCompte: false
+    })
+    if(erreurSIH) return erreur400(erreurSIH);
+
+    // ── 4. Diplômes ───────────────────────────────────────────────
+    const { erreur: erreurDiplomes, diplomes } = validators.normaliserDiplomes(diplomesRaw);
+    if(erreurDiplomes) return erreur400(erreurDiplomes);
+
+    // ── 5. IM normalisé + unicité BDD ─────────────────────────────
+    const imNormalise = validators.formatIM(im);
+
+    const erreurUnicite = await validators.verifierUniciteBDD({
+        im: imNormalise,
+        telephone: telephone?.trim(),
+        email: email?.trim() || null,
+    });
+    if(erreurUnicite) {
+        validators.supprimerFichierSiExiste(cheminFichier);
+        return res.status(409).json({ message: erreurUnicite });
     }
 
-    // 3-- Transformation des diplomes (JSON string → tableau d'objets)
-    let diplomes = [];
-    if (diplomesRaw) {
-        try {
-            const parsed = JSON.parse(diplomesRaw);
-            if (!Array.isArray(parsed)) throw new Error(); // doit être un tableau
-
-            diplomes = parsed
-                .map((d) => ({
-                    libelle: d?.libelle?.toString().trim() || "",
-                    etablissement: d?.etablissement?.toString().trim() || null,
-                    annee_obtention: d?.annee_obtention
-                        ? Number(d.annee_obtention)
-                        : null,
-                    est_principal: Boolean(d?.est_principal),
-                }))
-                .filter((d) => d.libelle !== "");
-        } catch (parseError) {
-            if (req.file) fs.unlinkSync(req.file.path);
-            return res.status(400).json({
-                message: "Format des diplomes invalide.",
-            });
-        }
-    }
-
-    // 4-- Hachage du mot de passe
+    // ── 6. Hachage mot de passe ───────────────────────────────────
     let password_hash = null;
-    if (accesBoolean) {
+    if(accesBoolean) {
         password_hash = await bcrypt.hash(password, 10);
     }
 
-    // 5-- Nommer photo de profil uploaded
-    const photoTemp = req.file ? req.file.filename : null; // nom temporaire si photo uploaded
-    const photoDefaut = "default-avatar.png"; // photo par defaut si pas d'upload
-
+    // ── 7. Insertion BDD ──────────────────────────────────────────
     try {
-        // 6-- Insertion dans le BDD
         const { personnelId, personnelIm } = await staffModels.addPersonnel({
             nom: nom.trim().toUpperCase(),
-            prenoms: prenoms.trim(),
-            im: parseInt(im.trim().replace(/\s+/g, ""), 10),
+            prenoms: prenoms.trim().split(" ").map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" "),
+            im: imNormalise,
             date_naissance,
-            categorie,
-            classe,
-            echelon,
-            specialite: specialite || null,
-            telephone: telephone || null,
-            email: email || null,
+            categorie, classe, echelon,
+            specialite: specialite?.trim() || null,
+            telephone: telephone.trim(),
+            email: email?.trim() || null,
             service_id: parseInt(service_id, 10),
             fonction_id: parseInt(fonction_id, 10),
             statut,
-            photo_profil: req.file ? `photo-profil-${im}.png` : photoDefaut,
+            photo_profil: req.file ? `photo-profil-${imNormalise.replace(" ", "")}.png` : "default-avatar.png",
             diplomes,
             donner_acces: accesBoolean,
             username: accesBoolean ? username.trim() : null,
-            password_hash: accesBoolean ? password_hash : null,
+            password_hash,
         });
 
-        // 7-- Renommer le fichier photo
-        if (req.file) {
-            const dossierPhotos = path.join(__dirname, "..", "..", "uploads");
-            const ancienChemin = path.join(dossierPhotos, req.file.filename);
-            const nouveauNom = `photo-profil-${personnelIm}.png`;
-            const nouveauChemin = path.join(dossierPhotos, nouveauNom);
-
+        // ── 8. Renommer le fichier photo ──────────────────────────
+        if(req.file) {
+            const dossier = path.join(__dirname, "..", "..", "uploads");
+            const ancienChemin = path.join(dossier, req.file.filename);
+            const nouveauNom = `photo-profil-${personnelIm.toString().replace(" ", "")}.png`;
+            const nouveauChemin = path.join(dossier, nouveauNom);
             fs.renameSync(ancienChemin, nouveauChemin);
         }
 
         res.status(201).json({
-            message: "personnel ajouté avec succès",
+            message: "Personnel ajouté avec succès",
             personnelId,
-            matricule: personnelIm,
+            matricule: personnelIm
         });
     } catch (error) {
-        if (req.file) {
-            try {
-                fs.unlinkSync(req.file.path);
-            } catch {}
-        }
+        validators.supprimerFichierSiExiste(cheminFichier);
         console.error("[addStaff] Erreur :", error);
+        if(error.code === "23505") return res.status(409).json({ message: "Ce matricule ou username existe déjà." });
+        if(error.code === "22P02" || error.code === "23502") return res.status(400).json({ message: "Données invalides, veuillez vérifier les champs saisis." });
+        res.status(500).json({ message: "Erreur interne du serveur" });
+    }
+}
 
-        if (error.code === "23505") {
-            return res.status(409).json({
-                message: "Ce matricule ou username existe déjà.",
-            });
-        }
+// PATCH /staff/update/:id
+// ── UPDATE ─────────────────────────────────────────────────────────
+async function updateStaff(req, res) {
+    const id = parseInt(req.params.id, 10);
 
-        if (error.code === "22P02" || error.code === "23502") {
-            return res.status(400).json({
-                message:
-                    "Données invalides, veuillez vérifier les champs saisis.",
-            });
-        }
 
-        res.status(500).json({
-            message: "Erreur interne du serveur",
+    // ── 1. Valider l'id ───────────────────────────────────────────
+    if(isNaN(id) || id <= 0) {
+        validators.supprimerFichierSiExiste(req.file?.path);
+        return res.status(400).json({ message: "ID invalide" });
+    }
+
+    // ── 2. Vérifier que le personnel existe ───────────────────────
+    let existant;
+    try {
+        existant = await staffModels.getStaffById(id);
+    } catch (error) {
+        validators.supprimerFichierSiExiste(req.file?.path);
+        console.error("[updateStaff] Erreur récupération profil :", error);
+        return res.status(500).json({ message: "Erreur interne du serveur" });
+    }
+
+    if(!existant) {
+        validators.supprimerFichierSiExiste(req.file?.path);
+        return res.status(404).json({ message: "Personnel introuvable" });
+    }
+
+    // Helper : lit req.body et retourne undifined si le champ est absent/vide
+    const body = req.body;
+    const ouString = (valeur) => (valeur !== undefined && valeur.trim?.() !== "" ? valeur.trim() : undefined);
+    const ouInt = (valeur) => {
+        const num = parseInt(valeur, 10);
+        return isNaN(num) ? undefined : num;
+    };
+
+    // ── 3. Extraire les champs présents dans le body ──────────────
+    const nom = ouString(body.nom);
+    const prenoms = ouString(body.prenoms);
+    const date_naissance = ouString(body.date_naissance);
+    const categorie = ouString(body.categorie);
+    const classe = ouString(body.classe);
+    const echelon = ouString(body.echelon);
+    const specialite = ouString(body.specialite);
+    const telephone = ouString(body.telephone);
+    const email = ouString(body.email);
+    const service_id = ouInt(body.service_id);
+    const fonction_id = ouInt(body.fonction_id);
+    const statut = ouString(body.statut);
+    
+    //Helper update : reutilise erreur400 avec nettoyage fichier
+    const erreur400 = (message) => {
+        validators.supprimerFichierSiExiste(req.file?.path);
+        return res.status(400).json({ message });
+    };
+
+    // ── 4. Validations — seulement pour les champs présents ───────
+    // Si un champ est undefined (non envoyé), on ne le valide pas car il ne sera pas modifié de toute façon
+    if(date_naissance !== undefined) {
+        const erreurAge = validators.validerAge(date_naissance);
+        if(erreurAge) return erreur400(erreurAge);
+    }
+
+    if(telephone !== undefined) {
+        const erreurTel = validators.validerTelephone(telephone);
+        if(erreurTel) return erreur400(erreurTel);
+    }
+
+    if(email !== undefined) {
+        const erreurEmail = validators.validerEmail(email);
+        if(erreurEmail) return erreur400(erreurEmail);
+    }
+
+    // ── 5. Unicité BDD — en excluant le personnel actuel ─────────
+    // On ne vérifie que les champs qui ont effectivement changé
+    const champsUnicite = {};
+    if(telephone !== undefined) champsUnicite.telephone = telephone;
+    if(email !== undefined) champsUnicite.email = email;
+
+    if(Object.keys(champsUnicite).length > 0) {
+        const erreurUnicite = await validators.verifierUniciteBDD({
+            ...champsUnicite,
+            excludedId: id,
         });
+        
+        if(erreurUnicite) {
+            validators.supprimerFichierSiExiste(req.file?.path);
+            return res.status(409).json({ message: erreurUnicite });
+        }
+    }
+
+    // ── 6. Diplômes ───────────────────────────────────────────────
+    const { erreur: erreurDiplomes, diplomes } = validators.normaliserDiplomes(body.diplomes);
+    if(erreurDiplomes) return erreur400(erreurDiplomes);
+
+    // ── 7. Photo de profil ────────────────────────────────────────
+    const matricule = existant.matricule;
+    
+    const anciennePhoto = existant.photo_profil ? existant.photo_profil.replace("/uploads/", "") : null;
+    let photo_profil = undefined; // si pas de changement
+
+    if(req.file) {
+        const nomFinal     = `photo-profil-${matricule.toString().replace(" ", "")}.png`;
+        const dossier      = path.join(__dirname, "..", "..", "uploads");
+        const ancienChemin = path.join(dossier, req.file.filename);
+        const nouveauChemin = path.join(dossier, nomFinal);
+
+        try {
+            fs.renameSync(ancienChemin, nouveauChemin);
+            photo_profil = nomFinal
+        } catch (error) {
+            validators.supprimerFichierSiExiste(req.file.path);
+            console.error("[updateStaff] Erreur renommage photo :", error)
+            return res.status(500).json({ message: "Erreur lors du traitement de la photo" });
+        }
+    }
+
+    // ── 8. Accès SIH ──────────────────────────────────────────────
+    const donner_acces = body.donner_access === "true";
+    const aDejaUnCompte = Boolean(existant.a_acces_sih);
+
+    let password_hash = undefined;
+
+    if(donner_acces) {
+        const erreurSIH = validators.validerAccesSIH({
+            donner_acces: true,
+            username: body.username,
+            password: body.password,
+            aDejaUnCompte,
+        });
+
+        if(body.password) {
+            password_hash = await bcrypt.hash(body.password, 10);
+        }
+    }
+
+    // ── 9. Transaction BDD ────────────────────────────────────────
+    try {
+        await staffModels.updatePersonnel({
+            id,
+            nom:          nom ? nom.toUpperCase() : undefined,
+            prenoms:      prenoms ? prenoms.split(" ").map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ") : undefined,
+            date_naissance,
+            categorie,
+            classe,
+            echelon,
+            specialite,
+            telephone,
+            email,
+            service_id,
+            fonction_id,
+            statut,
+            photo_profil,
+            anciennePhoto, 
+            diplomes,
+            donner_acces: donner_acces || undefined,
+            username:     donner_acces ? body.username?.trim() : undefined,
+            password_hash,
+        });
+
+        res.status(200).json({ message: "Personnel mis à jour avec succès" });
+    } catch (error) {
+        if(req.file && photo_profil) {
+            validators.supprimerFichierSiExiste(path.join(__dirname, "..", "..", "uploads", photo_profil));
+        }
+        console.error("[updateStaff] Erreur :", error);
+        if (error.code === "23505") return res.status(409).json({ message: "Ce username existe déjà." });
+        if (error.code === "22P02" || error.code === "23502") return res.status(400).json({ message: "Données invalides." });
+        res.status(500).json({ message: "Erreur interne du serveur" });
     }
 }
 
@@ -268,4 +423,5 @@ module.exports = {
     getFonctions,
     getStaffProfile,
     addStaff,
+    updateStaff,
 };

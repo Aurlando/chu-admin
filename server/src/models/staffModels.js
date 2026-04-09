@@ -1,5 +1,6 @@
 const pool = require("../config/db");
 
+// ── LISTE DU STAFF ────────────────────────────────────────────────
 async function getAllStaff({
     search = "",
     department = "",
@@ -30,8 +31,8 @@ async function getAllStaff({
     }
 
     if (fonction) {
-        params.push(`%${fonction}%`);
-        conditions.push(`p.fonction ILIKE $${params.length}`);
+        params.push(fonction);
+        conditions.push(`LOWER(f.libelle) = LOWER($${params.length})`);
     }
 
     const whereClause =
@@ -50,9 +51,10 @@ async function getAllStaff({
             p.prenoms,
             p.im               AS matricule,
             INITCAP(s.libelle) AS departement,
-            p.fonction         AS service
+            INITCAP(f.libelle) AS service
         FROM chu.personnel p
         LEFT JOIN ref.service s ON s.id = p.service_id
+        LEFT JOIN ref.fonction f ON f.id = p.fonction_id
         ${whereClause}
         ORDER BY p.nom ASC, p.prenoms ASC
         LIMIT  $${limitIdx}
@@ -65,6 +67,7 @@ async function getAllStaff({
         SELECT COUNT(*) AS total
         FROM chu.personnel p
         LEFT JOIN ref.service s ON s.id = p.service_id
+        LEFT JOIN ref.fonction f ON f.id = p.fonction_id
         ${whereClause}
     `;
 
@@ -89,34 +92,28 @@ async function getAllStaff({
     };
 }
 
-// ------------------------------------------------------------------
-//  pour alimenter le dropdown "Department"
-// ------------------------------------------------------------------
+// ── DROPDOWNS ─────────────────────────────────────────────────────
+// Dropdown Department
 async function getDistinctDepartments() {
     const result = await pool.query(`
-        SELECT DISTINCT INITCAP(s.libelle) AS departement
-        FROM ref.service s
-        ORDER BY departement ASC
+        SELECT id, INITCAP(libelle) AS libelle
+        FROM ref.service
+        ORDER BY libelle ASC
     `);
-    return result.rows.map((r) => r.departement); // retourne un tableau de strings
+    return result.rows;
 }
 
-// ------------------------------------------------------------------
-//  pour alimenter le dropdown "Service" du mockup
-// ------------------------------------------------------------------
+// Dropdown Fonction
 async function getDistinctFonctions() {
     const result = await pool.query(`
-        SELECT DISTINCT p.fonction AS job_title
-        FROM chu.personnel p
-        WHERE p.fonction IS NOT NULL
-        ORDER BY job_title ASC
+        SELECT id, INITCAP(libelle) AS libelle
+        FROM ref.fonction
+        ORDER BY libelle ASC
     `);
-    return result.rows.map((r) => r.job_title);
+    return result.rows;
 }
 
-// ------------------------------------------------------------------
-//  page profil d'un personnel
-// ------------------------------------------------------------------
+// ── PROFIL ────────────────────────────────────────────────────────
 async function getStaffById(id) {
     const query = `
         SELECT
@@ -138,7 +135,7 @@ async function getStaffById(id) {
             CAST(DATE_PART('year', AGE(CURRENT_DATE, p.date_entree_admin)) AS INT) AS annees_exercice,
             
             p.specialite,
-            p.fonction AS service,
+            INITCAP(f.libelle) AS service,
             p.telephone,
             p.email,
             INITCAP(s.libelle) AS departement,
@@ -163,6 +160,7 @@ async function getStaffById(id) {
 
         FROM chu.personnel p
         LEFT JOIN ref.service s ON s.id = p.service_id
+        LEFT JOIN ref.fonction f ON f.id = p.fonction_id
         WHERE p.id = $1
     `;
 
@@ -176,9 +174,7 @@ async function getStaffById(id) {
     pour que le front reçoive toujours un tableau (jamais null)
 */
 
-// ------------------------------------------------------------------
-//  ajout de personnel
-// ------------------------------------------------------------------
+// ── AJOUT ─────────────────────────────────────────────────────────
 async function addPersonnel({
     nom,
     prenoms,
@@ -244,9 +240,7 @@ async function addPersonnel({
             // Respect des types et des champs optionnels pour éviter les erreurs SQL
             const anneeObtention = Number.isFinite(
                 Number(diplome.annee_obtention),
-            )
-                ? Number(diplome.annee_obtention)
-                : null;
+            ) ? Number(diplome.annee_obtention) : null;
 
             await client.query(
                 `INSERT INTO ref.diplome (
@@ -263,6 +257,16 @@ async function addPersonnel({
             );
         }
 
+        // MBOLA MILA JERENA LE ROLE io
+        if (donner_acces) {
+            await client.query(
+                `INSERT INTO ref.auth_user (username, password_hash, role, id_personnel)
+                 VALUES ($1, $2, 'user', $3)`,
+                [username, password_hash, personnelId],
+            );
+        }
+
+
         await client.query("COMMIT"); // validation des transactions si aucune erreur
 
         return { personnelId, personnelIm };
@@ -274,10 +278,134 @@ async function addPersonnel({
     }
 }
 
+// ── UPDATE ────────────────────────────────────────────────────────
+async function updatePersonnel({
+    id,
+    nom, prenoms, date_naissance,
+    categorie, classe, echelon,
+    specialite, telephone, email,
+    service_id, fonction_id, statut,
+    photo_profil,
+    anciennePhoto,
+    diplomes = [],
+    donner_acces,
+    username, password_hash,
+}) {
+    const client = await pool.connect();
+    const fs   = require("fs");
+    const path = require("path");
+
+    try {
+        await client.query("BEGIN");
+
+        // ── SET dynamique pour chu.personnel ──────────────────────
+        const setClauses = [];
+        const setParams  = [];
+
+        // Helper pour construire les clauses SET de manière dynamique
+        const ajouter = (colonne, valeur) => {
+            if (valeur !== undefined) {
+                setParams.push(valeur);
+                setClauses.push(`${colonne} = $${setParams.length}`);
+            }
+        };
+
+        ajouter("nom", nom);
+        ajouter("prenoms", prenoms);
+        ajouter("date_naissance", date_naissance);
+        ajouter("categorie", categorie);
+        ajouter("classe", classe);
+        ajouter("echelon", echelon);
+        ajouter("specialite", specialite);
+        ajouter("telephone", telephone);
+        ajouter("email", email);
+        ajouter("service_id", service_id);
+        ajouter("fonction_id", fonction_id);
+        ajouter("statut", statut);
+        ajouter("photo_profil", photo_profil);
+
+        if (setClauses.length > 0) {
+            setParams.push(id); // WHERE id = $N (dernier paramètre)
+            await client.query(
+                `UPDATE chu.personnel SET ${setClauses.join(", ")} WHERE id = $${setParams.length}`,
+                setParams,
+            );
+        }
+
+        // ── Diplômes : INSERT ou UPDATE ───────────────────────────
+        for(const diplome of diplomes) {
+            const anneeObtention = Number.isFinite(Number(diplome.annee_obtention)) ? Number(diplome.annee_obtention) :null;
+            const libelle = diplome.libelle?.toString().trim() || "";
+            const etablissement = diplome.etablissement?.toString().trim() || null;
+            const estPrincipal = Boolean(diplome.est_principal);
+
+            if(!libelle) continue;
+
+            if(diplome.id) {
+                await client.query(
+                    `UPDATE ref.diplome
+                     SET libelle = $1, etablissement = $2,
+                         annee_obtention = $3, est_principal = $4
+                     WHERE id = $5 AND id_personnel = $6`,
+                    [libelle, etablissement, anneeObtention, estPrincipal, diplome.id, id],
+                );
+            } else {
+                await client.query(
+                    `INSERT INTO ref.diplome (libelle, etablissement, annee_obtention, est_principal, id_personnel)
+                     VALUES ($1, $2, $3, $4, $5)`,
+                    [libelle, etablissement, anneeObtention, estPrincipal, id],
+                );
+            }
+        }
+
+        // ── Accès SIH : upsert ────────────────────────────────────
+        if(donner_acces && username) {
+            if (password_hash !== undefined) {
+                await client.query(
+                    `INSERT INTO ref.auth_user (username, password_hash, role, id_personnel)
+                     VALUES ($1, $2, 'user', $3)
+                     ON CONFLICT (id_personnel) DO UPDATE SET
+                         username      = EXCLUDED.username,
+                         password_hash = EXCLUDED.password_hash`,
+                    [username, password_hash, id],
+                );
+            } else {
+                await client.query(
+                    `INSERT INTO ref.auth_user (username, password_hash, role, id_personnel)
+                     VALUES ($1, '', 'user', $2)
+                     ON CONFLICT (id_personnel) DO UPDATE SET
+                         username = EXCLUDED.username`,
+                        [username, id],
+                );
+            }
+        }
+
+        await client.query("COMMIT");
+
+        // ── Suppression ancienne photo APRÈS le COMMIT ────────────
+        if (photo_profil && anciennePhoto && anciennePhoto !== "default-avatar.png") {
+            const cheminAncien = path.join(__dirname, "..", "..", "uploads", anciennePhoto);
+            try {
+                if (fs.existsSync(cheminAncien)) fs.unlinkSync(cheminAncien);
+            } catch {
+                console.warn(`[updatePersonnel] Impossible de supprimer : ${anciennePhoto}`);
+            }
+        }
+
+        return { success: true };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
 module.exports = {
     getAllStaff,
     getDistinctDepartments,
     getDistinctFonctions,
     getStaffById,
     addPersonnel,
+    updatePersonnel,
 };

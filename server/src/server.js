@@ -13,10 +13,10 @@ const app = express();
 app.use(cors({
     origin: "http://localhost:5173",
     allowedHeaders: ["content-Type", "Authorization"],
-    methods: ["GET", "POST"]
+    methods: ["GET", "POST", "PATCH"]
 }))
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'))); // pour servir les images du dossier uploads
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads'))); // pour servir les images du dossier uploads  
 app.use('/auth', authRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/staff', staffRoutes);
