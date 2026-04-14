@@ -1,5 +1,9 @@
 require('dotenv').config();
 
+BigInt.prototype.toJSON = function() {
+    return this.toString();
+};
+
 const path = require('path');
 const cors = require('cors');
 const express = require('express');
