@@ -19,6 +19,8 @@ dist-ssr/
 # --- Prisma (Spécifique au serveur) ---
 # Ignore le dossier de génération si nécessaire, mais garde le schéma !
 /server/prisma/generated-client
+/server/src/generated/prisma
+
 
 # --- Logs ---
 npm-debug.log*

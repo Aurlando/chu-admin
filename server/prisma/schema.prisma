@@ -1,0 +1,887 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+  engineType      = "binary"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["chu", "ref"]
+}
+
+model allergie {
+  id           BigInt    @id @default(autoincrement())
+  patient_id   BigInt
+  substance    String
+  reaction     String?
+  severite     String?   @db.VarChar(20)
+  connu_depuis DateTime? @db.Date
+  patient      patient   @relation(fields: [patient_id], references: [id])
+
+  @@schema("chu")
+}
+
+model audit_log {
+  id          BigInt       @id @default(autoincrement())
+  table_name  String
+  record_id   BigInt
+  action      String       @db.VarChar(10)
+  auteur_id   BigInt?
+  at          DateTime     @default(now()) @db.Timestamptz(6)
+  diff        Json?
+  utilisateur utilisateur? @relation(fields: [auteur_id], references: [id])
+
+  @@schema("chu")
+}
+
+model consultation {
+  id                          BigInt               @id @default(autoincrement())
+  patient_id                  BigInt
+  service_id                  BigInt
+  medecin_traitant_id         BigInt?
+  date_consultation           DateTime             @default(now()) @db.Timestamptz(6)
+  motif                       String?
+  groupe_pathologie_entree_id BigInt?
+  diagnostic_sortie_id        BigInt?
+  activite_paraclinique       String?
+  anamnese                    String?
+  examen_clinique             String?
+  hypotheses                  String?
+  examens_complementaires     String?
+  avis_specialise             String?
+  utilisateur_id              BigInt?
+  created_at                  DateTime             @default(now()) @db.Timestamptz(6)
+  consultation_no             String?              @db.VarChar(20)
+  mode_admission_id           BigInt?
+  mode_sortie_id              BigInt?
+  motif_id                    BigInt?
+  is_new                      Boolean?             @default(true)
+  convention_id               Int?
+  convention                  convention?          @relation(fields: [convention_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  diagnostic                  diagnostic?          @relation(fields: [diagnostic_sortie_id], references: [id])
+  groupe_pathologie           groupe_pathologie?   @relation(fields: [groupe_pathologie_entree_id], references: [id])
+  personnel                   personnel?           @relation(fields: [medecin_traitant_id], references: [id])
+  patient                     patient              @relation(fields: [patient_id], references: [id])
+  service                     service              @relation(fields: [service_id], references: [id])
+  utilisateur                 utilisateur?         @relation(fields: [utilisateur_id], references: [id])
+  mode_admission              mode_admission?      @relation(fields: [mode_admission_id], references: [id], map: "fk_consultation_mode_admission")
+  mode_sortie                 mode_sortie?         @relation(fields: [mode_sortie_id], references: [id], map: "fk_consultation_mode_sortie")
+  diagnostic_patient          diagnostic_patient[]
+  examen                      examen[]
+  histoire_malade             histoire_malade[]
+  ordonnance                  ordonnance[]
+  vital_sign                  vital_sign[]
+
+  @@unique([patient_id, date_consultation, service_id], map: "uq_consult_unique")
+  @@index([groupe_pathologie_entree_id], map: "idx_consult_gp_entree")
+  @@index([medecin_traitant_id], map: "idx_consult_med")
+  @@index([patient_id], map: "idx_consult_patient")
+  @@index([service_id], map: "idx_consult_service")
+  @@schema("chu")
+}
+
+model convention {
+  id                   Int                  @id @default(autoincrement())
+  societe_id           Int
+  reference            String?              @db.VarChar(100)
+  date_debut           DateTime             @db.Date
+  date_fin             DateTime?            @db.Date
+  taux_prise_en_charge Decimal?             @default(100) @db.Decimal(5, 2)
+  plafond_mensuel      Decimal?             @db.Decimal(14, 2)
+  statut               String?              @default("active") @db.VarChar(30)
+  created_at           DateTime?            @default(now()) @db.Timestamp(6)
+  consultation         consultation[]
+  societe              societe              @relation(fields: [societe_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  facture_convention   facture_convention[]
+  hospitalisation      hospitalisation[]
+  patient_convention   patient_convention[]
+
+  @@schema("chu")
+}
+
+model diagnostic {
+  id                        BigInt                  @id @default(autoincrement())
+  code_cim                  String?                 @db.VarChar(100)
+  nom                       String
+  groupe_pathologie_id      BigInt
+  sous_groupe_pathologie_id BigInt?
+  consultation              consultation[]
+  groupe_pathologie         groupe_pathologie       @relation(fields: [groupe_pathologie_id], references: [id])
+  sous_groupe_pathologie    sous_groupe_pathologie? @relation(fields: [sous_groupe_pathologie_id], references: [id])
+  diagnostic_patient        diagnostic_patient[]
+  hospitalisation           hospitalisation[]
+  saisie_rma                saisie_rma[]
+
+  @@unique([code_cim, nom], map: "uq_diag")
+  @@schema("chu")
+}
+
+model diagnostic_patient {
+  id                 BigInt           @id @default(autoincrement())
+  patient_id         BigInt
+  hospitalisation_id BigInt?
+  consultation_id    BigInt?
+  diagnostic_id      BigInt?
+  libelle            String?
+  type               String           @default("principal") @db.VarChar(20)
+  date_debut         DateTime?        @db.Date
+  date_fin           DateTime?        @db.Date
+  consultation       consultation?    @relation(fields: [consultation_id], references: [id])
+  diagnostic         diagnostic?      @relation(fields: [diagnostic_id], references: [id])
+  hospitalisation    hospitalisation? @relation(fields: [hospitalisation_id], references: [id])
+  patient            patient          @relation(fields: [patient_id], references: [id])
+
+  @@index([patient_id], map: "idx_diag_patient")
+  @@schema("chu")
+}
+
+model evolution_journaliere {
+  id                 BigInt           @id @default(autoincrement())
+  hospitalisation_id BigInt?
+  horodatage         DateTime         @default(now()) @db.Timestamptz(6)
+  examen_clinique    String?
+  cat                String?
+  emargement         String?
+  auteur_id          BigInt?
+  utilisateur        utilisateur?     @relation(fields: [auteur_id], references: [id])
+  hospitalisation    hospitalisation? @relation(fields: [hospitalisation_id], references: [id], onDelete: Cascade)
+
+  @@schema("chu")
+}
+
+model examen {
+  id                 BigInt           @id @default(autoincrement())
+  patient_id         BigInt
+  hospitalisation_id BigInt?
+  consultation_id    BigInt?
+  type_id            Int?             @db.SmallInt
+  libelle            String?
+  date_prescription  DateTime         @default(now()) @db.Timestamptz(6)
+  date_resultat      DateTime?        @db.Timestamptz(6)
+  resultat           String?
+  consultation       consultation?    @relation(fields: [consultation_id], references: [id])
+  hospitalisation    hospitalisation? @relation(fields: [hospitalisation_id], references: [id])
+  patient            patient          @relation(fields: [patient_id], references: [id])
+  type_examen        type_examen?     @relation(fields: [type_id], references: [id])
+
+  @@schema("chu")
+}
+
+model facture_convention {
+  id                        Int                         @id @default(autoincrement())
+  societe_id                Int?
+  convention_id             Int?
+  mois                      Int
+  annee                     Int
+  montant_total             Decimal?                    @db.Decimal(14, 2)
+  statut                    String?                     @default("brouillon") @db.VarChar(30)
+  date_generation           DateTime?                   @default(now()) @db.Timestamp(6)
+  convention                convention?                 @relation(fields: [convention_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  societe                   societe?                    @relation(fields: [societe_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  facture_convention_detail facture_convention_detail[]
+
+  @@unique([convention_id, mois, annee])
+  @@schema("chu")
+}
+
+model facture_convention_detail {
+  id                 Int                 @id @default(autoincrement())
+  facture_id         Int?
+  patient_id         BigInt?
+  type_acte          String?             @db.VarChar(50)
+  acte_id            Int?
+  date_acte          DateTime?           @db.Date
+  montant            Decimal?            @db.Decimal(14, 2)
+  facture_convention facture_convention? @relation(fields: [facture_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  patient            patient?            @relation(fields: [patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@schema("chu")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model histoire_malade {
+  id                      BigInt       @id @default(autoincrement())
+  consultation_id         BigInt
+  motif                   String?
+  antecedents_personnels  String?
+  antecedents_familiaux   String?
+  habitus                 String?
+  hma                     String?
+  examen_clinique         String?
+  examens_complementaires String?
+  diagnostic_principal    String?
+  traitement              String?
+  observations            String?
+  auteur_id               BigInt?
+  date_redaction          DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime     @default(now()) @db.Timestamptz(6)
+  auth_user               auth_user?   @relation(fields: [auteur_id], references: [id], onUpdate: NoAction)
+  consultation            consultation @relation(fields: [consultation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([consultation_id], map: "idx_hma_consultation_id")
+  @@schema("chu")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model hospitalisation {
+  id                                   BigInt                  @id @default(autoincrement())
+  patient_id                           BigInt
+  service_id                           BigInt
+  medecin_traitant_id                  BigInt?
+  num_salle                            String?                 @db.VarChar(50)
+  date_entree                          DateTime                @db.Date
+  date_sortie                          DateTime?               @db.Date
+  num_dossier_medical                  String?                 @db.VarChar(50)
+  mode_admission_id                    BigInt?
+  categorie_id                         Int?                    @db.SmallInt
+  resume_hospitalisation               String?
+  diagnostic_principal_text            String?
+  diagnostic_associe_text              String?
+  maladie_chronique_non_transmissibles String?
+  diagnostic_sortie_id                 BigInt?
+  mode_sortie_id                       BigInt?
+  cause_deces                          String?
+  motif_transfert                      String?
+  convention_id                        Int?
+  diagnostic_patient                   diagnostic_patient[]
+  evolution_journaliere                evolution_journaliere[]
+  examen                               examen[]
+  categorie_hosp                       categorie_hosp?         @relation(fields: [categorie_id], references: [id])
+  convention                           convention?             @relation(fields: [convention_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  diagnostic                           diagnostic?             @relation(fields: [diagnostic_sortie_id], references: [id])
+  personnel                            personnel?              @relation(fields: [medecin_traitant_id], references: [id])
+  mode_admission                       mode_admission?         @relation(fields: [mode_admission_id], references: [id])
+  mode_sortie                          mode_sortie?            @relation(fields: [mode_sortie_id], references: [id])
+  patient                              patient                 @relation(fields: [patient_id], references: [id])
+  service                              service                 @relation(fields: [service_id], references: [id])
+  ordonnance                           ordonnance[]
+  sejour                               sejour[]
+  surveillance                         surveillance[]
+  vital_sign                           vital_sign[]
+
+  @@index([medecin_traitant_id], map: "idx_hosp_med")
+  @@index([mode_sortie_id], map: "idx_hosp_modesortie")
+  @@index([patient_id], map: "idx_hosp_patient")
+  @@index([service_id], map: "idx_hosp_service")
+  @@schema("chu")
+}
+
+model ligne_ordonnance {
+  id                   BigInt             @id @default(autoincrement())
+  ordonnance_id        BigInt
+  type_prescription_id Int?               @db.SmallInt
+  produit              String
+  dose                 String?
+  voie_id              Int?               @db.SmallInt
+  rythme               String?
+  date_debut           DateTime?          @db.Timestamptz(6)
+  date_fin             DateTime?          @db.Timestamptz(6)
+  instructions         String?
+  ordonnance           ordonnance         @relation(fields: [ordonnance_id], references: [id], onDelete: Cascade)
+  type_prescription    type_prescription? @relation(fields: [type_prescription_id], references: [id])
+  type_voie_admin      type_voie_admin?   @relation(fields: [voie_id], references: [id])
+
+  @@schema("chu")
+}
+
+model ordonnance {
+  id                 BigInt             @id @default(autoincrement())
+  patient_id         BigInt
+  hospitalisation_id BigInt?
+  consultation_id    BigInt?
+  auteur_id          BigInt?
+  date_prescription  DateTime           @default(now()) @db.Timestamptz(6)
+  notes              String?
+  ligne_ordonnance   ligne_ordonnance[]
+  utilisateur        utilisateur?       @relation(fields: [auteur_id], references: [id])
+  consultation       consultation?      @relation(fields: [consultation_id], references: [id])
+  hospitalisation    hospitalisation?   @relation(fields: [hospitalisation_id], references: [id])
+  patient            patient            @relation(fields: [patient_id], references: [id])
+
+  @@index([patient_id, date_prescription(sort: Desc)], map: "idx_ord_patient_time")
+  @@schema("chu")
+}
+
+/// This model contains an expression index which requires additional setup for migrations. Visit https://pris.ly/d/expression-indexes for more info.
+model patient {
+  id                        BigInt                      @id @default(autoincrement())
+  patient_no                String?                     @unique
+  nom                       String                      @db.VarChar(100)
+  prenom                    String?                     @db.VarChar(100)
+  date_naissance            DateTime?                   @db.Date
+  genre_id                  BigInt?
+  telephone                 String?
+  adresse_texte             String?
+  adresse_fokontany         BigInt?
+  adresse_commune           BigInt?
+  adresse_district          BigInt?
+  adresse_region            BigInt?
+  adresse_province          BigInt?
+  profession                String?                     @db.VarChar(100)
+  accompagnant_nom          String?                     @db.VarChar(150)
+  accompagnant_lien         String?                     @db.VarChar(100)
+  accompagnant_tel          String?                     @db.VarChar(50)
+  mode_admission_id         BigInt?
+  allergies                 String?
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  id_lien_familial          BigInt?
+  photo                     String?
+  est_conventionne          Boolean?                    @default(false)
+  allergie                  allergie[]
+  consultation              consultation[]
+  diagnostic_patient        diagnostic_patient[]
+  examen                    examen[]
+  facture_convention_detail facture_convention_detail[]
+  hospitalisation           hospitalisation[]
+  ordonnance                ordonnance[]
+  lien_familial             lien_familial?              @relation(fields: [id_lien_familial], references: [id], map: "fk_patient_lien_familial")
+  commune                   commune?                    @relation(fields: [adresse_commune], references: [id])
+  district                  district?                   @relation(fields: [adresse_district], references: [id])
+  fokontany                 fokontany?                  @relation(fields: [adresse_fokontany], references: [id])
+  province                  province?                   @relation(fields: [adresse_province], references: [id])
+  region                    region?                     @relation(fields: [adresse_region], references: [id])
+  genre                     genre?                      @relation(fields: [genre_id], references: [id])
+  mode_admission            mode_admission?             @relation(fields: [mode_admission_id], references: [id])
+  patient_convention        patient_convention[]
+  vital_sign                vital_sign[]
+  prestations_patient       prestations_patient[]
+
+  @@index([date_naissance], map: "idx_patient_dob")
+  @@schema("chu")
+}
+
+model patient_convention {
+  id                Int        @id @default(autoincrement())
+  patient_id        BigInt
+  convention_id     Int
+  matricule_societe String?    @db.VarChar(100)
+  date_debut        DateTime   @db.Date
+  date_fin          DateTime?  @db.Date
+  convention        convention @relation(fields: [convention_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  patient           patient    @relation(fields: [patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@schema("chu")
+}
+
+model patient_counters {
+  period_key String @id
+  last_seq   Int
+
+  @@schema("chu")
+}
+
+model personnel {
+  id                 BigInt            @id(map: "medecin_traitant_pkey") @default(autoincrement())
+  service_id         BigInt?
+  nom                String            @db.VarChar(100)
+  prenoms            String?           @db.VarChar(100)
+  im                 String?
+  date_naissance     DateTime?         @db.Date
+  corps              String?
+  grade              String?
+  categorie          String?
+  classe             String?
+  echelon            String?
+  date_effet         DateTime?         @db.Date
+  date_entree_admin  DateTime?         @db.Date
+  annee_entree_admin Int?
+  annee_exercice     Int?
+  specialite         String?
+  autres_diplomes    String?
+  telephone          String?
+  email              String?           @unique(map: "medecin_traitant_email_key")
+  fonction_id        Int?
+  statut             statut_personnel  @default(En_activit_)
+  photo_profil       String?           @default("default-avatar.png") @db.VarChar(255)
+  consultation       consultation[]
+  hospitalisation    hospitalisation[]
+  fonction           fonction?         @relation(fields: [fonction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  service            service?          @relation(fields: [service_id], references: [id])
+  auth_user          auth_user?
+  diplome           diplome[]
+
+  @@schema("chu")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model saisie_rma {
+  id             BigInt      @id @default(autoincrement())
+  quantite       Int
+  id_date_saisie DateTime    @db.Date
+  genre_id       BigInt
+  id_tranche_age BigInt
+  id_diagnostic  BigInt
+  service_id     BigInt
+  mois           Int?
+  annee          Int?
+  genre          genre       @relation(fields: [genre_id], references: [id])
+  diagnostic     diagnostic  @relation(fields: [id_diagnostic], references: [id])
+  tranche_age    tranche_age @relation(fields: [id_tranche_age], references: [id])
+  service        service     @relation(fields: [service_id], references: [id])
+
+  @@index([id_date_saisie, genre_id, id_tranche_age, service_id], map: "idx_rma_dims")
+  @@schema("chu")
+}
+
+model sejour {
+  id                 BigInt          @id @default(autoincrement())
+  hospitalisation_id BigInt
+  chambre            String?
+  lit                String?
+  date_entree        DateTime        @default(now()) @db.Timestamptz(6)
+  date_sortie        DateTime?       @db.Timestamptz(6)
+  utilisateur_id     BigInt?
+  hospitalisation    hospitalisation @relation(fields: [hospitalisation_id], references: [id], onDelete: Cascade)
+  utilisateur        utilisateur?    @relation(fields: [utilisateur_id], references: [id])
+
+  @@schema("chu")
+}
+
+model surveillance {
+  id                 BigInt           @id @default(autoincrement())
+  hospitalisation_id BigInt?
+  horodatage         DateTime         @default(now()) @db.Timestamptz(6)
+  t                  Decimal?         @db.Decimal(4, 1)
+  fc                 Int?             @db.SmallInt
+  fr                 Int?             @db.SmallInt
+  ta_syst            Int?             @db.SmallInt
+  ta_diast           Int?             @db.SmallInt
+  spo2               Int?             @db.SmallInt
+  score_douleur      Int?             @db.SmallInt
+  gcs                Int?             @db.SmallInt
+  cat                String?
+  emargement         String?
+  hospitalisation    hospitalisation? @relation(fields: [hospitalisation_id], references: [id], onDelete: Cascade)
+
+  @@schema("chu")
+}
+
+model utilisateur {
+  id                    BigInt                  @id @default(autoincrement())
+  nom                   String
+  prenom                String?
+  email                 String?                 @unique
+  role_id               Int?                    @db.SmallInt
+  actif                 Boolean                 @default(true)
+  audit_log             audit_log[]
+  consultation          consultation[]
+  evolution_journaliere evolution_journaliere[]
+  ordonnance            ordonnance[]
+  sejour                sejour[]
+  role                  role?                   @relation(fields: [role_id], references: [id])
+
+  @@schema("chu")
+}
+
+model vital_sign {
+  id                    BigInt           @id @default(autoincrement())
+  patient_id            BigInt
+  hospitalisation_id    BigInt?
+  consultation_id       BigInt?
+  horodatage            DateTime         @default(now()) @db.Timestamptz(6)
+  ta_syst               Int?             @db.SmallInt
+  ta_diast              Int?             @db.SmallInt
+  fc                    Int?             @db.SmallInt
+  fr                    Int?             @db.SmallInt
+  temperature           Decimal?         @db.Decimal(4, 1)
+  spo2                  Int?             @db.SmallInt
+  poids                 Decimal?         @db.Decimal(6, 2)
+  perimetre_cranien     Decimal?         @db.Decimal(5, 2)
+  perimetre_abdo_ascite Decimal?         @db.Decimal(5, 2)
+  eva                   Int?             @db.SmallInt
+  gcs                   Int?             @db.SmallInt
+  autres                Json?
+  consultation          consultation?    @relation(fields: [consultation_id], references: [id])
+  hospitalisation       hospitalisation? @relation(fields: [hospitalisation_id], references: [id])
+  patient               patient          @relation(fields: [patient_id], references: [id])
+
+  @@index([patient_id, horodatage(sort: Desc)], map: "idx_vitals_patient_time")
+  @@schema("chu")
+}
+
+model auth_user {
+  id              BigInt            @id @default(autoincrement())
+  username        String            @unique
+  password_hash   String
+  role            String            @default("user")
+  created_at      DateTime          @default(now()) @db.Timestamptz(6)
+  id_personnel    BigInt?           @unique
+  histoire_malade histoire_malade[]
+  personnel       personnel?        @relation(fields: [id_personnel], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@schema("ref")
+}
+
+model categorie_hosp {
+  id              Int               @id @default(autoincrement()) @db.SmallInt
+  libelle         String            @unique
+  hospitalisation hospitalisation[]
+
+  @@schema("ref")
+}
+
+model categories_patient {
+  id                  Int                   @id @default(autoincrement())
+  code                String                @unique @db.VarChar(50)
+  libelle             String                @db.VarChar(150)
+  prestations_patient prestations_patient[]
+  tarifs_prestations  tarifs_prestations[]
+
+  @@schema("ref")
+}
+
+model commune {
+  id          BigInt      @id @default(autoincrement())
+  id_district BigInt
+  nom         String      @db.VarChar(255)
+  patient     patient[]
+  district    district    @relation(fields: [id_district], references: [id])
+  fokontany   fokontany[]
+
+  @@unique([id_district, nom], map: "uq_commune")
+  @@schema("ref")
+}
+
+model diplome {
+  id              Int       @id @default(autoincrement())
+  libelle         String
+  etablissement   String?
+  annee_obtention Int?
+  est_principal   Boolean?  @default(false)
+  id_personnel    BigInt
+  personnel       personnel @relation(fields: [id_personnel], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_personnel")
+
+  @@schema("ref")
+}
+
+model district {
+  id        BigInt    @id @default(autoincrement())
+  id_region BigInt
+  libelle   String    @db.VarChar(255)
+  patient   patient[]
+  commune   commune[]
+  region    region    @relation(fields: [id_region], references: [id])
+
+  @@unique([id_region, libelle], map: "uq_district")
+  @@schema("ref")
+}
+
+model fokontany {
+  id         BigInt    @id @default(autoincrement())
+  commune_id BigInt
+  nom        String    @db.VarChar(255)
+  patient    patient[]
+  commune    commune   @relation(fields: [commune_id], references: [id])
+
+  @@unique([commune_id, nom], map: "uq_fokontany")
+  @@schema("ref")
+}
+
+model fonction {
+  id              Int              @id @default(autoincrement())
+  libelle         String           @db.VarChar(255)
+  groupe_id       Int?
+  personnel       personnel[]
+  groupe_fonction groupe_fonction? @relation(fields: [groupe_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@schema("ref")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model genre {
+  id         BigInt       @id @default(autoincrement())
+  libelle    String       @unique @db.Char(1)
+  patient    patient[]
+  saisie_rma saisie_rma[]
+
+  @@schema("ref")
+}
+
+model groupe_diagnostic {
+  id                BigInt              @id @default(autoincrement())
+  nom               String              @unique @db.VarChar(255)
+  groupe_pathologie groupe_pathologie[]
+
+  @@schema("ref")
+}
+
+model groupe_fonction {
+  id       Int        @id @default(autoincrement())
+  libelle  String     @db.VarChar(100)
+  fonction fonction[]
+
+  @@schema("ref")
+}
+
+model groupe_pathologie {
+  id                     BigInt                   @id @default(autoincrement())
+  groupe_diagnostic_id   BigInt
+  nom                    String                   @db.VarChar(255)
+  consultation           consultation[]
+  diagnostic             diagnostic[]
+  groupe_diagnostic      groupe_diagnostic        @relation(fields: [groupe_diagnostic_id], references: [id])
+  sous_groupe_pathologie sous_groupe_pathologie[]
+
+  @@unique([groupe_diagnostic_id, nom], map: "uq_groupe_path")
+  @@schema("ref")
+}
+
+model lien_familial {
+  id          BigInt    @id @default(autoincrement())
+  code        String    @unique @db.VarChar(20)
+  libelle     String
+  description String?
+  patient     patient[]
+
+  @@schema("ref")
+}
+
+model mode_admission {
+  id              BigInt            @id @default(autoincrement())
+  libelle         String            @unique @db.VarChar(255)
+  consultation    consultation[]
+  hospitalisation hospitalisation[]
+  patient         patient[]
+
+  @@schema("ref")
+}
+
+model mode_sortie {
+  id              BigInt            @id @default(autoincrement())
+  code            String            @unique
+  libelle         String
+  consultation    consultation[]
+  hospitalisation hospitalisation[]
+
+  @@schema("ref")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model motif {
+  id           BigInt @id @default(autoincrement())
+  libelle      String
+  libelle_norm String @unique(map: "motif_libelle_norm_uniq")
+
+  @@schema("ref")
+}
+
+model prestation_supplements {
+  prestation_id          Int
+  supplement_id          Int
+  prestations            prestations            @relation(fields: [prestation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  supplements_tarifaires supplements_tarifaires @relation(fields: [supplement_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([prestation_id, supplement_id])
+  @@schema("ref")
+}
+
+model prestations {
+  id                     Int                      @id @default(autoincrement())
+  type_prestation_id     Int?
+  sous_type_id           Int?
+  specialite             String?                  @db.VarChar(150)
+  code                   String?                  @db.VarChar(50)
+  designation            String                   @db.VarChar(255)
+  actif                  Boolean?                 @default(true)
+  prestation_supplements prestation_supplements[]
+  sous_types_prestations sous_types_prestations?  @relation(fields: [sous_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  types_prestations      types_prestations?       @relation(fields: [type_prestation_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  prestations_patient    prestations_patient[]
+  tarifs_prestations     tarifs_prestations[]
+
+  @@schema("ref")
+}
+
+model prestations_patient {
+  id                   Int                 @id @default(autoincrement())
+  patient_id           BigInt?
+  prestation_id        Int?
+  categorie_patient_id Int?
+  type_patient_id      Int?
+  date_prestation      DateTime            @db.Date
+  quantite             Int?                @default(1)
+  nombre_jours         Int?                @default(1)
+  montant_base         Decimal?            @db.Decimal(15, 2)
+  montant_supplements  Decimal?            @default(0) @db.Decimal(15, 2)
+  montant_total        Decimal?            @db.Decimal(15, 2)
+  created_at           DateTime?           @default(now()) @db.Timestamp(6)
+  categories_patient   categories_patient? @relation(fields: [categorie_patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  patient              patient?            @relation(fields: [patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  prestations          prestations?        @relation(fields: [prestation_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  type_patient         type_patient?       @relation(fields: [type_patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@schema("ref")
+}
+
+model province {
+  id      BigInt    @id @default(autoincrement())
+  nom     String    @unique @db.VarChar(255)
+  patient patient[]
+  region  region[]
+
+  @@schema("ref")
+}
+
+model region {
+  id          BigInt     @id @default(autoincrement())
+  id_province BigInt
+  nom         String     @db.VarChar(255)
+  patient     patient[]
+  district    district[]
+  province    province   @relation(fields: [id_province], references: [id])
+
+  @@unique([id_province, nom], map: "uq_region")
+  @@schema("ref")
+}
+
+model role {
+  id          Int           @id @default(autoincrement()) @db.SmallInt
+  libelle     String        @unique
+  utilisateur utilisateur[]
+
+  @@schema("ref")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model service {
+  id              BigInt            @id @default(autoincrement())
+  code            String?           @unique(map: "service_code_key_idx") @db.VarChar(20)
+  libelle         String            @unique(map: "service_libelle_key_idx") @db.VarChar(255)
+  domain          String?
+  actif           Boolean           @default(true)
+  consultation    consultation[]
+  hospitalisation hospitalisation[]
+  personnel       personnel[]
+  saisie_rma      saisie_rma[]
+
+  @@index([domain], where: raw("actif"))
+  @@schema("ref")
+}
+
+model societe {
+  id                 Int                  @id @default(autoincrement())
+  nom                String               @db.VarChar(255)
+  adresse            String?
+  contact            String?              @db.VarChar(150)
+  telephone          String?              @db.VarChar(50)
+  email              String?              @db.VarChar(150)
+  actif              Boolean?             @default(true)
+  created_at         DateTime?            @default(now()) @db.Timestamp(6)
+  convention         convention[]
+  facture_convention facture_convention[]
+
+  @@schema("ref")
+}
+
+model sous_groupe_pathologie {
+  id                   BigInt            @id @default(autoincrement())
+  groupe_pathologie_id BigInt
+  nom                  String            @db.VarChar(255)
+  diagnostic           diagnostic[]
+  groupe_pathologie    groupe_pathologie @relation(fields: [groupe_pathologie_id], references: [id])
+
+  @@unique([groupe_pathologie_id, nom], map: "uq_sous_path")
+  @@schema("ref")
+}
+
+model sous_types_prestations {
+  id                 Int                @id @default(autoincrement())
+  type_prestation_id Int?
+  libelle            String             @db.VarChar(150)
+  prestations        prestations[]
+  types_prestations  types_prestations? @relation(fields: [type_prestation_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@schema("ref")
+}
+
+model supplements_tarifaires {
+  id                     Int                      @id @default(autoincrement())
+  code                   String?                  @unique @db.VarChar(50)
+  libelle                String?                  @db.VarChar(150)
+  montant                Decimal                  @db.Decimal(15, 2)
+  prestation_supplements prestation_supplements[]
+
+  @@schema("ref")
+}
+
+model tarifs_prestations {
+  id                   Int                 @id @default(autoincrement())
+  prestation_id        Int?
+  categorie_patient_id Int?
+  type_patient_id      Int?
+  annee                Int
+  montant              Decimal             @db.Decimal(15, 2)
+  unite                String?             @db.VarChar(50)
+  date_debut           DateTime?           @db.Date
+  date_fin             DateTime?           @db.Date
+  categories_patient   categories_patient? @relation(fields: [categorie_patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  prestations          prestations?        @relation(fields: [prestation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  type_patient         type_patient?       @relation(fields: [type_patient_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([prestation_id, categorie_patient_id, type_patient_id, annee])
+  @@schema("ref")
+}
+
+model tranche_age {
+  id         BigInt       @id @default(autoincrement())
+  libelle    String       @unique @db.VarChar(50)
+  saisie_rma saisie_rma[]
+
+  @@schema("ref")
+}
+
+model type_examen {
+  id      Int      @id @default(autoincrement()) @db.SmallInt
+  libelle String   @unique
+  examen  examen[]
+
+  @@schema("ref")
+}
+
+model type_patient {
+  id                  Int                   @id @default(autoincrement())
+  code                String?               @unique @db.VarChar(50)
+  libelle             String?               @db.VarChar(100)
+  prestations_patient prestations_patient[]
+  tarifs_prestations  tarifs_prestations[]
+
+  @@schema("ref")
+}
+
+model type_prescription {
+  id               Int                @id @default(autoincrement()) @db.SmallInt
+  libelle          String             @unique
+  ligne_ordonnance ligne_ordonnance[]
+
+  @@schema("ref")
+}
+
+model type_voie_admin {
+  id               Int                @id @default(autoincrement()) @db.SmallInt
+  code             String             @unique @db.VarChar(10)
+  libelle          String
+  ligne_ordonnance ligne_ordonnance[]
+
+  @@schema("ref")
+}
+
+model types_prestations {
+  id                     Int                      @id @default(autoincrement())
+  code                   String                   @unique @db.VarChar(50)
+  libelle                String                   @db.VarChar(150)
+  prestations            prestations[]
+  sous_types_prestations sous_types_prestations[]
+
+  @@schema("ref")
+}
+
+enum statut_personnel {
+  En_activit_ @map("En activité")
+  En_absence  @map("En absence")
+  Sortie
+
+  @@schema("chu")
+}
