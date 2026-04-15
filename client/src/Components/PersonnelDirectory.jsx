@@ -1,29 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import StaffProfile from "./StaffProfile";
 import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
-
-// ════════════════════════════════════════════════════════════════════
-// PersonnelDirectory.jsx — Page "Répertoire du personnel"
-//
-// RÔLE : Affiche la liste du personnel (tableau + filtres + pagination)
-//        ET gère la navigation vers le profil détail d'un membre.
-//
-// NAVIGATION INTERNE AU COMPOSANT :
-//   - selectedMatricule === null  → affiche le tableau (vue liste)
-//   - selectedMatricule = "293780" → affiche <StaffProfile> (vue détail)
-//
-//   C'est le même pattern que Dashboard.jsx avec activeNav :
-//   un state contrôle quelle "sous-vue" est affichée.
-//
-// PROPS reçues depuis Dashboard.jsx :
-//   - dark : booléen thème sombre/clair
-//
-// ROUTES API utilisées :
-//   GET /staff/show-all?search=&department=&fonction=&page=&limit=
-//   GET /staff/departments
-//   GET /staff/fonctions
-//   GET /staff/profile/:id  ← utilisé par StaffProfile.jsx (id = p.id de la réponse JSON)
-// ════════════════════════════════════════════════════════════════════
+import "../App.css";
 
 const API_BASE = "http://localhost:3000";
 const LIMIT    = 10;
@@ -82,9 +60,7 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
   // selectedId : null = liste, valeur = vue profil détail
   const [selectedId, setSelectedId] = useState(null);
 
-  // [NOUVEAU] selectedIdUpdate : null = pas de modal ouvert
-  //           valeur = id du membre dont on veut modifier les infos
-  //           Le modal UpdateModal est monté PAR-DESSUS la liste (pas à la place)
+ 
   const [selectedIdUpdate, setSelectedIdUpdate] = useState(null);
 
   // Vue profil — remplace toute la page
@@ -101,10 +77,7 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
   // Vue liste — avec le modal superposé si selectedIdUpdate != null
   return (
     <>
-      {/* [NOUVEAU] Modal de mise à jour
-          Monté par-dessus la liste (position:fixed dans UpdateModal)
-          onClose → ferme le modal sans rien changer
-          onSaved → ferme le modal (la liste se rafraîchit via fetchPersonnel) */}
+
       {selectedIdUpdate !== null && (
         <UpdateModal
           id={selectedIdUpdate}
@@ -123,15 +96,6 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
   );
 }
 
-// ════════════════════════════════════════════════════════════════════
-// Sous-composant : tableau de la liste du personnel
-//
-// PROPS :
-//   - dark           : thème sombre/clair
-//   - onSelectId     : clic "Voir" → affiche StaffProfile
-//   - onSelectIdUpdate : clic "Mis à jour" → ouvre UpdateModal
-//   - onNavigate     : clic "Ajouter" → change de page dans Dashboard
-// ════════════════════════════════════════════════════════════════════
 function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
 
   // ── États des données
@@ -208,10 +172,10 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
     sub:        dark ? "text-slate-400"          : "text-slate-500",
     card:       dark ? "bg-[#0d1526] border-white/8" : "bg-white border-slate-200 shadow-sm",
     input:      dark ? "bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-500/50" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-blue-400",
-    select:     dark ? "bg-white/5 border-white/10 text-slate-300 focus:border-blue-500/50" : "bg-white border-slate-200 text-slate-700 focus:border-blue-400",
+    select:     dark ? "bg-white/5 border-white/10 text-slate-300 focus:border-blue-500/50 [&_option]:text-black [&_option]:bg-white" : "bg-white border-slate-200 text-slate-700 focus:border-blue-400",
     thHead:     dark ? "text-slate-500 border-white/8 bg-white/3" : "text-slate-400 border-slate-200 bg-slate-50",
     trHover:    dark ? "hover:bg-white/3 border-white/5 " : "hover:bg-slate-50/80 border-slate-100",
-    tdText:     dark ? "text-slate-200"          : "text-slate-700",
+    tdText:     dark ? "text-slate-200 "          : "text-slate-700",
     tdSub:      dark ? "text-slate-500"          : "text-slate-400",
     pagBtn:     dark ? "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50",
     pagBtnAct:  "bg-blue-600 border-blue-600 text-white",
@@ -282,14 +246,23 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
           <select value={filterDept} onChange={(e) => handleFilterDept(e.target.value)}
             className={`text-sm px-3 py-2.5 rounded-xl border outline-none cursor-pointer transition-all ${T.select}`}>
             <option value="">Département</option>
-            {departments.map(d => <option key={d} value={d}>{d}</option>)}
+            {departments.map(d => {
+              const id = typeof d === "string" ? d : d.id;
+              const label = typeof d === "string" ? d : d.libelle;
+              return <option key={id} value={label}>{label}</option>;
+            })}
+              
           </select>
 
           {/* Dropdown Service (= m.fonction dans la BDD) → ?fonction= */}
           <select value={filterFonc} onChange={(e) => handleFilterFonc(e.target.value)}
             className={`text-sm px-3 py-2.5 rounded-xl border outline-none cursor-pointer transition-all ${T.select}`}>
             <option value="">Service</option>
-            {fonctions.map(f => <option key={f} value={f}>{f}</option>)}
+            {fonctions.map(f => {
+              const id = typeof f === "string" ? f : f.id;
+              const label = typeof f === "string" ? f : f.libelle;
+              return <option key={id} value={label}>{label}</option>;
+            })}
           </select>
 
           {/* Bouton reset filtres — visible uniquement si un filtre est actif */}
@@ -419,7 +392,7 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
                           title="Mettre à jour"
                         >
                           <EditIcon />
-                          <span className="hidden sm:inline cursor-pointer w-full">Mis à jour</span>
+                          <span className="hidden sm:inline cursor-pointer w-max">Mis à jour</span>
                           
                         </button>
                       </div>
