@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef, Component } from "react";
+import "../App.css";
+import ComfirmModal from "./ConfirModal";
 
 const API_BASE = "http://localhost:3000";
 
 // ── Error Boundary : capture les erreurs de rendu et affiche un message clair
 // au lieu d'une page blanche
 class ErrorBoundary extends Component {
-  constructor(props) { super(props); this.state = { hasError: false, message: "" }; }
+  constructor(props) {
+     super(props); 
+     this.state = { hasError: false, message: "" }; 
+    }
   static getDerivedStateFromError(err) { return { hasError: true, message: err?.message || "Erreur inconnue" }; }
   render() {
     if (this.state.hasError) {
@@ -49,7 +54,7 @@ const CLASSES     = [
   { value: "2",         label: "Classe 2"  },
 ];
 const ECHELONS = ["1","2","3"];
-const STATUTS  = ["En activité","Congé","Suspendu"];
+const STATUTS  = ["En activité","En absence","Sortie"];
 const DIPLOME_VIDE = { libelle: "", etablissement: "", annee_obtention: "", est_principal: false };
 
 // ── Définition des étapes (label + icône SVG)
@@ -136,24 +141,48 @@ function RecapRow({ label, value, dark }) {
 // ════════════════════════════════════════════════════════════════════
 export function AddPersonnelInner({ dark, onAnnuler }) {
   const fileInputRef = useRef(null);
+  const THIRTY_MINUTES = 30 * 60 * 1000; // 30 minutes en millisecondes
+
+  // Helper pour vérifier si le brouillon est toujours valide
+  const getValidDraft = (key, defaultValue) => {
+    const saved = localStorage.getItem(key);
+    const timestamp = localStorage.getItem("add_personnel_timestamp");
+    
+    if (saved && timestamp) {
+      const isExpired = Date.now() - parseInt(timestamp, 10) > THIRTY_MINUTES;
+      if (!isExpired) return (key === "add_personnel_step") ? parseInt(saved, 10) : JSON.parse(saved);
+    }
+    return defaultValue;
+  };
 
   // ── Étape active (1 à 5)
   // currentStep contrôle quelle section du formulaire est visible
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(() => {
+    return getValidDraft("add_personnel_step", 1);
+  });
 
   // ── Données du formulaire
-  const [form, setForm] = useState({
-    nom: "", prenoms: "", im: "", date_naissance: "",
-    categorie: "", classe: "", echelon: "", specialite: "",
-    telephone: "", email: "",
-    service_id: "", fonction_id: "",
-    statut: "En activité",
-    username: "", password: "",
+  const [form, setForm] = useState(() => {
+    return getValidDraft("add_personnel_form", {
+      nom: "", prenoms: "", im: "", date_naissance: "",
+      categorie: "", classe: "", echelon: "", specialite: "",
+      telephone: "", email: "",
+      service_id: "", fonction_id: "",
+      statut: "En activité",
+      username: "", password: "",
+    });
   });
+
   const [photoFile,    setPhotoFile]    = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
-  const [diplomes,     setDiplomes]     = useState([{ ...DIPLOME_VIDE, est_principal: true }]);
-  const [creerCompte,  setCreerCompte]  = useState(false);
+
+  const [diplomes, setDiplomes] = useState(() => {
+    return getValidDraft("add_personnel_diplomes", [{ ...DIPLOME_VIDE, est_principal: true }]);
+  });
+
+  const [creerCompte, setCreerCompte] = useState(() => {
+    return getValidDraft("add_personnel_creerCompte", false);
+  });
 
   // ── Données API
   const [services,  setServices]  = useState([]);
@@ -165,7 +194,44 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
   const [success,    setSuccess]    = useState(false);
   const [apiError,   setApiError]   = useState(null);
 
+  const [confirmSave, setConfirmSave] = useState(false);
+  const [confirmleave, setConfirmLeave] = useState(false);
+
+
   const token = localStorage.getItem("token");
+
+  // ── Sauvegarde automatique dans localStorage
+  const updateTimestamp = () => {
+    localStorage.setItem("add_personnel_timestamp", Date.now().toString());
+  };
+
+  useEffect(() => {
+    localStorage.setItem("add_personnel_form", JSON.stringify(form));
+    updateTimestamp();
+  }, [form]);
+
+  useEffect(() => {
+    localStorage.setItem("add_personnel_diplomes", JSON.stringify(diplomes));
+    updateTimestamp();
+  }, [diplomes]);
+
+  useEffect(() => {
+    localStorage.setItem("add_personnel_creerCompte", JSON.stringify(creerCompte));
+    updateTimestamp();
+  }, [creerCompte]);
+
+  useEffect(() => {
+    localStorage.setItem("add_personnel_step", currentStep.toString());
+    updateTimestamp();
+  }, [currentStep]);
+
+  const clearSavedData = () => {
+    localStorage.removeItem("add_personnel_form");
+    localStorage.removeItem("add_personnel_diplomes");
+    localStorage.removeItem("add_personnel_creerCompte");
+    localStorage.removeItem("add_personnel_step");
+    localStorage.removeItem("add_personnel_timestamp");
+  };
 
   useEffect(() => {
     const headers = { Authorization: `Bearer ${token}` };
@@ -208,29 +274,64 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
   // On valide uniquement les champs de l'étape en cours avant de passer à la suivante
   const validateStep = (step) => {
     const e = {};
+    const noSpecialCharsRegex = /^[a-zA-ZÀ-ÿ\s]+$/;
+    const noSpecialCharsAlphanumRegex = /^[a-zA-Z0-9À-ÿ\s]+$/;
+
     if (step === 1) {
       if (!form.nom.trim())                          e.nom           = "Requis";
-      else if (/\d/.test(form.nom))                  e.nom           = "Le nom ne doit pas contenir de chiffres";
+      else if (!noSpecialCharsRegex.test(form.nom))  e.nom           = "Pas de chiffres ou caractères spéciaux";
       if (!form.prenoms.trim())                      e.prenoms       = "Requis";
-      else if (/\d/.test(form.prenoms))              e.prenoms       = "Le prénom ne doit pas contenir de chiffres";
+      else if (!noSpecialCharsRegex.test(form.prenoms)) e.prenoms    = "Pas de chiffres ou caractères spéciaux";
       if (!form.im.trim())                           e.im            = "Requis";
       else if (!/^\d+$/.test(form.im.trim()))        e.im            = "Le matricule doit contenir uniquement des chiffres";
       if (!form.date_naissance)                      e.date_naissance= "Requis";
+      else {
+        const birthDate = new Date(form.date_naissance);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+        if (age < 16) e.date_naissance = "L'âge doit être de 16 ans minimum";
+      }
     }
     if (step === 2) {
       if (!form.categorie)            e.categorie     = "Requis";
       if (!form.classe)               e.classe        = "Requis";
       if (!form.echelon)              e.echelon       = "Requis";
+      if (!form.specialite.trim())    e.specialite    = "Requis";
+      else if (!noSpecialCharsAlphanumRegex.test(form.specialite)) e.specialite = "Pas de caractères spéciaux";
     }
     if (step === 3) {
       if (!form.service_id)           e.service_id    = "Requis";
       if (!form.fonction_id)          e.fonction_id   = "Requis";
+      // Validation du numéro de téléphone
+      if (!form.telephone.trim()) {
+        e.telephone = "Le numéro de téléphone est requis.";
+      } else {
+        const tel = form.telephone.trim().replace(/[\s-]/g, "");
+        const telRegex = /^(\+261\d{9}|0\d{9})$/;
+        if (!telRegex.test(tel)) {
+          e.telephone = "Le numéro de téléphone n'est pas valide (ex: 034 00 000 00 ou +261 34 000 0000).";
+        }
+      }
+      // Validation de l'email (si renseigné)
+      if (form.email.trim()) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(form.email.trim())) {
+          e.email = "L'adresse email n'est pas valide (ex: jean@chu.mg).";
+        }
+      }
     }
     if (step === 4) {
       if (!diplomes[0].libelle.trim()) e.diplome0     = "Le diplôme principal est requis";
+      diplomes.forEach((d, i) => {
+        if (d.libelle && !noSpecialCharsAlphanumRegex.test(d.libelle)) e[`diplome${i}`] = "Pas de caractères spéciaux";
+        if (d.etablissement && !noSpecialCharsAlphanumRegex.test(d.etablissement)) e[`etab${i}`] = "Pas de caractères spéciaux";
+      });
     }
     if (step === 5 && creerCompte) {
       if (!form.username.trim())      e.username      = "Requis";
+      else if (!/^[a-zA-Z0-9]+$/.test(form.username)) e.username    = "Pas de caractères spéciaux";
       if (form.password.length < 6)   e.password      = "Minimum 6 caractères";
     }
     return e;
@@ -251,10 +352,49 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // [AJOUT] Fonction pour gérer la navigation par clic sur les icônes de progression
+  const handleStepClick = (targetStepId) => {
+    if (targetStepId < currentStep) {
+      // [AJOUT] Navigation vers l'arrière : Toujours autorisée
+      setErrors({});
+      setCurrentStep(targetStepId);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else if (targetStepId > currentStep) {
+      // [AJOUT] Navigation vers l'avant : On valide chaque étape entre l'actuelle et la cible
+      for (let s = currentStep; s < targetStepId; s++) {
+        const stepErrors = validateStep(s);
+        if (Object.keys(stepErrors).length > 0) {
+          // [AJOUT] Si une erreur est trouvée, on bloque la navigation et on affiche l'erreur
+          setErrors(stepErrors);
+          setCurrentStep(s);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
+      }
+      // [AJOUT] Si toutes les étapes intermédiaires sont valides, on saute directement à la cible
+      setErrors({});
+      setCurrentStep(targetStepId);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  // Helper pour valider toutes les étapes et rediriger vers la première erreur trouvée
+  const validateAllAndRedirect = () => {
+    for (let step = 1; step <= 5; step++) {
+      const stepErrors = validateStep(step);
+      if (Object.keys(stepErrors).length > 0) {
+        setErrors(stepErrors);
+        setCurrentStep(step);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return false;
+      }
+    }
+    return true;
+  };
+
   // ── Soumission finale (étape 5)
   const handleSubmit = async () => {
-    const e = validateStep(5);
-    if (Object.keys(e).length > 0) { setErrors(e); return; }
+    if (!validateAllAndRedirect()) return;
 
     setSubmitting(true);
     setApiError(null);
@@ -298,6 +438,7 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
         throw new Error(json.message || `Erreur ${res.status}`);
       }
       setSuccess(true);
+      clearSavedData();
       // Reset complet
       setForm({ nom:"", prenoms:"", im:"", date_naissance:"", categorie:"", classe:"",
         echelon:"", specialite:"", telephone:"", email:"", service_id:"", fonction_id:"",
@@ -308,6 +449,26 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
       setCurrentStep(1);
     } catch (err) {
       setApiError(err.message);
+      // Redirection intelligente selon l'erreur renvoyée par l'API
+      const msg = err.message.toLowerCase();
+      let fieldKey = null;
+      if (msg.includes("matricule") || msg.includes(" im ")) {
+        setCurrentStep(1);
+        fieldKey = "im";
+      } else if (msg.includes("téléphone") || msg.includes("telephone")) {
+        setCurrentStep(3);
+        fieldKey = "telephone";
+      } else if (msg.includes("email")) {
+        setCurrentStep(3);
+        fieldKey = "email";
+      } else if (msg.includes("username") || msg.includes("utilisateur")) {
+        setCurrentStep(5);
+        fieldKey = "username";
+      }
+
+      if (fieldKey) setErrors(prev => ({ ...prev, [fieldKey]: err.message }));
+      
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } finally {
       setSubmitting(false);
     }
@@ -324,14 +485,14 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
     ? "w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white text-sm placeholder:text-slate-600 outline-none focus:border-blue-500/60 focus:bg-white/8 transition-all"
     : "w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 text-sm placeholder:text-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/10 transition-all";
   const inputErr= dark
-    ? "w-full px-3.5 py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/5 text-white text-sm placeholder:text-slate-600 outline-none transition-all"
-    : "w-full px-3.5 py-2.5 rounded-xl border border-rose-300 bg-rose-50/50 text-slate-800 text-sm placeholder:text-slate-400 outline-none transition-all";
+    ? "w-full px-3.5 py-2.5 rounded-xl border-2 border-rose-500 bg-rose-500/10 text-white text-sm placeholder:text-slate-400 outline-none ring-4 ring-rose-500/10 transition-all"
+    : "w-full px-3.5 py-2.5 rounded-xl border-2 border-rose-500 bg-rose-50 text-slate-800 text-sm placeholder:text-slate-400 outline-none ring-4 ring-rose-500/10 transition-all";
   const selectCls = dark
-    ? "w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-200 text-sm outline-none focus:border-blue-500/60 cursor-pointer transition-all"
+    ? "w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-200 text-sm outline-none focus:border-blue-500/60 cursor-pointer transition-all [&_option]:text-black [&_option]:bg-white"
     : "w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm outline-none focus:border-blue-400 cursor-pointer transition-all";
   const selectErr = dark
-    ? "w-full px-3.5 py-2.5 rounded-xl border border-rose-500/40 bg-rose-500/5 text-slate-200 text-sm outline-none cursor-pointer transition-all"
-    : "w-full px-3.5 py-2.5 rounded-xl border border-rose-300 bg-rose-50/50 text-slate-700 text-sm outline-none cursor-pointer transition-all";
+    ? "w-full px-3.5 py-2.5 rounded-xl border-2 border-rose-500 bg-rose-500/10 text-slate-200 text-sm outline-none cursor-pointer transition-all [&_option]:text-black [&_option]:bg-white ring-4 ring-rose-500/10"
+    : "w-full px-3.5 py-2.5 rounded-xl border-2 border-rose-500 bg-rose-50 text-slate-700 text-sm outline-none cursor-pointer transition-all ring-4 ring-rose-500/10";
 
   const inp  = (name) => errors[name] ? inputErr  : inputCls;
   const sel  = (name) => errors[name] ? selectErr : selectCls;
@@ -362,6 +523,43 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
 
   return (
     <div className={`flex-1 overflow-auto ${bg}`}>
+
+      {confirmSave && (
+        <ComfirmModal
+        dark={dark}
+        type="confirm"
+        title="Enregistrer le personnel ?"
+        message="Vous êtes sur le point d'ajouter un nouveau membre. Veuillez vérifier les informations dans le recapitulatif avant de confirmer."
+        labelOui="Oui, enregistrer"
+        labelNon="Non, vérifier"
+        onConfirm={() => {
+          setConfirmSave(false);
+          handleSubmit();
+        }}
+        onCancel={() => setConfirmSave(false)}
+        />
+      )}
+
+      {confirmleave && (
+        < ComfirmModal
+        dark={dark}
+        type="danger"
+        title="Abandonner le formulaire ?"
+        message="Toutes les informations saisies seront perdues. Cette action est irréversible"
+
+      labelOui="Oui, abandonner"
+      labelNon="Non, continuer"
+      onConfirm={() => {
+        setConfirmLeave(false);
+        clearSavedData();
+        onAnnuler();
+      }}
+      onCancel={()=> setConfirmLeave(false)}
+        />
+      )
+
+      }
+
       <div className="max-w-2xl mx-auto p-4 lg:p-6">
 
         {/* ── En-tête ── */}
@@ -388,16 +586,9 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                   <div className="flex flex-col items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => {
-                        if (done) {
-                          setErrors({});
-                          setCurrentStep(step.id);
-                          window.scrollTo({ top: 0, behavior: "smooth" });
-                        }
-                      }}
-                      disabled={!done}
-                      title={done ? `Retour : ${step.label}` : undefined}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 border-2 ${
+                      // [AJOUT] On utilise handleStepClick pour permettre d'avancer ou reculer
+                      onClick={() => handleStepClick(step.id)} 
+                      className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 border-2 cursor-pointer ${
                         done
                           ? "bg-blue-600 border-blue-600 text-white cursor-pointer hover:bg-blue-500 hover:scale-110"
                           : active
@@ -589,9 +780,9 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                     {STATUTS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </Field>
-                <Field label="Spécialité" dark={dark} error={errors.specialite}>
+                <Field label="Spécialité" required dark={dark} error={errors.specialite}>
                   <input type="text" placeholder="Ex: Médecin spécialiste en chirurgie" value={form.specialite}
-                    onChange={e => handleChange("specialite", e.target.value)} className={inputCls} />
+                    onChange={e => handleChange("specialite", e.target.value)} className={inp("specialite")} />
                 </Field>
               </div>
             </div>
@@ -624,13 +815,13 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                     {fonctions.map(f => <option key={f.id} value={f.id}>{f.libelle}</option>)}
                   </select>
                 </Field>
-                <Field label="Téléphone" dark={dark}>
+                <Field label="Téléphone" required dark={dark} error={errors.telephone}>
                   <input type="tel" placeholder="Ex: 034 24 724 58" value={form.telephone}
-                    onChange={e => handleChange("telephone", e.target.value)} className={inputCls} />
+                    onChange={e => handleChange("telephone", e.target.value)} className={inp("telephone")} />
                 </Field>
-                <Field label="Email" dark={dark}>
+                <Field label="Email" dark={dark} error={errors.email}>
                   <input type="email" placeholder="Ex: jean@chu.mg" value={form.email}
-                    onChange={e => handleChange("email", e.target.value)} className={inputCls} />
+                    onChange={e => handleChange("email", e.target.value)} className={inp("email")} />
                 </Field>
               </div>
             </div>
@@ -672,17 +863,17 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Field label="Intitulé du diplôme" required={diplome.est_principal} dark={dark}
-                        error={index === 0 ? errors.diplome0 : null}>
+                        error={index === 0 ? (errors.diplome0 || errors.diplome0) : errors[`diplome${index}`]}>
                         <input type="text" placeholder="Ex: Doctorat en Médecine"
                           value={diplome.libelle}
                           onChange={e => handleDiplomeChange(index, "libelle", e.target.value)}
-                          className={index === 0 && errors.diplome0 ? inputErr : inputCls} />
+                          className={(index === 0 && errors.diplome0) || errors[`diplome${index}`] ? inputErr : inputCls} />
                       </Field>
-                      <Field label="Établissement" dark={dark}>
+                      <Field label="Établissement" dark={dark} error={errors[`etab${index}`]}>
                         <input type="text" placeholder="Ex: Université d'Antananarivo"
                           value={diplome.etablissement}
                           onChange={e => handleDiplomeChange(index, "etablissement", e.target.value)}
-                          className={inputCls} />
+                          className={errors[`etab${index}`] ? inputErr : inputCls} />
                       </Field>
                       <Field label="Année d'obtention" dark={dark}>
                         <input type="number" min="1950" max={new Date().getFullYear()}
@@ -808,7 +999,10 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
             {/* Gauche : Annuler + Précédent */}
             <div className="flex items-center gap-2">
               {/* Annuler — redirige vers le Répertoire via onAnnuler (Dashboard.jsx) */}
-              <button type="button" onClick={onAnnuler}
+              <button type="button" onClick={() => {
+                clearSavedData();
+                onAnnuler();
+              }}
                 className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
                   dark ? "border-rose-500/20 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/30"
                        : "border-rose-200 text-rose-500 hover:bg-rose-50 hover:border-rose-300"
@@ -844,7 +1038,10 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                 </svg>
               </button>
             ) : (
-              <button type="button" onClick={handleSubmit} disabled={submitting}
+              <button type="button" onClick={() => { if (validateAllAndRedirect()) setConfirmSave(true); }
+              }
+              
+              disabled={submitting}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shadow-lg shadow-emerald-600/20 hover:-translate-y-0.5">
                 {submitting ? (
                   <>
