@@ -1,31 +1,86 @@
-const pool = require('../config/db');
+
+const prisma = require('../config/prisma');
 
 async function getDashboardStats() {
-    const statsQuery = `
-        SELECT
-            COUNT(*) AS total_staff,
-            COUNT(*) FILTER (WHERE fonction = 'Médecin traitant') AS total_medecin,
-            COUNT(*) FILTER (WHERE fonction = 'Sage Femme') AS total_sage_femme,
-            COUNT(*) FILTER (WHERE fonction NOT IN ('Médecin traitant', 'Sage Femme')) AS total_admin
-        FROM chu.personnel;
-    `;
+    // on recupere les 6 groupes
+    const groupes = await prisma.groupe_fonction.findMany({
+        orderBy: { id: 'asc' },
+        include: {
+            fonction: {
+                include: {
+                    personnel: {
+                        where: {
+                            statut: { not: 'Sortie' }
+                        },
+                        select: {
+                            id: true,
+                            service_id: true,
+                        }
+                    }
+                }
+            }
+        }
+    });
 
-    const distributionQuery = `
-        SELECT
-            s.code AS code_service,
-            COUNT(p.id) AS id_medecin
-        FROM ref.service s
-        LEFT JOIN chu.personnel p ON s.id = p.service_id
-        GROUP BY s.code;    
-    `;
+    // on recupere les services
+    const services = await prisma.service.findMany({
+        orderBy: { libelle: 'asc' },
+        select: { id: true, libelle: true }
+    });
 
-    const statsResult = await pool.query(statsQuery);
-    const distributionResult = await pool.query(distributionQuery);
+    // total des personnels dans chu
+    let totalGeneral = 0;
 
-    return {
-        'summary': statsResult.rows[0] || {},
-        'distribution': distributionResult.rows
+    // cards : total personnels dans un groupe pour les 6 groupes
+    const cards = groupes.map(groupe => {
+        const personnelsDuGroupe = groupe.fonction.flatMap(f => f.personnel);
+        const total = personnelsDuGroupe.length;
+        totalGeneral += total;
+
+        return {
+            groupe_id: groupe.id,
+            groupe: groupe.libelle,
+            total,
+        };
+    });
+
+    // on ajoute une card final pour le total des personnels dans le chu
+    cards.push({
+        groupe_id: null,
+        groupe: 'Total',
+        total: totalGeneral,
+    });
+
+    // Construction donnees graphe par service
+    const grapheMap = new Map();
+
+    for (const service of services) {
+        // initialisation de chaque groupe a 0
+        const entry = { service: service.libelle };
+        for (const groupe of groupes) {
+            entry[groupe.libelle] = 0;
+        }
+        grapheMap.set(service.id, entry);
+    }
+
+    // Comptage des personnels par groupes et par serrvice
+    for (const groupe of groupes) {
+        const personnelsDuGroupe = groupe.fonction.flatMap(f => f.personnel);
+        for (const personnel of personnelsDuGroupe) {
+            // on ne compte pas un personnel sans service
+            if (personnel.service_id === null) continue;
+            const entry = grapheMap.get(personnel.service_id);
+            if (entry) {
+                // incrementer le groupe pour ce service
+                entry[groupe.libelle] = (entry[groupe.libelle] || 0) + 1;
+            }
+        }
     };
+
+    // conversion du Map en tableau pour le JSON
+    const graphe = Array.from(grapheMap.values());
+
+    return { cards, graphe };
 }
 
 module.exports = {
