@@ -1,5 +1,5 @@
-const pool = require('../config/db');
-
+// const pool = require('../config/db');
+const prisma = require('../config/prisma');
 // ------------------------------------------------------------------
 //  verification de l'age (>= 16 ans)
 // ------------------------------------------------------------------
@@ -61,7 +61,7 @@ function validerTelephone(telephone) {
 }
 
 // ------------------------------------------------------------------
-//  verification du matricule (obligatoire)
+//  verification du matricule 6 chiffres (obligatoire)
 // ------------------------------------------------------------------
 function validerIM(im) {
     if(!im) return "Le matricule est requis."
@@ -125,30 +125,27 @@ function normaliserDiplomes(diplomesRaw) {
 //  verification unicite : im, telephone, email, excludedId
 // ------------------------------------------------------------------
 async function verifierUniciteBDD({ im, telephone, email, excludedId = null }) {
-    const exclusion = excludedId ? `AND id != $2` : ""; // si excludedId existe, on l'exclut de la verification
+    const exclusion = excludedId ? { NOT: { id: BigInt(excludedId) } } : {}; // si excludedId existe, on l'exclut de la verification
     
-    if(im !== undefined) {
-        const check = await pool.query(
-            `SELECT id FROM chu.personnel WHERE im = $1 ${exclusion}`,
-            excludedId ? [im, excludedId] : [im]
-        );
-        if(check.rows.length > 0) return "Ce matricule existe déjà.";
+    if (im !== undefined) {
+        const doublon = await prisma.personnel.findFirst({
+            where: { im, ...exclusion },
+        });
+        if(doublon) return "Ce matricule existe déjà.";
     }
 
-    if(telephone !== undefined && telephone !== null) {
-        const check = await pool.query(
-            `SELECT id FROM chu.personnel WHERE telephone = $1 ${exclusion}`,
-            excludedId ? [telephone, excludedId] : [telephone]
-        );
-        if(check.rows.length > 0) return "Ce numero de telephone existe déjà.";
+    if (telephone !== undefined && telephone !== null) {
+        const doublon = await prisma.personnel.findFirst({
+            where: { telephone, ...exclusion },
+        });
+        if(doublon) return "Ce numero de telephone existe déjà.";
     }
 
     if(email !== undefined && email !== null) {
-        const check = await pool.query(
-            `SELECT id FROM chu.personnel WHERE email = $1 ${exclusion}`,
-            excludedId ? [email, excludedId] : [email]
-        );
-        if(check.rows.length > 0) return "Cet email existe déjà.";
+        const doublon = await prisma.personnel.findFirst({
+            where: { email, ...exclusion },
+        });
+        if(doublon) return "Cet email existe déjà.";
     }
 
     return null; // pas de doublon 

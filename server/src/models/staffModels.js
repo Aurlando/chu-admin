@@ -1,93 +1,126 @@
-const pool = require("../config/db");
+const prisma = require('../config/prisma');
+const path = require('path');
+const fs = require('fs');
+
+
+// Calculer l'age à partir de la date de naissance
+// Équivalent de DATE_PART('year', AGE(date_naissance))
+function calculerAge(date) {
+    if (!date) return null;
+
+    const naissance = new Date(date);
+    if (isNaN(naissance.getTime())) return null;
+
+    const today = new Date();
+    let age = today.getFullYear() - naissance.getFullYear();
+    const moisDiff = today.getMonth() - naissance.getMonth();
+    if (moisDiff < 0 || (moisDiff === 0 && today.getDate() < naissance.getDate())) {
+        age--;
+    }
+    return age;
+}
+
+// Formater la date de naissance
+// Équivalent de TO_CHAR(date_naissance, 'DD/MM/YYYY')
+function formaterDate(date) {
+    if (!date) return null;
+
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return null;
+
+    const jour = String(d.getDate()).padStart(2, '0');
+    const mois = String(d.getMonth() + 1).padStart(2, '0');
+    const annee = d.getFullYear();
+
+    return `${jour}/${mois}/${annee}`;
+}
 
 // ── LISTE DU STAFF ────────────────────────────────────────────────
-async function getAllStaff({
-    search = "",
-    department = "",
-    fonction = "",
-    page = 1,
-    limit = 10,
-} = {}) {
-    // -- PARAMÈTRES DE PAGINATION ----------------------------------
-    const offset = (page - 1) * limit; // ligne 1 de la page N = (N-1) * taille_page
+async function getAllStaff({  search = "", department = "", fonction = "", page = 1, limit = 10, } = {}) {
+    // Construction du WHERE dynamique Prisma pour les filtres
+    const where = {
+        AND: [],
+    }
 
-    // -- CONSTRUCTION DYNAMIQUE DE LA REQUÊTE ----------------------
-    const conditions = []; // ["m.nom ILIKE $1", "s.libelle = $2"]
-    const params = []; // ["%rakoto%", "Chirurgie"]
-
+    // Filtre de recherche (nom, prenoms ou matricule)
     if (search) {
-        params.push(`%${search}%`);
-        const idx = params.length;
-        conditions.push(`(
-            p.nom     ILIKE $${idx} OR
-            p.prenoms ILIKE $${idx} OR
-            CAST(p.im AS TEXT) ILIKE $${idx}
-        )`);
+        where.AND.push({
+            OR: [
+                { nom: { contains: search, mode: 'insensitive' } },
+                { prenoms: { contains: search, mode: 'insensitive' } },
+                { im: { contains: search, mode: 'insensitive' } },
+            ]
+        })
     }
 
+    // Filtre de departement
     if (department) {
-        params.push(department);
-        conditions.push(`LOWER(s.libelle) = LOWER($${params.length})`);
+        where.AND.push({
+            service: {
+                libelle: { equals: department, mode: 'insensitive' }
+            }
+        })
     }
 
+    // Filtre de fonction
     if (fonction) {
-        params.push(fonction);
-        conditions.push(`LOWER(f.libelle) = LOWER($${params.length})`);
+        where.AND.push({
+            ref_fonction: {
+                libelle: { equals: fonction, mode: 'insensitive' }
+            }
+        })
     }
 
-    const whereClause =
-        conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    // si aucun filtre on vide le where
+    const whereClause = where.AND.length > 0 ? where : {};
 
-    // -- REQUÊTE PRINCIPALE (avec pagination) ----------------------
-    params.push(limit); // $N   → nb lignes à retourner
-    params.push(offset); // $N+1 → nb lignes à sauter
-    const limitIdx = params.length - 1; // index du $limit  dans params
-    const offsetIdx = params.length; // index du $offset dans params
-
-    const staffsQuery = `
-        SELECT
-            p.id,
-            p.nom,
-            p.prenoms,
-            p.im               AS matricule,
-            INITCAP(s.libelle) AS departement,
-            INITCAP(f.libelle) AS service
-        FROM chu.personnel p
-        LEFT JOIN ref.service s ON s.id = p.service_id
-        LEFT JOIN ref.fonction f ON f.id = p.fonction_id
-        ${whereClause}
-        ORDER BY p.nom ASC, p.prenoms ASC
-        LIMIT  $${limitIdx}
-        OFFSET $${offsetIdx}
-    `;
-
-    // -- REQUÊTE DE COMPTAGE (pour calculer le total de pages) ------
-    const countParams = params.slice(0, params.length - 2); // retire les 2 derniers (limit, offset)
-    const countQuery = `
-        SELECT COUNT(*) AS total
-        FROM chu.personnel p
-        LEFT JOIN ref.service s ON s.id = p.service_id
-        LEFT JOIN ref.fonction f ON f.id = p.fonction_id
-        ${whereClause}
-    `;
-
-    // -- EXÉCUTION EN PARALLÈLE ------------------------------------
-    // Promise.all([...]) lance les deux requêtes EN MÊME TEMPS
-    const [staffResult, countResult] = await Promise.all([
-        pool.query(staffsQuery, params),
-        pool.query(countQuery, countParams),
+    // Execution en parallele : findMany + count
+    const [data, total] = await Promise.all([
+        prisma.personnel.findMany({
+            where: whereClause,
+            select: {
+                id: true,
+                nom: true,
+                prenoms: true,
+                im: true,
+                service: {
+                    select: { libelle: true }
+                },
+                ref_fonction: {
+                    select: { libelle: true }
+                },
+            },
+            orderBy: [
+                { nom: 'asc' },
+                { prenoms: 'asc' },
+            ],
+            // Pagination : skip = OFFSET, take = LIMIT
+            skip: (page - 1) * limit,
+            take: limit,
+        }),
+        prisma.personnel.count({ where: whereClause }),
     ]);
 
-    const total = parseInt(countResult.rows[0].total, 10);
-    const totalPages = Math.ceil(total / limit);
+    const formaterDate = data.map(p => ({
+        id: p.id,
+        nom: p.nom,
+        prenoms: p.prenoms,
+        matricule: p.im,
+        departement: p.service
+            ? p.service.libelle.charAt(0).toUpperCase() + p.service.libelle.slice(1).toLowerCase()
+            : null,
+        service: p.ref_fonction
+            ? p.ref_fonction.libelle.charAt(0).toUpperCase() + p.ref_fonction.libelle.slice(1).toLowerCase()
+            : null,
+    }));
 
     return {
-        data: staffResult.rows,
+        data: formaterDate,
         pagination: {
             total,
             page,
             limit,
-            totalPages,
+            totalPages: Math.ceil(total / limit),
         },
     };
 }
@@ -95,187 +128,160 @@ async function getAllStaff({
 // ── DROPDOWNS ─────────────────────────────────────────────────────
 // Dropdown Department
 async function getDistinctDepartments() {
-    const result = await pool.query(`
-        SELECT id, INITCAP(libelle) AS libelle
-        FROM ref.service
-        ORDER BY libelle ASC
-    `);
-    return result.rows;
+    const services = await prisma.service.findMany({
+        select: { id: true, libelle: true },
+        orderBy: { libelle: 'asc' },
+    });
+
+    return services.map(s => ({
+        id: s.id,
+        libelle: s.libelle.charAt(0).toUpperCase() + s.libelle.slice(1).toLowerCase(),
+    }));
 }
 
 // Dropdown Fonction
 async function getDistinctFonctions() {
-    const result = await pool.query(`
-        SELECT id, INITCAP(libelle) AS libelle
-        FROM ref.fonction
-        ORDER BY libelle ASC
-    `);
-    return result.rows;
-}
+    const fonctions = await prisma.fonction.findMany({
+        select: { id: true, libelle: true },
+        orderBy: { libelle: 'asc' },
+    });
+
+    return fonctions.map(f => ({
+        id: f.id,
+        libelle: f.libelle.charAt(0).toUpperCase() + f.libelle.slice(1).toLowerCase(),
+    }));
+};
 
 // ── PROFIL ────────────────────────────────────────────────────────
 async function getStaffById(id) {
-    const query = `
-        SELECT
-            p.id,
-            p.nom,
-            p.prenoms,
-            p.im AS matricule,
-            CONCAT('/uploads/', p.photo_profil) AS photo_profil,
+    const personnel = await prisma.personnel.findUnique({
+        where: { id: BigInt(id) },
 
-            TO_CHAR(p.date_naissance, 'DD/MM/YYYY') AS date_naissance,
-            CAST(DATE_PART('year', AGE(p.date_naissance)) AS INT) AS age,
-            
-            p.categorie, 
-            p.classe, 
-            p.echelon,
+        include: {
+            service: {
+                select: { id: true, libelle: true }
+            },
+            ref_fonction: {
+                select: { id: true, libelle: true }
+            },
+            diplomes: {
+                orderBy: { est_principal: 'desc' },
+                select: {
+                    id: true,
+                    diplome: true,
+                    institution: true,
+                    annee_obtention: true,
+                    est_principal: true,
+                },
+            },
 
-            
-            TO_CHAR(p.date_entree_admin, 'DD/MM/YYYY') AS date_entree_admin,
-            CAST(DATE_PART('year', AGE(CURRENT_DATE, p.date_entree_admin)) AS INT) AS annees_exercice,
-            
-            p.specialite,
-            INITCAP(f.libelle) AS service,
-            p.telephone,
-            p.email,
-            INITCAP(s.libelle) AS departement,
-            p.statut,
-            
-            COALESCE(
-                (
-                    SELECT JSON_AGG(
-                        JSON_BUILD_OBJECT(
-                            'id',              d.id,
-                            'libelle',         d.libelle,
-                            'etablissement',   d.etablissement,
-                            'annee_obtention', d.annee_obtention,
-                            'est_principal',   d.est_principal
-                        )
-                        ORDER BY d.est_principal DESC    
-                    )
-                    FROM ref.diplome d   
-                    WHERE p.id = d.id_personnel 
-                ), '[]'::json
-            ) AS diplomes
+            auth_user: {
+                select: {
+                    username: true,
+                }
+            },
+        },
+    });
 
-        FROM chu.personnel p
-        LEFT JOIN ref.service s ON s.id = p.service_id
-        LEFT JOIN ref.fonction f ON f.id = p.fonction_id
-        WHERE p.id = $1
-    `;
+    if (!personnel) return null;
 
-    const result = await pool.query(query, [id]);
-    return result.rows[0];
+    const dateNaissanceFormatee = formaterDate(personnel.date_naissance);
+    const dateEntreeAdminFormatee = formaterDate(personnel.annee_entree_admin);
+    const age = calculerAge(personnel.date_naissance);
+    const anneesExercice = calculerAge(personnel.date_entree_admin);
+
+    // INITCAP sur libelles
+    const toInitCap = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : null;
+
+    return {
+        id: personnel.id,
+        nom: personnel.nom,
+        prenoms: personnel.prenoms,
+        matricule: personnel.im,
+        photo_profil: personnel.photo_profil ? `/server/uploads/${personnel.photo_profil}` : `/server/uploads/default-avatar.png`,
+        date_naissance: dateNaissanceFormatee,
+        age: age,
+        categorie: personnel.categorie,
+        classe: personnel.classe,
+        echelon: personnel.echelon,
+        date_entree_admin: dateEntreeAdminFormatee,
+        annees_exercice: anneesExercice,
+        specialite: personnel.specialite,
+        service: toInitCap(personnel.ref_fonction?.libelle),
+        fonction_id: personnel.fonction_id,
+        telephone: personnel.telephone,
+        email: personnel.email,
+        departement: toInitCap(personnel.service?.libelle),
+        service_id: personnel.service_id,
+        statut: personnel.statut,
+        a_acces_sih: personnel.auth_user?.username ?? null,
+        username_sih: personnel.auth_user?.username ?? null,
+        diplomes: personnel.diplomes,
+    }
 }
-/*  -- JSON_AGG() agrège plusieurs lignes en un tableau JSON
-    -- JSON_BUILD_OBJECT() construit un objet JSON clé/valeur
-    -- COALESCE(..., '[]'::json) : si le personnel n'a AUCUN diplôme,
-    JSON_AGG retourne NULL — on le remplace par un tableau JSON vide []
-    pour que le front reçoive toujours un tableau (jamais null)
-*/
 
 // ── AJOUT ─────────────────────────────────────────────────────────
 async function addPersonnel({
-    nom,
-    prenoms,
-    im,
-    date_naissance,
-    categorie,
-    classe,
-    echelon,
-    specialite,
-    telephone,
-    email,
-    service_id,
-    fonction_id,
-    statut,
-    photo_profil,
+    nom, prenoms, im, date_naissance,
+    categorie, classe, echelon,
+    specialite, telephone, email,
+    service_id, fonction_id, statut, photo_profil,
     diplomes = [],
-    donner_acces = false,
-    username,
-    password_hash,
+    donner_acces = false, username, password_hash,
 }) {
-    const client = await pool.connect(); // reserver une connexion du pool permettant de faire plusieurs requetes dans la même transaction, avy eo BEGIN-COMMIT-ROLLBACK
+    return await prisma.$transaction(async (tx) => {
 
-    try {
-        await client.query("BEGIN"); // debut de la transaction
-
-        const personnelResult = await client.query(
-            `INSERT INTO chu.personnel (
-                nom, prenoms, im, date_naissance, 
-                categorie, classe, echelon,
-                date_entree_admin,
-                specialite, telephone, email,
-                service_id, fonction_id, statut, photo_profil
-            ) 
-            VALUES (
-                $1, $2, $3, $4,
-                $5, $6, $7,
-                CURRENT_DATE,
-                $8, $9, $10,
-                $11, $12, $13, $14
-            )
-            RETURNING id, im`,
-            [
-                nom,
+        // INSERT chu.personnel
+        const personnel = await tx.personnel.create({
+            data: {
+                nom, 
                 prenoms,
                 im,
-                date_naissance,
+                date_naissance: new Date(date_naissance),
                 categorie,
                 classe,
                 echelon,
+                date_entree_admin: new Date(),
                 specialite,
                 telephone,
                 email,
-                service_id,
-                fonction_id,
+                service_id: BigInt(service_id),
+                fonction_id: BigInt(fonction_id),
                 statut,
                 photo_profil,
-            ],
-        );
+            },
+        });
 
-        const { id: personnelId, im: personnelIm } = personnelResult.rows[0]; // prends id et im du RETURNING et on renomme avec personnelId et personnelIm
+        const personnelId = personnel.id;
+        const personnelIm = personnel.im;
 
-        for (const diplome of diplomes) {
-            // Respect des types et des champs optionnels pour éviter les erreurs SQL
-            const anneeObtention = Number.isFinite(
-                Number(diplome.annee_obtention),
-            ) ? Number(diplome.annee_obtention) : null;
-
-            await client.query(
-                `INSERT INTO ref.diplome (
-                    libelle, etablissement, annee_obtention, est_principal, id_personnel
-                )
-                VALUES ($1, $2, $3, $4, $5)`,
-                [
-                    diplome.libelle,
-                    diplome.etablissement || null,
-                    anneeObtention,
-                    Boolean(diplome.est_principal),
-                    personnelId,
-                ],
-            );
+        // INSERT ref.diplome
+        if (diplomes.length > 0) {
+            await tx.diplome.createMany({
+                data: diplomes.map(d => ({
+                    libelle: d.libelle,
+                    etablissement: d.etablissement || null,
+                    annee_obtention: d.annee_obtention ?? null,
+                    est_principal: Boolean(d.est_principal),
+                    id_personnel: personnelId,
+                })),
+            });
         }
 
-        // MBOLA MILA JERENA LE ROLE io
-        if (donner_acces) {
-            await client.query(
-                `INSERT INTO ref.auth_user (username, password_hash, role, id_personnel)
-                 VALUES ($1, $2, 'user', $3)`,
-                [username, password_hash, personnelId],
-            );
+        // INSERT ref.auth_user si acces SIH donne
+        if (donner_acces && username && password_hash) {
+            await tx.auth_user.create({
+                data: {
+                    username,
+                    password_hash,
+                    role: 'user',
+                    id_personnel: personnelId,
+                },
+            });
         }
-
-
-        await client.query("COMMIT"); // validation des transactions si aucune erreur
 
         return { personnelId, personnelIm };
-    } catch (error) {
-        await client.query("ROLLBACK"); // annulation de toutes les requetes si une erreur survient
-        throw error; // relance l'erreur pour que le controller la gère
-    } finally {
-        client.release(); // toujours libérer la connexion, que la transaction réussisse ou échoue
-    }
+    });
 }
 
 // ── UPDATE ────────────────────────────────────────────────────────
@@ -291,114 +297,111 @@ async function updatePersonnel({
     donner_acces,
     username, password_hash,
 }) {
-    const client = await pool.connect();
-    const fs   = require("fs");
-    const path = require("path");
+    await prisma.$transaction(async (tx) => {
+        const dataToUpdate = {};
 
-    try {
-        await client.query("BEGIN");
+        // ajout des champs non undefined
+        if (nom !== undefined) dataToUpdate.nom = nom;
+        if (prenoms !== undefined) dataToUpdate.prenoms = prenoms;
+        if (date_naissance !== undefined) dataToUpdate.date_naissance = new Date(date_naissance);
+        if (categorie !== undefined) dataToUpdate.categorie = categorie;
+        if (classe !== undefined) dataToUpdate.classe = classe;
+        if (echelon !== undefined) dataToUpdate.echelon = echelon;
+        if (specialite !== undefined) dataToUpdate.specialite = specialite;
+        if (telephone !== undefined) dataToUpdate.telephone = telephone;
+        if (email !== undefined) dataToUpdate.email = email;
+        if (service_id !== undefined) dataToUpdate.service_id = BigInt(service_id);
+        if (fonction_id !== undefined) dataToUpdate.fonction_id = BigInt(fonction_id);
+        if (statut !== undefined) dataToUpdate.statut = statut;
+        if (photo_profil !== undefined) dataToUpdate.photo_profil = photo_profil;
 
-        // ── SET dynamique pour chu.personnel ──────────────────────
-        const setClauses = [];
-        const setParams  = [];
-
-        // Helper pour construire les clauses SET de manière dynamique
-        const ajouter = (colonne, valeur) => {
-            if (valeur !== undefined) {
-                setParams.push(valeur);
-                setClauses.push(`${colonne} = $${setParams.length}`);
-            }
-        };
-
-        ajouter("nom", nom);
-        ajouter("prenoms", prenoms);
-        ajouter("date_naissance", date_naissance);
-        ajouter("categorie", categorie);
-        ajouter("classe", classe);
-        ajouter("echelon", echelon);
-        ajouter("specialite", specialite);
-        ajouter("telephone", telephone);
-        ajouter("email", email);
-        ajouter("service_id", service_id);
-        ajouter("fonction_id", fonction_id);
-        ajouter("statut", statut);
-        ajouter("photo_profil", photo_profil);
-
-        if (setClauses.length > 0) {
-            setParams.push(id); // WHERE id = $N (dernier paramètre)
-            await client.query(
-                `UPDATE chu.personnel SET ${setClauses.join(", ")} WHERE id = $${setParams.length}`,
-                setParams,
-            );
+        // UPDATE only si un cham a ete modifie
+        if (Object.keys(dataToUpdate).length > 0) {
+            await tx.personnel.update({
+                where: { id: BigInt(id) },
+                data: dataToUpdate,
+            });
         }
 
-        // ── Diplômes : INSERT ou UPDATE ───────────────────────────
-        for(const diplome of diplomes) {
-            const anneeObtention = Number.isFinite(Number(diplome.annee_obtention)) ? Number(diplome.annee_obtention) :null;
-            const libelle = diplome.libelle?.toString().trim() || "";
-            const etablissement = diplome.etablissement?.toString().trim() || null;
-            const estPrincipal = Boolean(diplome.est_principal);
-
-            if(!libelle) continue;
-
-            if(diplome.id) {
-                await client.query(
-                    `UPDATE ref.diplome
-                     SET libelle = $1, etablissement = $2,
-                         annee_obtention = $3, est_principal = $4
-                     WHERE id = $5 AND id_personnel = $6`,
-                    [libelle, etablissement, anneeObtention, estPrincipal, diplome.id, id],
-                );
+        // INSERT ou UPDATE
+        for (const diplome of diplomes) {
+            if (!diplome.libelle) constinue;
+            if (diplome.id) {
+                // UPDATE si a un id
+                await tx.diplome.update({
+                    where: {
+                        id: parseInt(diplome.id, 10),
+                        id_personnel: BigInt(id),
+                    },
+                    data: {
+                        libelle: diplome.libelle,
+                        etablissement: diplome.etablissement || null,
+                        annee_obtention: diplome.annee_obtention ?? null,
+                        est_principal: Boolean(diplome.est_principal),
+                    },
+                });
             } else {
-                await client.query(
-                    `INSERT INTO ref.diplome (libelle, etablissement, annee_obtention, est_principal, id_personnel)
-                     VALUES ($1, $2, $3, $4, $5)`,
-                    [libelle, etablissement, anneeObtention, estPrincipal, id],
-                );
+                // INSERT si pas d'id
+                await tx.diplome.create({
+                    data: {
+                        libelle: diplome.libelle,
+                        etablissement: diplome.etablissement || null,
+                        annee_obtention: diplome.annee_obtention ?? null,
+                        est_principal: Boolean(diplome.est_principal),
+                        id_personnel: BigInt(id),
+                    },
+                });
             }
         }
 
-        // ── Accès SIH : upsert ────────────────────────────────────
-        if(donner_acces && username) {
+        // upsert = INSERT si absent, UPDATE si present
+        if (donner_acces && username) {
             if (password_hash !== undefined) {
-                await client.query(
-                    `INSERT INTO ref.auth_user (username, password_hash, role, id_personnel)
-                     VALUES ($1, $2, 'user', $3)
-                     ON CONFLICT (id_personnel) DO UPDATE SET
-                         username      = EXCLUDED.username,
-                         password_hash = EXCLUDED.password_hash`,
-                    [username, password_hash, id],
-                );
-            } else {
-                await client.query(
-                    `INSERT INTO ref.auth_user (username, password_hash, role, id_personnel)
-                     VALUES ($1, '', 'user', $2)
-                     ON CONFLICT (id_personnel) DO UPDATE SET
-                         username = EXCLUDED.username`,
-                        [username, id],
-                );
+                // upsert complet si nouveau password
+                await tx.auth_user.upsert({
+                    where: { id_personnel: BigInt(id) },
+                    create: {
+                        // si pas de compte -> creer
+                        username,
+                        password_hash,
+                        role: 'user',
+                        id_personnel: BigInt(id),
+                    },
+                    update: {
+                        // si compte existe -> update
+                        username,
+                        password_hash,
+                    },
+                });
+            }
+            else {
+                // upsert username si pas de nouveau password
+                await tx.auth_user.upsert({
+                    where: { id_personnel: BigInt(id) },
+                    create: {
+                        username,
+                        password_hash: '',
+                        role: 'user',
+                        id_personnel: BigInt(id),
+                    },
+                    update: {
+                        username,
+                    }
+                })
             }
         }
+    });
 
-        await client.query("COMMIT");
-
-        // ── Suppression ancienne photo APRÈS le COMMIT ────────────
-        if (photo_profil && anciennePhoto && anciennePhoto !== "default-avatar.png") {
-            const cheminAncien = path.join(__dirname, "..", "..", "uploads", anciennePhoto);
-            try {
-                if (fs.existsSync(cheminAncien)) fs.unlinkSync(cheminAncien);
-            } catch {
-                console.warn(`[updatePersonnel] Impossible de supprimer : ${anciennePhoto}`);
-            }
+    if (photo_profil && anciennePhoto && anciennePhoto !== 'default-avatar.png') {
+        const cheminAncien = path.join(__dirname, '..', '..', 'uploads', anciennePhoto);
+        try {
+            if (fs.existsSync(cheminAncien)) fs.unlinkSync(cheminAncien);
+        } catch {
+            console.warn(`[updatePersonnel] Impossible de supprimer : ${anciennePhoto}`);
         }
-
-        return { success: true };
-    } catch (error) {
-        await client.query("ROLLBACK");
-        throw error;
-    } finally {
-        client.release();
     }
+
+    return { success: true };
 }
 
 module.exports = {

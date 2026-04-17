@@ -3,7 +3,6 @@ const fs = require("fs");
 const bcrypt = require("bcrypt");
 const staffModels = require("../models/staffModels");
 const validators = require("../validators/staffValidators");
-const console = require("console");
 
 // Paramètres acceptés dans l'URL (query string) :
 //   ?search=dupont&department=Chirurgie&page=2&limit=10
@@ -111,39 +110,16 @@ async function addStaff(req, res) {
     }
     // ── 1. Champs obligatoires ────────────────────────────────────
     const {
-        nom,
-        prenoms,
-        im,
-        date_naissance,
-        categorie,
-        classe,
-        echelon,
-        specialite,
-        telephone,
-        email,
-        service_id,
-        fonction_id,
-        statut,
-        donner_access,
-        username,
-        password,
+        nom, prenoms, im, date_naissance,
+        categorie, classe, echelon,
+        specialite, telephone, email,
+        service_id, fonction_id, statut,
+        donner_access, username, password,
         diplomes: diplomesRaw,
     } = req.body;
 
     // champs obligatoire pour creer un personnel
-    const champsObligatoires = {
-        nom,
-        prenoms,
-        im,
-        date_naissance,
-        categorie,
-        classe,
-        echelon,
-        telephone,
-        service_id,
-        fonction_id,
-        statut,
-    };
+    const champsObligatoires = { nom, prenoms, im, date_naissance, categorie, classe, echelon, telephone, service_id, fonction_id, statut, };
     const manquants = Object.entries(champsObligatoires) // transforme l'objet en tableau de tableux; {nom: "", prenoms: "Rakoto", ...} ==> [["nom", ""], ["prenoms", "Rakoto"], ...]
         .filter(([_, valeur]) => !valeur || valeur.toString().trim() === "") // ce qui n'ont pas de valeur ou vide
         .map(([cle]) => cle); // garder only nom du champ
@@ -240,8 +216,7 @@ async function addStaff(req, res) {
     } catch (error) {
         validators.supprimerFichierSiExiste(cheminFichier);
         console.error("[addStaff] Erreur :", error);
-        if(error.code === "23505") return res.status(409).json({ message: "Ce matricule ou username existe déjà." });
-        if(error.code === "22P02" || error.code === "23502") return res.status(400).json({ message: "Données invalides, veuillez vérifier les champs saisis." });
+        if (error.code === 'P2002') return res.status(409).json({ message: 'Ce matricule ou username existe déjà.' });
         res.status(500).json({ message: "Erreur interne du serveur" });
     }
 }
@@ -411,8 +386,7 @@ async function updateStaff(req, res) {
             validators.supprimerFichierSiExiste(path.join(__dirname, "..", "..", "uploads", photo_profil));
         }
         console.error("[updateStaff] Erreur :", error);
-        if (error.code === "23505") return res.status(409).json({ message: "Ce username existe déjà." });
-        if (error.code === "22P02" || error.code === "23502") return res.status(400).json({ message: "Données invalides." });
+        if (error.code === 'P2002') return res.status(409).json({ message: 'Ce username existe déjà.' });
         res.status(500).json({ message: "Erreur interne du serveur" });
     }
 }
