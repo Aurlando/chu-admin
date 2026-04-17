@@ -95,13 +95,40 @@ function formatIM(im) {
 // ------------------------------------------------------------------
 //  verification des diplomes et normalisation de format
 // ------------------------------------------------------------------
+const STATUTS_ENUM_MAP = {
+    "En activité": "En_activit_",
+    "En absence": "En_absence",
+    "Sortie": "Sortie",
+    "En_activit_": "En_activit_",
+    "En_absence": "En_absence",
+};
+
+const STATUTS_LABEL_MAP = {
+    En_activit_: "En activité",
+    En_absence: "En absence",
+    Sortie: "Sortie",
+};
+
+function normaliserStatut(statutRaw) {
+    if (!statutRaw) return null;
+    const statut = statutRaw.toString().trim();
+    return STATUTS_ENUM_MAP[statut] ?? null;
+}
+
+function formatStatutPourClient(statutEnum) {
+    if (!statutEnum) return null;
+    return STATUTS_LABEL_MAP[statutEnum] ?? statutEnum;
+}
+
 function normaliserDiplomes(diplomesRaw) {
     if(!diplomesRaw) {
         return { erreur: null, diplomes: [] } // diplomes non obligatoires
     }
 
     try {
-        const diplomesParsed = JSON.parse(diplomesRaw);
+        const diplomesParsed = typeof diplomesRaw === 'string'
+            ? JSON.parse(diplomesRaw)
+            : diplomesRaw;
 
         if(!Array.isArray(diplomesParsed)) throw new Error("Format Diplomes invalide.");
 
@@ -192,6 +219,8 @@ module.exports = {
     validerIM,
     formatIM,
     normaliserDiplomes,
+    normaliserStatut,
+    formatStatutPourClient,
     verifierUniciteBDD,
     validerAccesSIH,
     supprimerFichierSiExiste

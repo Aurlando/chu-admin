@@ -94,7 +94,7 @@ async function getStaffProfile(req, res) {
             data: profile,
         });
     } catch (error) {
-        console.error("[getStaffPtofile] Erreur :", error);
+        console.error("[getStaffProfile] Erreur :", error);
         res.status(500).json({ message: "Erreur interne du serveur" });
     }
 }
@@ -114,7 +114,7 @@ async function addStaff(req, res) {
         categorie, classe, echelon,
         specialite, telephone, email,
         service_id, fonction_id, statut,
-        donner_access, username, password,
+        donner_access, donner_acces, username, password,
         diplomes: diplomesRaw,
     } = req.body;
 
@@ -134,6 +134,18 @@ async function addStaff(req, res) {
         });
     }
 
+    const serviceId = parseInt(service_id, 10);
+    const fonctionId = parseInt(fonction_id, 10);
+    if (Number.isNaN(serviceId) || serviceId <= 0) {
+        return erreur400("service_id invalide");
+    }
+    if (Number.isNaN(fonctionId) || fonctionId <= 0) {
+        return erreur400("fonction_id invalide");
+    }
+
+    const statutNormalise = validators.normaliserStatut(statut);
+    if (!statutNormalise) return erreur400("Statut invalide");
+
     // ── 2. Validations métier ─────────────────────────────────────
     const erreurIM = validators.validerIM(im);
     if(erreurIM) return erreur400(erreurIM);
@@ -148,7 +160,7 @@ async function addStaff(req, res) {
     if(erreurEmail) return erreur400(erreurEmail);
 
     // ── 3. Accès SIH ──────────────────────────────────────────────
-    const accesBoolean = donner_access === "true";
+    const accesBoolean = (donner_access ?? donner_acces) === "true";
     const erreurSIH = validators.validerAccesSIH({
         donner_acces: accesBoolean, username, password,
         aDejaUnCompte: false
@@ -189,9 +201,9 @@ async function addStaff(req, res) {
             specialite: specialite?.trim() || null,
             telephone: telephone.trim(),
             email: email?.trim() || null,
-            service_id: parseInt(service_id, 10),
-            fonction_id: parseInt(fonction_id, 10),
-            statut,
+            service_id: serviceId,
+            fonction_id: fonctionId,
+            statut: statutNormalise,
             photo_profil: req.file ? `photo-profil-${imNormalise.replace(" ", "")}.png` : "default-avatar.png",
             diplomes,
             donner_acces: accesBoolean,
@@ -205,7 +217,14 @@ async function addStaff(req, res) {
             const ancienChemin = path.join(dossier, req.file.filename);
             const nouveauNom = `photo-profil-${personnelIm.toString().replace(" ", "")}.png`;
             const nouveauChemin = path.join(dossier, nouveauNom);
-            fs.renameSync(ancienChemin, nouveauChemin);
+
+            try {
+                fs.renameSync(ancienChemin, nouveauChemin);
+            } catch (error) {
+                validators.supprimerFichierSiExiste(ancienChemin);
+                console.error("[addStaff] Erreur renommage photo :", error);
+                return res.status(500).json({ message: "Erreur lors du traitement de la photo" });
+            }
         }
 
         res.status(201).json({
@@ -269,12 +288,30 @@ async function updateStaff(req, res) {
     const service_id = ouInt(body.service_id);
     const fonction_id = ouInt(body.fonction_id);
     const statut = ouString(body.statut);
-    
+
     //Helper update : reutilise erreur400 avec nettoyage fichier
     const erreur400 = (message) => {
         validators.supprimerFichierSiExiste(req.file?.path);
         return res.status(400).json({ message });
     };
+    
+    if (body.service_id !== undefined && service_id === undefined) {
+        return erreur400("service_id invalide");
+    }
+    if (body.fonction_id !== undefined && fonction_id === undefined) {
+        return erreur400("fonction_id invalide");
+    }
+    if (service_id !== undefined && service_id <= 0) {
+        return erreur400("service_id invalide");
+    }
+    if (fonction_id !== undefined && fonction_id <= 0) {
+        return erreur400("fonction_id invalide");
+    }
+
+    if (statut !== undefined) {
+        const statutNormalise = validators.normaliserStatut(statut);
+        if (!statutNormalise) return erreur400("Statut invalide");
+    }
 
     // ── 4. Validations — seulement pour les champs présents ───────
     // Si un champ est undefined (non envoyé), on ne le valide pas car il ne sera pas modifié de toute façon
@@ -338,7 +375,7 @@ async function updateStaff(req, res) {
     }
 
     // ── 8. Accès SIH ──────────────────────────────────────────────
-    const donner_acces = body.donner_access === "true";
+    const donner_acces = (body.donner_access ?? body.donner_acces) === "true";
     const aDejaUnCompte = Boolean(existant.a_acces_sih);
 
     let password_hash = undefined;
@@ -371,7 +408,7 @@ async function updateStaff(req, res) {
             email,
             service_id,
             fonction_id,
-            statut,
+            statut: statut !== undefined ? validators.normaliserStatut(statut) : undefined,
             photo_profil,
             anciennePhoto, 
             diplomes,
@@ -379,6 +416,9 @@ async function updateStaff(req, res) {
             username:     donner_acces ? body.username?.trim() : undefined,
             password_hash,
         });
+
+        // Supprimer l'ancienne photo après la mise à jour en BDD
+        staffModels.supprimerAnciennePhoto(photo_profil, anciennePhoto);
 
         res.status(200).json({ message: "Personnel mis à jour avec succès" });
     } catch (error) {

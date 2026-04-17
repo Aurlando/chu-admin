@@ -1,6 +1,7 @@
 const prisma = require('../config/prisma');
 const path = require('path');
 const fs = require('fs');
+const validators = require('../validators/staffValidators');
 
 
 // Calculer l'age à partir de la date de naissance
@@ -65,7 +66,7 @@ async function getAllStaff({  search = "", department = "", fonction = "", page 
     // Filtre de fonction
     if (fonction) {
         where.AND.push({
-            ref_fonction: {
+            fonction: {
                 libelle: { equals: fonction, mode: 'insensitive' }
             }
         })
@@ -86,7 +87,7 @@ async function getAllStaff({  search = "", department = "", fonction = "", page 
                 service: {
                     select: { libelle: true }
                 },
-                ref_fonction: {
+                fonction: {
                     select: { libelle: true }
                 },
             },
@@ -101,7 +102,7 @@ async function getAllStaff({  search = "", department = "", fonction = "", page 
         prisma.personnel.count({ where: whereClause }),
     ]);
 
-    const formaterDate = data.map(p => ({
+    const formatedData = data.map(p => ({
         id: p.id,
         nom: p.nom,
         prenoms: p.prenoms,
@@ -109,13 +110,13 @@ async function getAllStaff({  search = "", department = "", fonction = "", page 
         departement: p.service
             ? p.service.libelle.charAt(0).toUpperCase() + p.service.libelle.slice(1).toLowerCase()
             : null,
-        service: p.ref_fonction
-            ? p.ref_fonction.libelle.charAt(0).toUpperCase() + p.ref_fonction.libelle.slice(1).toLowerCase()
+        service: p.fonction
+            ? p.fonction.libelle.charAt(0).toUpperCase() + p.fonction.libelle.slice(1).toLowerCase()
             : null,
     }));
 
     return {
-        data: formaterDate,
+        data: formatedData,
         pagination: {
             total,
             page,
@@ -161,15 +162,15 @@ async function getStaffById(id) {
             service: {
                 select: { id: true, libelle: true }
             },
-            ref_fonction: {
+            fonction: {
                 select: { id: true, libelle: true }
             },
-            diplomes: {
+            diplome: {
                 orderBy: { est_principal: 'desc' },
                 select: {
                     id: true,
-                    diplome: true,
-                    institution: true,
+                    libelle: true,
+                    etablissement: true,
                     annee_obtention: true,
                     est_principal: true,
                 },
@@ -198,7 +199,7 @@ async function getStaffById(id) {
         nom: personnel.nom,
         prenoms: personnel.prenoms,
         matricule: personnel.im,
-        photo_profil: personnel.photo_profil ? `/server/uploads/${personnel.photo_profil}` : `/server/uploads/default-avatar.png`,
+        photo_profil: personnel.photo_profil ? `/uploads/${personnel.photo_profil}` : `/uploads/default-avatar.png`,
         date_naissance: dateNaissanceFormatee,
         age: age,
         categorie: personnel.categorie,
@@ -207,13 +208,13 @@ async function getStaffById(id) {
         date_entree_admin: dateEntreeAdminFormatee,
         annees_exercice: anneesExercice,
         specialite: personnel.specialite,
-        service: toInitCap(personnel.ref_fonction?.libelle),
+        service: toInitCap(personnel.fonction?.libelle),
         fonction_id: personnel.fonction_id,
         telephone: personnel.telephone,
         email: personnel.email,
         departement: toInitCap(personnel.service?.libelle),
         service_id: personnel.service_id,
-        statut: personnel.statut,
+        statut: validators.formatStatutPourClient(personnel.statut),
         a_acces_sih: personnel.auth_user?.username ?? null,
         username_sih: personnel.auth_user?.username ?? null,
         diplomes: personnel.diplomes,
@@ -246,7 +247,7 @@ async function addPersonnel({
                 telephone,
                 email,
                 service_id: BigInt(service_id),
-                fonction_id: BigInt(fonction_id),
+                fonction_id: fonction_id !== undefined ? fonction_id : null,
                 statut,
                 photo_profil,
             },
@@ -311,7 +312,7 @@ async function updatePersonnel({
         if (telephone !== undefined) dataToUpdate.telephone = telephone;
         if (email !== undefined) dataToUpdate.email = email;
         if (service_id !== undefined) dataToUpdate.service_id = BigInt(service_id);
-        if (fonction_id !== undefined) dataToUpdate.fonction_id = BigInt(fonction_id);
+        if (fonction_id !== undefined) dataToUpdate.fonction_id = fonction_id;
         if (statut !== undefined) dataToUpdate.statut = statut;
         if (photo_profil !== undefined) dataToUpdate.photo_profil = photo_profil;
 
@@ -325,13 +326,12 @@ async function updatePersonnel({
 
         // INSERT ou UPDATE
         for (const diplome of diplomes) {
-            if (!diplome.libelle) constinue;
+            if (!diplome.libelle) continue;
             if (diplome.id) {
                 // UPDATE si a un id
                 await tx.diplome.update({
                     where: {
                         id: parseInt(diplome.id, 10),
-                        id_personnel: BigInt(id),
                     },
                     data: {
                         libelle: diplome.libelle,
@@ -392,16 +392,19 @@ async function updatePersonnel({
         }
     });
 
+    return { success: true };
+}
+
+// Fonction auxiliaire : supprime l'ancienne photo du serveur
+function supprimerAnciennePhoto(photo_profil, anciennePhoto) {
     if (photo_profil && anciennePhoto && anciennePhoto !== 'default-avatar.png') {
         const cheminAncien = path.join(__dirname, '..', '..', 'uploads', anciennePhoto);
         try {
             if (fs.existsSync(cheminAncien)) fs.unlinkSync(cheminAncien);
         } catch {
-            console.warn(`[updatePersonnel] Impossible de supprimer : ${anciennePhoto}`);
+            console.warn(`[supprimerAnciennePhoto] Impossible de supprimer : ${anciennePhoto}`);
         }
     }
-
-    return { success: true };
 }
 
 module.exports = {
@@ -411,4 +414,5 @@ module.exports = {
     getStaffById,
     addPersonnel,
     updatePersonnel,
+    supprimerAnciennePhoto,
 };
