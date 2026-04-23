@@ -11,6 +11,7 @@ const express = require('express');
 const authRoutes = require('./routes/authRoutes')
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const staffRoutes = require('./routes/staffRoutes');
+const structureRoutes = require('./routes/structureRoutes');
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads'))); // p
 app.use('/auth', authRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/staff', staffRoutes);
+app.use('/structure', structureRoutes);
 
 app.listen(process.env.PORT, () => {
     console.log(`Server is running at PORT ${process.env.PORT}`);
