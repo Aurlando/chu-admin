@@ -407,6 +407,39 @@ function supprimerAnciennePhoto(photo_profil, anciennePhoto) {
     }
 }
 
+// ── ARCHIVER UN PERSONNEL (soft delete) ───────────────────────────
+async function archiverPersonnel(id) {
+    const personnel = await prisma.personnel.findUnique({
+        where: { id: BigInt(id) },
+        select: { id: true, statut: true },
+    });
+
+    if (!personnel) return { found: false };
+
+    if (personnel.statut === 'Sortie') {
+        return { found: true, dejaArchive: true };
+    }
+    
+    await prisma.$transaction(async (tx) => {
+        // update changer statut et date_sortie
+        await tx.personnel.update({
+            where: { id: BigInt(id) },
+            data: {
+                statut: 'Sortie',
+                date_sortie: new Date(),
+            },
+        });
+
+        // Mettre inactif les comptes SIH
+        await tx.auth_user.updateMany({
+            where: { id_personnel: BigInt(id) },
+            data:  { actif: false },
+        });
+    });
+
+    return { found: true, dejaArchive: false };
+}
+
 module.exports = {
     getAllStaff,
     getDistinctDepartments,
@@ -415,4 +448,5 @@ module.exports = {
     addPersonnel,
     updatePersonnel,
     supprimerAnciennePhoto,
+    archiverPersonnel,
 };

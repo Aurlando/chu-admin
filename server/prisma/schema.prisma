@@ -396,12 +396,13 @@ model personnel {
   fonction_id        Int?
   statut             statut_personnel  @default(En_activit_)
   photo_profil       String?           @default("default-avatar.png") @db.VarChar(255)
+  date_sortie        DateTime?         @db.Date
   consultation       consultation[]
   hospitalisation    hospitalisation[]
   fonction           fonction?         @relation(fields: [fonction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   service            service?          @relation(fields: [service_id], references: [id])
   auth_user          auth_user?
-  diplome           diplome[]
+  diplome            diplome[]
 
   @@schema("chu")
 }
@@ -505,10 +506,11 @@ model vital_sign {
 model auth_user {
   id              BigInt            @id @default(autoincrement())
   username        String            @unique
-  password_hash   String
+  password_hash   String            @db.VarChar(255)
   role            String            @default("user")
   created_at      DateTime          @default(now()) @db.Timestamptz(6)
   id_personnel    BigInt?           @unique
+  actif           Boolean?          @default(true)
   histoire_malade histoire_malade[]
   personnel       personnel?        @relation(fields: [id_personnel], references: [id], onDelete: Cascade, onUpdate: NoAction)
 

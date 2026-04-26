@@ -16,6 +16,11 @@ async function login(req, res) {
             return res.status(401).json({message: "Utilisateur introuvable"});
         }
 
+        // Si le compte est désactivé
+        if (!user.actif) {
+            return res.status(401).json({ message: "Compte désactivé" });
+        }
+
         const isMatch = await bcrypt.compare(password, user.password_hash)
 
         if(!isMatch) {

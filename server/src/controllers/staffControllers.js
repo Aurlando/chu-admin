@@ -431,6 +431,32 @@ async function updateStaff(req, res) {
     }
 }
 
+// ── ARCHIVER UN PERSONNEL ─────────────────────────────────────────
+async function archiverStaff(req, res) {
+    const id = parseInt(req.params.id, 10);
+
+    if (isNaN(id) || id <= 0) {
+        return res.status(400).json({ message: 'ID invalide' });
+    }
+
+    try {
+        const result = await staffModels.archiverPersonnel(id);
+
+        if (!result.found) {
+            return res.status(404).json({ message: 'Personnel introuvable' });
+        }
+
+        if (result.dejaArchive) {
+            return res.status(409).json({ message: 'Ce personnel est déjà sorti du service' });
+        }
+
+        res.status(200).json({ message: 'Personnel archivé avec succès' });
+    } catch (error) {
+        console.error('[archiverStaff] Erreur :', error);
+        res.status(500).json({ message: 'Erreur interne du serveur' });
+    }
+}
+
 module.exports = {
     getStaff,
     getDepartments,
@@ -438,4 +464,5 @@ module.exports = {
     getStaffProfile,
     addStaff,
     updateStaff,
+    archiverStaff,
 };

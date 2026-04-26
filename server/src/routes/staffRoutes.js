@@ -52,4 +52,7 @@ router.post('/add', upload.single('photo'), staffControllers.addStaff);
 // route update personnel
 router.patch('/update/:id', upload.single('photo'), staffControllers.updateStaff);
 
+// Route pour mettre fin au service d'un personnel
+router.patch('/:id/archiver', staffControllers.archiverStaff);
+
 module.exports = router;
