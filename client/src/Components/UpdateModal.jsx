@@ -21,7 +21,7 @@ const CLASSES = [
     { value: "2", label: "Classe 2" },
 ];
 const ECHELONS = ["1", "2", "3"];
-const STATUTS = ["En activité", "Congé", "Suspendu"];
+const STATUTS = ["En activité", "En absence", "Sortie"];
 const DIPLOME_VIDE = {
     libelle: "",
     etablissement: "",
@@ -195,7 +195,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
     // [AJOUT] États des modals de confirmation
     // confirmSave  : true → affiche "Confirmer la mise à jour ?"
     // confirmClose : true → affiche "Confirmer l'annulation de la modification ?"
-    const [confirmSave,  setConfirmSave]  = useState(false);
+    const [confirmSave, setConfirmSave] = useState(false);
     const [confirmClose, setConfirmClose] = useState(false);
 
     const token = localStorage.getItem("token");
@@ -349,11 +349,68 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
     // ── Validation
     const validate = () => {
         const e = {};
-        if (!form.nom.trim()) e.nom = "Requis";
-        if (!form.prenoms.trim()) e.prenoms = "Requis";
-        if (!form.im.trim()) e.im = "Requis";
+        // [AJOUT] Définition des expressions régulières pour des messages plus explicatifs
+        const noSpecialCharsRegex = /^[a-zA-ZÀ-ÿ\s]+$/;
+        const noSpecialCharsAlphanumRegex = /^[a-zA-Z0-9À-ÿ\s]+$/;
+
+        if (!form.nom.trim()) {
+            e.nom = "Le nom est requis";
+        } else if (!noSpecialCharsRegex.test(form.nom)) {
+            // [AJOUT] Message spécifique pour expliquer la nature de l'erreur
+            e.nom = "Pas de chiffres ou caractères spéciaux";
+        }
+
+        if (!form.prenoms.trim()) {
+            e.prenoms = "Le prénom est requis";
+        } else if (!noSpecialCharsRegex.test(form.prenoms)) {
+            e.prenoms = "Pas de chiffres ou caractères spéciaux";
+        }
+
+        if (!form.im.trim()) {
+            e.im = "Le matricule est requis";
+        } else if (!/^\d+$/.test(form.im.trim())) {
+            e.im = "Le matricule doit contenir uniquement des chiffres";
+        }
+
+        // [AJOUT] Validation de l'âge (minimum 16 ans)
+        if (form.date_naissance) {
+            const birthDate = new Date(form.date_naissance);
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate()))
+                age--;
+            if (age < 16)
+                e.date_naissance = "L'âge doit être de 16 ans minimum";
+        }
+
+        // [AJOUT] Validation des coordonnées avec messages spécifiques
+        if (form.telephone.trim()) {
+            const telRegex = /^(\+261\d{9}|0\d{9})$/;
+            if (!telRegex.test(form.telephone.trim().replace(/[\s-]/g, ""))) {
+                e.telephone = "Format invalide (ex: 034 00 000 00)";
+            }
+        }
+        if (form.email.trim()) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(form.email.trim()))
+                e.email = "L'adresse email n'est pas valide";
+        }
+
         if (!diplomes[0]?.libelle?.trim())
             e.diplome0 = "Le diplôme principal est requis";
+
+        // [AJOUT] Explication de l'erreur pour tous les diplômes et établissements
+        diplomes.forEach((d, i) => {
+            if (d.libelle && !noSpecialCharsAlphanumRegex.test(d.libelle))
+                e[`diplome${i}`] = "Pas de caractères spéciaux";
+            if (
+                d.etablissement &&
+                !noSpecialCharsAlphanumRegex.test(d.etablissement)
+            )
+                e[`etab${i}`] = "Pas de caractères spéciaux";
+        });
+
         return e;
     };
 
@@ -362,6 +419,11 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
         const e = validate();
         if (Object.keys(e).length > 0) {
             setErrors(e);
+
+            // [AJOUT] Redirection automatique vers l'onglet contenant la première erreur
+            if (e.nom || e.prenoms || e.im) setActiveTab("identite");
+            else if (e.diplome0) setActiveTab("diplomes");
+
             return;
         }
 
@@ -418,7 +480,8 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                 fieldKey = "email";
             }
 
-            if (fieldKey) setErrors(prev => ({ ...prev, [fieldKey]: err.message }));
+            if (fieldKey)
+                setErrors((prev) => ({ ...prev, [fieldKey]: err.message }));
         } finally {
             setSubmitting(false);
         }
@@ -450,772 +513,811 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
         // sans div wrapper — les ConfirmModals sont frères de l'overlay UpdateModal,
         // pas enfants, donc ils ne sont pas bloqués par overflow:hidden
         <>
-        {/* [AJOUT] ConfirmModals au niveau racine — position:fixed les rend visibles
+            {/* [AJOUT] ConfirmModals au niveau racine — position:fixed les rend visibles
             par-dessus tout le reste, z-[60] > z-50 de l'overlay UpdateModal */}
-        {confirmSave && (
-            <ConfirmModal
-                dark={dark}
-                type="confirm"
-                title="Confirmer la mise à jour ?"
-                message="Les informations de ce membre seront modifiées. Assurez-vous que les données saisies sont correctes."
-                labelOui="Oui, mettre à jour"
-                labelNon="Non, vérifier"
-                onConfirm={() => {
-                    setConfirmSave(false);
-                    handleSubmit();
-                }}
-                onCancel={() => setConfirmSave(false)}
-            />
-        )}
-        {confirmClose && (
-            <ConfirmModal
-                dark={dark}
-                type="danger"
-                title="Abandonner les modifications ?"
-                message="Les modifications non enregistrées seront perdues. Voulez-vous vraiment fermer ?"
-                labelOui="Oui, abandonner"
-                labelNon="Non, continuer"
-                onConfirm={() => {
-                    setConfirmClose(false);
-                    onClose();
-                }}
-                onCancel={() => setConfirmClose(false)}
-            />
-        )}
+            {confirmSave && (
+                <ConfirmModal
+                    dark={dark}
+                    type="confirm"
+                    title="Confirmer la mise à jour ?"
+                    message="Les informations de ce membre seront modifiées. Assurez-vous que les données saisies sont correctes."
+                    labelOui="Oui, mettre à jour"
+                    labelNon="Non, vérifier"
+                    onConfirm={() => {
+                        setConfirmSave(false);
+                        handleSubmit();
+                    }}
+                    onCancel={() => setConfirmSave(false)}
+                />
+            )}
+            {confirmClose && (
+                <ConfirmModal
+                    dark={dark}
+                    type="danger"
+                    title="Abandonner les modifications ?"
+                    message="Les modifications non enregistrées seront perdues. Voulez-vous vraiment fermer ?"
+                    labelOui="Oui, abandonner"
+                    labelNon="Non, continuer"
+                    onConfirm={() => {
+                        setConfirmClose(false);
+                        onClose();
+                    }}
+                    onCancel={() => setConfirmClose(false)}
+                />
+            )}
 
-        {/* ── OVERLAY : fond semi-transparent derrière le modal */}
-        <div
-            className={overlay}
-            onClick={handleBackdropClick}
-        >
-            {/* ── MODAL ── */}
+            {/* ── OVERLAY : fond semi-transparent derrière le modal */}
             <div
-                className={`relative w-full max-w-2xl max-h-[90vh] rounded-2xl border shadow-2xl flex flex-col ${modalBg}`}
-                onClick={(e) => e.stopPropagation()} // empêche la fermeture au clic à l'intérieur
+                className={overlay}
+                onClick={handleBackdropClick}
             >
-                {/* ── En-tête du modal ── */}
+                {/* ── MODAL ── */}
                 <div
-                    className={`flex items-center justify-between px-5 py-4 border-b rounded-t-2xl ${headerBg}`}
+                    className={`relative w-full max-w-2xl max-h-[90vh] rounded-2xl border shadow-2xl flex flex-col ${modalBg}`}
+                    onClick={(e) => e.stopPropagation()} // empêche la fermeture au clic à l'intérieur
                 >
-                    <div>
-                        <h2 className={`text-base font-bold ${ttl}`}>
-                            Mise à jour du personnel
-                        </h2>
-                        <p className={`text-xs mt-0.5 ${sub}`}>
-                            Modifiez les informations puis cliquez sur
-                            Enregistrer
-                        </p>
-                    </div>
-                    {/* Bouton fermer (✕) */}
-                    <button
-                        onClick={onClose}
-                        className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
-                            dark
-                                ? "text-slate-500 hover:text-white hover:bg-white/10"
-                                : "text-slate-400 hover:text-slate-800 hover:bg-slate-200"
-                        }`}
+                    {/* ── En-tête du modal ── */}
+                    <div
+                        className={`flex items-center justify-between px-5 py-4 border-b rounded-t-2xl ${headerBg}`}
                     >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="w-4 h-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2.5}
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M6 18L18 6M6 6l12 12"
-                            />
-                        </svg>
-                    </button>
-                </div>
-
-                {/* ── Onglets ── */}
-                <div
-                    className={`flex items-center gap-1 px-4 py-2.5 border-b ${dark ? "border-white/8" : "border-slate-200"}`}
-                >
-                    {TABS.map((tab) => (
+                        <div>
+                            <h2 className={`text-base font-bold ${ttl}`}>
+                                Mise à jour du personnel
+                            </h2>
+                            <p className={`text-xs mt-0.5 ${sub}`}>
+                                Modifiez les informations puis cliquez sur
+                                Enregistrer
+                            </p>
+                        </div>
+                        {/* Bouton fermer (✕) */}
                         <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${activeTab === tab.id ? tabActive : tabIdle}`}
+                            onClick={onClose}
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                                dark
+                                    ? "text-slate-500 hover:text-white hover:bg-white/10"
+                                    : "text-slate-400 hover:text-slate-800 hover:bg-slate-200"
+                            }`}
                         >
-                            {tab.icon}
-                            <span className="hidden sm:inline">
-                                {tab.label}
-                            </span>
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2.5}
+                            >
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    d="M6 18L18 6M6 6l12 12"
+                                />
+                            </svg>
                         </button>
-                    ))}
-                </div>
+                    </div>
 
-                {/* ── Contenu scrollable ── */}
-                <div className="flex-1 overflow-y-auto p-5">
-                    {/* ── État : chargement du profil ── */}
-                    {loadingProfile && (
-                        <div className="flex items-center justify-center h-48">
-                            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                        </div>
-                    )}
-
-                    {/* ── État : erreur de chargement ── */}
-                    {!loadingProfile && loadError && (
-                        <div
-                            className={`rounded-xl border p-4 text-sm flex items-center gap-3 ${dark ? "bg-rose-500/10 border-rose-500/20 text-rose-400" : "bg-rose-50 border-rose-200 text-rose-600"}`}
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="w-5 h-5 shrink-0"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                                />
-                            </svg>
-                            Impossible de charger le profil : {loadError}
-                        </div>
-                    )}
-
-                    {/* ── Erreur soumission API ── */}
-                    {apiError && (
-                        <div
-                            className={`mb-4 rounded-xl border p-3.5 flex items-center gap-3 text-sm ${dark ? "bg-rose-500/10 border-rose-500/20 text-rose-400" : "bg-rose-50 border-rose-200 text-rose-600"}`}
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="w-4 h-4 shrink-0"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                                />
-                            </svg>
-                            {apiError}
+                    {/* ── Onglets ── */}
+                    <div
+                        className={`flex items-center gap-1 px-4 py-2.5 border-b ${dark ? "border-white/8" : "border-slate-200"}`}
+                    >
+                        {TABS.map((tab) => (
                             <button
-                                onClick={() => setApiError(null)}
-                                className="ml-auto opacity-60 hover:opacity-100"
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${activeTab === tab.id ? tabActive : tabIdle}`}
                             >
-                                ✕
+                                {tab.icon}
+                                <span className="hidden sm:inline">
+                                    {tab.label}
+                                </span>
                             </button>
-                        </div>
-                    )}
+                        ))}
+                    </div>
 
-                    {!loadingProfile && !loadError && (
-                        <>
-                            {/* ══════ ONGLET 1 : IDENTITÉ ══════ */}
-                            {activeTab === "identite" && (
-                                <div className="space-y-4">
-                                    {/* Photo */}
-                                    <div className="flex items-center gap-4 mb-2">
-                                        <div
-                                            onClick={() =>
-                                                fileInputRef.current?.click()
-                                            }
-                                            className={`relative w-16 h-16 rounded-xl overflow-hidden shrink-0 cursor-pointer group border-2 border-dashed transition-all ${
-                                                photoPreview
-                                                    ? "border-transparent"
-                                                    : dark
-                                                      ? "border-white/15 hover:border-blue-500/50"
-                                                      : "border-slate-300 hover:border-blue-400"
-                                            }`}
-                                        >
-                                            {photoPreview ? (
-                                                <>
-                                                    <img
-                                                        src={photoPreview}
-                                                        alt="Photo"
-                                                        className="w-full h-full object-cover"
-                                                    />
-                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    {/* ── Contenu scrollable ── */}
+                    <div className="flex-1 overflow-y-auto p-5">
+                        {/* ── État : chargement du profil ── */}
+                        {loadingProfile && (
+                            <div className="flex items-center justify-center h-48">
+                                <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                            </div>
+                        )}
+
+                        {/* ── État : erreur de chargement ── */}
+                        {!loadingProfile && loadError && (
+                            <div
+                                className={`rounded-xl border p-4 text-sm flex items-center gap-3 ${dark ? "bg-rose-500/10 border-rose-500/20 text-rose-400" : "bg-rose-50 border-rose-200 text-rose-600"}`}
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="w-5 h-5 shrink-0"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                    />
+                                </svg>
+                                Impossible de charger le profil : {loadError}
+                            </div>
+                        )}
+
+                        {/* ── Erreur soumission API ── */}
+                        {apiError && (
+                            <div
+                                className={`mb-4 rounded-xl border p-3.5 flex items-center gap-3 text-sm ${dark ? "bg-rose-500/10 border-rose-500/20 text-rose-400" : "bg-rose-50 border-rose-200 text-rose-600"}`}
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="w-4 h-4 shrink-0"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                    />
+                                </svg>
+                                {apiError}
+                                <button
+                                    onClick={() => setApiError(null)}
+                                    className="ml-auto opacity-60 hover:opacity-100"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        )}
+
+                        {!loadingProfile && !loadError && (
+                            <>
+                                {/* ══════ ONGLET 1 : IDENTITÉ ══════ */}
+                                {activeTab === "identite" && (
+                                    <div className="space-y-4">
+                                        {/* Photo */}
+                                        <div className="flex items-center gap-4 mb-2">
+                                            <div
+                                                onClick={() =>
+                                                    fileInputRef.current?.click()
+                                                }
+                                                className={`relative w-16 h-16 rounded-xl overflow-hidden shrink-0 cursor-pointer group border-2 border-dashed transition-all ${
+                                                    photoPreview
+                                                        ? "border-transparent"
+                                                        : dark
+                                                          ? "border-white/15 hover:border-blue-500/50"
+                                                          : "border-slate-300 hover:border-blue-400"
+                                                }`}
+                                            >
+                                                {photoPreview ? (
+                                                    <>
+                                                        <img
+                                                            src={photoPreview}
+                                                            alt="Photo"
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                            <svg
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                className="w-4 h-4 text-white"
+                                                                fill="none"
+                                                                viewBox="0 0 24 24"
+                                                                stroke="currentColor"
+                                                                strokeWidth={2}
+                                                            >
+                                                                <path
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                                                                />
+                                                                <path
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                                                                />
+                                                            </svg>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <div
+                                                        className={`w-full h-full flex items-center justify-center ${dark ? "bg-white/5" : "bg-slate-100"}`}
+                                                    >
                                                         <svg
                                                             xmlns="http://www.w3.org/2000/svg"
-                                                            className="w-4 h-4 text-white"
+                                                            className={`w-6 h-6 ${dark ? "text-slate-600" : "text-slate-400"}`}
                                                             fill="none"
                                                             viewBox="0 0 24 24"
                                                             stroke="currentColor"
-                                                            strokeWidth={2}
+                                                            strokeWidth={1.5}
                                                         >
                                                             <path
                                                                 strokeLinecap="round"
                                                                 strokeLinejoin="round"
-                                                                d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                                                            />
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                                                                d="M12 4v16m8-8H4"
                                                             />
                                                         </svg>
                                                     </div>
-                                                </>
-                                            ) : (
-                                                <div
-                                                    className={`w-full h-full flex items-center justify-center ${dark ? "bg-white/5" : "bg-slate-100"}`}
+                                                )}
+                                            </div>
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={(e) =>
+                                                    handlePhoto(
+                                                        e.target.files[0],
+                                                    )
+                                                }
+                                            />
+                                            <div>
+                                                <p
+                                                    className={`text-sm font-medium ${ttl}`}
                                                 >
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        className={`w-6 h-6 ${dark ? "text-slate-600" : "text-slate-400"}`}
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                        strokeWidth={1.5}
+                                                    Photo de profil
+                                                </p>
+                                                <p
+                                                    className={`text-xs mt-0.5 mb-1.5 ${sub}`}
+                                                >
+                                                    Cliquez pour changer
+                                                </p>
+                                                {photoFile && (
+                                                    <span
+                                                        className={`text-xs px-2 py-0.5 rounded-full ${dark ? "bg-emerald-500/15 text-emerald-400" : "bg-emerald-50 text-emerald-600"}`}
                                                     >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            d="M12 4v16m8-8H4"
-                                                        />
-                                                    </svg>
-                                                </div>
-                                            )}
+                                                        Nouvelle photo
+                                                        sélectionnée
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            accept="image/*"
-                                            className="hidden"
-                                            onChange={(e) =>
-                                                handlePhoto(e.target.files[0])
-                                            }
-                                        />
-                                        <div>
-                                            <p
-                                                className={`text-sm font-medium ${ttl}`}
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <Field
+                                                label="Nom"
+                                                required
+                                                dark={dark}
+                                                error={errors.nom}
                                             >
-                                                Photo de profil
-                                            </p>
-                                            <p
-                                                className={`text-xs mt-0.5 mb-1.5 ${sub}`}
+                                                <input
+                                                    type="text"
+                                                    value={form.nom}
+                                                    onChange={(e) =>
+                                                        handleChange(
+                                                            "nom",
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    className={inp("nom")}
+                                                    placeholder="Ex: RAKOTO"
+                                                />
+                                            </Field>
+                                            <Field
+                                                label="Prénoms"
+                                                required
+                                                dark={dark}
+                                                error={errors.prenoms}
                                             >
-                                                Cliquez pour changer
-                                            </p>
-                                            {photoFile && (
-                                                <span
-                                                    className={`text-xs px-2 py-0.5 rounded-full ${dark ? "bg-emerald-500/15 text-emerald-400" : "bg-emerald-50 text-emerald-600"}`}
-                                                >
-                                                    Nouvelle photo sélectionnée
-                                                </span>
-                                            )}
+                                                <input
+                                                    type="text"
+                                                    value={form.prenoms}
+                                                    onChange={(e) =>
+                                                        handleChange(
+                                                            "prenoms",
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    className={inp("prenoms")}
+                                                    placeholder="Ex: Jean Paul"
+                                                />
+                                            </Field>
+                                            <Field
+                                                label="Matricule (IM)"
+                                                required
+                                                dark={dark}
+                                                error={errors.im}
+                                            >
+                                                <input
+                                                    type="text"
+                                                    value={form.im}
+                                                    onChange={(e) =>
+                                                        handleChange(
+                                                            "im",
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    className={inp("im")}
+                                                    placeholder="Ex: 371815"
+                                                />
+                                            </Field>
+                                            <Field
+                                                label="Date de naissance"
+                                                dark={dark}
+                                                // [AJOUT] Liaison avec le message d'erreur
+                                                error={errors.date_naissance}
+                                            >
+                                                <input
+                                                    type="date"
+                                                    value={form.date_naissance}
+                                                    onChange={(e) =>
+                                                        handleChange(
+                                                            "date_naissance",
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    className={inputCls}
+                                                />
+                                            </Field>
                                         </div>
                                     </div>
+                                )}
 
+                                {/* ══════ ONGLET 2 : SITUATION ══════ */}
+                                {activeTab === "situation" && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <Field
-                                            label="Nom"
-                                            required
+                                            label="Catégorie"
                                             dark={dark}
-                                            error={errors.nom}
                                         >
-                                            <input
-                                                type="text"
-                                                value={form.nom}
+                                            <select
+                                                value={form.categorie}
                                                 onChange={(e) =>
                                                     handleChange(
-                                                        "nom",
+                                                        "categorie",
                                                         e.target.value,
                                                     )
                                                 }
-                                                className={inp("nom")}
-                                                placeholder="Ex: RAKOTO"
-                                            />
+                                                className={selectCls}
+                                            >
+                                                <option value="">
+                                                    Sélectionner
+                                                </option>
+                                                {CATEGORIES.map((c) => (
+                                                    <option
+                                                        key={c}
+                                                        value={c}
+                                                    >
+                                                        {c}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </Field>
                                         <Field
-                                            label="Prénoms"
-                                            required
+                                            label="Classe"
                                             dark={dark}
-                                            error={errors.prenoms}
                                         >
-                                            <input
-                                                type="text"
-                                                value={form.prenoms}
+                                            <select
+                                                value={form.classe}
                                                 onChange={(e) =>
                                                     handleChange(
-                                                        "prenoms",
+                                                        "classe",
                                                         e.target.value,
                                                     )
                                                 }
-                                                className={inp("prenoms")}
-                                                placeholder="Ex: Jean Paul"
-                                            />
+                                                className={selectCls}
+                                            >
+                                                <option value="">
+                                                    Sélectionner
+                                                </option>
+                                                {CLASSES.map((c) => (
+                                                    <option
+                                                        key={c.value}
+                                                        value={c.value}
+                                                    >
+                                                        {c.label}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </Field>
                                         <Field
-                                            label="Matricule (IM)"
-                                            required
+                                            label="Échelon"
                                             dark={dark}
-                                            error={errors.im}
                                         >
-                                            <input
-                                                type="text"
-                                                value={form.im}
+                                            <select
+                                                value={form.echelon}
                                                 onChange={(e) =>
                                                     handleChange(
-                                                        "im",
+                                                        "echelon",
                                                         e.target.value,
                                                     )
                                                 }
-                                                className={inp("im")}
-                                                placeholder="Ex: 371815"
-                                            />
+                                                className={selectCls}
+                                            >
+                                                <option value="">
+                                                    Sélectionner
+                                                </option>
+                                                {ECHELONS.map((e) => (
+                                                    <option
+                                                        key={e}
+                                                        value={e}
+                                                    >
+                                                        {e}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </Field>
                                         <Field
-                                            label="Date de naissance"
+                                            label="Statut"
                                             dark={dark}
                                         >
-                                            <input
-                                                type="date"
-                                                value={form.date_naissance}
+                                            <select
+                                                value={form.statut}
                                                 onChange={(e) =>
                                                     handleChange(
-                                                        "date_naissance",
+                                                        "statut",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={selectCls}
+                                            >
+                                                {STATUTS.map((s) => (
+                                                    <option
+                                                        key={s}
+                                                        value={s}
+                                                    >
+                                                        {s}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </Field>
+                                        <Field
+                                            label="Spécialité"
+                                            dark={dark}
+                                            error={errors.specialite}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={form.specialite}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "specialite",
                                                         e.target.value,
                                                     )
                                                 }
                                                 className={inputCls}
+                                                placeholder="Ex: Médecin spécialiste en chirurgie"
                                             />
                                         </Field>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {/* ══════ ONGLET 2 : SITUATION ══════ */}
-                            {activeTab === "situation" && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <Field
-                                        label="Catégorie"
-                                        dark={dark}
-                                    >
-                                        <select
-                                            value={form.categorie}
-                                            onChange={(e) =>
-                                                handleChange(
-                                                    "categorie",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={selectCls}
+                                {/* ══════ ONGLET 3 : AFFECTATION ══════ */}
+                                {activeTab === "affectation" && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <Field
+                                            label="Service"
+                                            dark={dark}
+                                            error={errors.service_id}
                                         >
-                                            <option value="">
-                                                Sélectionner
-                                            </option>
-                                            {CATEGORIES.map((c) => (
-                                                <option
-                                                    key={c}
-                                                    value={c}
-                                                >
-                                                    {c}
+                                            <select
+                                                value={form.service_id}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "service_id",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={sel("service_id")}
+                                            >
+                                                <option value="">
+                                                    Sélectionner un service
                                                 </option>
-                                            ))}
-                                        </select>
-                                    </Field>
-                                    <Field
-                                        label="Classe"
-                                        dark={dark}
-                                    >
-                                        <select
-                                            value={form.classe}
-                                            onChange={(e) =>
-                                                handleChange(
-                                                    "classe",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={selectCls}
-                                        >
-                                            <option value="">
-                                                Sélectionner
-                                            </option>
-                                            {CLASSES.map((c) => (
-                                                <option
-                                                    key={c.value}
-                                                    value={c.value}
-                                                >
-                                                    {c.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </Field>
-                                    <Field
-                                        label="Échelon"
-                                        dark={dark}
-                                    >
-                                        <select
-                                            value={form.echelon}
-                                            onChange={(e) =>
-                                                handleChange(
-                                                    "echelon",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={selectCls}
-                                        >
-                                            <option value="">
-                                                Sélectionner
-                                            </option>
-                                            {ECHELONS.map((e) => (
-                                                <option
-                                                    key={e}
-                                                    value={e}
-                                                >
-                                                    {e}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </Field>
-                                    <Field
-                                        label="Statut"
-                                        dark={dark}
-                                    >
-                                        <select
-                                            value={form.statut}
-                                            onChange={(e) =>
-                                                handleChange(
-                                                    "statut",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={selectCls}
-                                        >
-                                            {STATUTS.map((s) => (
-                                                <option
-                                                    key={s}
-                                                    value={s}
-                                                >
-                                                    {s}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </Field>
-                                    <Field
-                                        label="Spécialité"
-                                        dark={dark}
-                                        error={errors.specialite}
-                                    >
-                                        <input
-                                            type="text"
-                                            value={form.specialite}
-                                            onChange={(e) =>
-                                                handleChange(
-                                                    "specialite",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={inputCls}
-                                            placeholder="Ex: Médecin spécialiste en chirurgie"
-                                        />
-                                    </Field>
-                                </div>
-                            )}
-
-                            {/* ══════ ONGLET 3 : AFFECTATION ══════ */}
-                            {activeTab === "affectation" && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <Field
-                                        label="Service"
-                                        dark={dark}
-                                        error={errors.service_id}
-                                    >
-                                        <select
-                                            value={form.service_id}
-                                            onChange={(e) =>
-                                                handleChange(
-                                                    "service_id",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={sel("service_id")}
-                                        >
-                                            <option value="">
-                                                Sélectionner un service
-                                            </option>
-                                            {services.map((s) => (
-                                                <option
-                                                    key={s.id}
-                                                    value={s.id}
-                                                >
-                                                    {s.libelle}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </Field>
-                                    <Field
-                                        label="Fonction"
-                                        dark={dark}
-                                        error={errors.fonction_id}
-                                    >
-                                        <select
-                                            value={form.fonction_id}
-                                            onChange={(e) =>
-                                                handleChange(
-                                                    "fonction_id",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={sel("fonction_id")}
-                                        >
-                                            <option value="">
-                                                Sélectionner une fonction
-                                            </option>
-                                            {fonctions.map((f) => (
-                                                <option
-                                                    key={f.id}
-                                                    value={f.id}
-                                                >
-                                                    {f.libelle}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </Field>
-                                    <Field
-                                        label="Téléphone"
-                                        dark={dark}
-                                    >
-                                        <input
-                                            type="tel"
-                                            value={form.telephone}
-                                            onChange={(e) =>
-                                                handleChange(
-                                                    "telephone",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={inputCls}
-                                            placeholder="Ex: 034 24 724 58"
-                                        />
-                                    </Field>
-                                    <Field
-                                        label="Email"
-                                        dark={dark}
-                                    >
-                                        <input
-                                            type="email"
-                                            value={form.email}
-                                            onChange={(e) =>
-                                                handleChange(
-                                                    "email",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className={inputCls}
-                                            placeholder="Ex: jean@chu.mg"
-                                        />
-                                    </Field>
-                                </div>
-                            )}
-
-                            {/* ══════ ONGLET 4 : DIPLÔMES ══════ */}
-                            {activeTab === "diplomes" && (
-                                <div className="space-y-3">
-                                    {diplomes.map((diplome, index) => (
-                                        <div
-                                            key={index}
-                                            className={dipCard}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <span
-                                                    className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                                                        diplome.est_principal
-                                                            ? dark
-                                                                ? "text-blue-400 border-blue-500/20 bg-blue-500/10"
-                                                                : "text-blue-600 border-blue-200 bg-blue-50"
-                                                            : dark
-                                                              ? "text-slate-500 border-white/10 bg-white/5"
-                                                              : "text-slate-500 border-slate-200 bg-slate-100"
-                                                    }`}
-                                                >
-                                                    {diplome.est_principal
-                                                        ? "★ Principal"
-                                                        : `Diplôme ${index + 1}`}
-                                                </span>
-                                                {!diplome.est_principal && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            supprimerDiplome(
-                                                                index,
-                                                            )
-                                                        }
-                                                        className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                                                {services.map((s) => (
+                                                    <option
+                                                        key={s.id}
+                                                        value={s.id}
                                                     >
-                                                        <svg
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                            className="w-3.5 h-3.5"
-                                                            fill="none"
-                                                            viewBox="0 0 24 24"
-                                                            stroke="currentColor"
-                                                            strokeWidth={2}
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                                            />
-                                                        </svg>
-                                                        Supprimer
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                <Field
-                                                    label="Intitulé"
-                                                    required={
-                                                        diplome.est_principal
-                                                    }
-                                                    dark={dark}
-                                                    error={
-                                                        index === 0
-                                                            ? errors.diplome0
-                                                            : null
-                                                    }
-                                                >
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Ex: Doctorat en Médecine"
-                                                        value={diplome.libelle}
-                                                        onChange={(e) =>
-                                                            handleDiplomeChange(
-                                                                index,
-                                                                "libelle",
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className={
-                                                            index === 0 &&
-                                                            errors.diplome0
-                                                                ? inputErr
-                                                                : inputCls
-                                                        }
-                                                    />
-                                                </Field>
-                                                <Field
-                                                    label="Établissement"
-                                                    dark={dark}
-                                                >
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Ex: Université d'Antananarivo"
-                                                        value={
-                                                            diplome.etablissement
-                                                        }
-                                                        onChange={(e) =>
-                                                            handleDiplomeChange(
-                                                                index,
-                                                                "etablissement",
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className={inputCls}
-                                                    />
-                                                </Field>
-                                                <Field
-                                                    label="Année d'obtention"
-                                                    dark={dark}
-                                                >
-                                                    <input
-                                                        type="number"
-                                                        min="1950"
-                                                        max={new Date().getFullYear()}
-                                                        placeholder="Ex: 2010"
-                                                        value={
-                                                            diplome.annee_obtention
-                                                        }
-                                                        onChange={(e) =>
-                                                            handleDiplomeChange(
-                                                                index,
-                                                                "annee_obtention",
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className={inputCls}
-                                                    />
-                                                </Field>
-                                            </div>
-                                        </div>
-                                    ))}
-
-                                    <button
-                                        type="button"
-                                        onClick={ajouterDiplome}
-                                        className={`w-full py-2.5 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 transition-all ${
-                                            dark
-                                                ? "border-white/10 border-dashed text-slate-500 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5"
-                                                : "border-slate-300 border-dashed text-slate-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/50"
-                                        }`}
-                                    >
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            className="w-4 h-4"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                            strokeWidth={2}
+                                                        {s.libelle}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </Field>
+                                        <Field
+                                            label="Fonction"
+                                            dark={dark}
+                                            error={errors.fonction_id}
                                         >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M12 4v16m8-8H4"
+                                            <select
+                                                value={form.fonction_id}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "fonction_id",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={sel("fonction_id")}
+                                            >
+                                                <option value="">
+                                                    Sélectionner une fonction
+                                                </option>
+                                                {fonctions.map((f) => (
+                                                    <option
+                                                        key={f.id}
+                                                        value={f.id}
+                                                    >
+                                                        {f.libelle}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </Field>
+                                        <Field
+                                            label="Téléphone"
+                                            dark={dark}
+                                            // [AJOUT] Liaison avec le message d'erreur
+                                            error={errors.telephone}
+                                        >
+                                            <input
+                                                type="tel"
+                                                value={form.telephone}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "telephone",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={inp("telephone")} // [MODIFIÉ] Utilise inp() pour la bordure rouge en cas d'erreur
+                                                placeholder="Ex: 034 24 724 58"
                                             />
-                                        </svg>
-                                        Ajouter un autre diplôme
-                                    </button>
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
+                                        </Field>
+                                        <Field
+                                            label="Email"
+                                            dark={dark}
+                                            // [AJOUT] Liaison avec le message d'erreur
+                                            error={errors.email}
+                                        >
+                                            <input
+                                                type="email"
+                                                value={form.email}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "email",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={inp("email")} // [MODIFIÉ] Utilise inp() pour la bordure rouge en cas d'erreur
+                                                placeholder="Ex: jean@chu.mg"
+                                            />
+                                        </Field>
+                                    </div>
+                                )}
 
-                {/* ── Pied du modal : Annuler + Enregistrer ── */}
-                <div
-                    className={`flex items-center justify-end gap-3 px-5 py-4 border-t rounded-b-2xl ${dark ? "border-white/8 bg-white/2" : "border-slate-100 bg-slate-50/50"}`}
-                >
-                    {/* [MODIFIÉ] Annuler — ouvre le modal de confirmation d'annulation */}
-                    <button
-                        onClick={() => setConfirmClose(true)}
-                        className={`px-4 py-2.5 rounded-xl border text-sm font-medium transition-all ${
-                            dark
-                                ? "border-white/10 text-slate-400 hover:text-white hover:bg-white/5"
-                                : "border-slate-200 text-slate-600 hover:bg-slate-100"
-                        }`}
-                    >
-                        Annuler
-                    </button>
-                    {/* [MODIFIÉ] Enregistrer — ouvre le modal de confirmation */}
-                    <button
-                        onClick={() => {
-                            const e = validate();
-                            if (Object.keys(e).length > 0) { setErrors(e); return; }
-                            setConfirmSave(true);
-                        }}
-                        disabled={submitting || loadingProfile}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shadow-lg shadow-blue-600/20 hover:-translate-y-0.5"
-                    >
-                        {submitting ? (
-                            <>
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                Enregistrement...
-                            </>
-                        ) : (
-                            <>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                                Enregistrer les modifications
+                                {/* ══════ ONGLET 4 : DIPLÔMES ══════ */}
+                                {activeTab === "diplomes" && (
+                                    <div className="space-y-3">
+                                        {diplomes.map((diplome, index) => (
+                                            <div
+                                                key={index}
+                                                className={dipCard}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span
+                                                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                                                            diplome.est_principal
+                                                                ? dark
+                                                                    ? "text-blue-400 border-blue-500/20 bg-blue-500/10"
+                                                                    : "text-blue-600 border-blue-200 bg-blue-50"
+                                                                : dark
+                                                                  ? "text-slate-500 border-white/10 bg-white/5"
+                                                                  : "text-slate-500 border-slate-200 bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        {diplome.est_principal
+                                                            ? "★ Principal"
+                                                            : `Diplôme ${index + 1}`}
+                                                    </span>
+                                                    {!diplome.est_principal && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                supprimerDiplome(
+                                                                    index,
+                                                                )
+                                                            }
+                                                        className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors cursor-pointer"
+                                                        >
+                                                            <svg
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                className="w-3.5 h-3.5"
+                                                                fill="none"
+                                                                viewBox="0 0 24 24"
+                                                                stroke="currentColor"
+                                                                strokeWidth={2}
+                                                            >
+                                                                <path
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                                />
+                                                            </svg>
+                                                            Supprimer
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    <Field
+                                                        label="Intitulé"
+                                                        required={
+                                                            diplome.est_principal
+                                                        }
+                                                        dark={dark}
+                                                        error={
+                                                            index === 0
+                                                                ? errors.diplome0
+                                                                : null
+                                                        }
+                                                    >
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Ex: Doctorat en Médecine"
+                                                            value={
+                                                                diplome.libelle
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleDiplomeChange(
+                                                                    index,
+                                                                    "libelle",
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            className={
+                                                                index === 0 &&
+                                                                errors.diplome0
+                                                                    ? inputErr
+                                                                    : inputCls
+                                                            }
+                                                        />
+                                                    </Field>
+                                                    <Field
+                                                        label="Établissement"
+                                                        dark={dark}
+                                                        // [AJOUT] Liaison avec le message d'erreur
+                                                        error={
+                                                            errors[
+                                                                `etab${index}`
+                                                            ]
+                                                        }
+                                                    >
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Ex: Université d'Antananarivo"
+                                                            value={
+                                                                diplome.etablissement
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleDiplomeChange(
+                                                                    index,
+                                                                    "etablissement",
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            className={inputCls}
+                                                        />
+                                                    </Field>
+                                                    <Field
+                                                        label="Année d'obtention"
+                                                        dark={dark}
+                                                    >
+                                                        <input
+                                                            type="number"
+                                                            min="1950"
+                                                            max={new Date().getFullYear()}
+                                                            placeholder="Ex: 2010"
+                                                            value={
+                                                                diplome.annee_obtention
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleDiplomeChange(
+                                                                    index,
+                                                                    "annee_obtention",
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            className={inputCls}
+                                                        />
+                                                    </Field>
+                                                </div>
+                                            </div>
+                                        ))}
+
+                                        <button
+                                            type="button"
+                                            onClick={ajouterDiplome}
+                                            className={`w-full py-2.5 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                                dark
+                                                    ? "border-white/10 border-dashed text-slate-500 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5"
+                                                    : "border-slate-300 border-dashed text-slate-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/50"
+                                            }`}
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                className="w-4 h-4"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                                strokeWidth={2}
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    d="M12 4v16m8-8H4"
+                                                />
+                                            </svg>
+                                            Ajouter un autre diplôme
+                                        </button>
+                                    </div>
+                                )}
                             </>
                         )}
-                    </button>
+                    </div>
+
+                    {/* ── Pied du modal : Annuler + Enregistrer ── */}
+                    <div
+                        className={`flex items-center justify-end gap-3 px-5 py-4 border-t rounded-b-2xl ${dark ? "border-white/8 bg-white/2" : "border-slate-100 bg-slate-50/50"}`}
+                    >
+                        {/* [MODIFIÉ] Annuler — ouvre le modal de confirmation d'annulation */}
+                        <button
+                            onClick={() => setConfirmClose(true)}
+                            className={`px-4 py-2.5 rounded-xl border text-sm font-medium transition-all cursor-pointer ${
+                                dark
+                                    ? "border-white/10 text-slate-400 hover:text-white hover:bg-white/5"
+                                    : "border-slate-200 text-slate-600 hover:bg-slate-100"
+                            }`}
+                        >
+                            Annuler
+                        </button>
+                        {/* [MODIFIÉ] Enregistrer — ouvre le modal de confirmation */}
+                        <button
+                            onClick={() => {
+                                const e = validate();
+                                if (Object.keys(e).length > 0) {
+                                    setErrors(e);
+                                    // [AJOUT] Redirection immédiate vers l'onglet fautif pour gagner du temps
+                                    if (e.nom || e.prenoms || e.im)
+                                        setActiveTab("identite");
+                                    else if (e.diplome0)
+                                        setActiveTab("diplomes");
+                                    return;
+                                }
+                                setConfirmSave(true);
+                            }}
+                            disabled={submitting || loadingProfile}
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all shadow-lg shadow-blue-600/20 hover:-translate-y-0.5 cursor-pointer"
+                        >
+                            {submitting ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    Enregistrement...
+                                </>
+                            ) : (
+                                <>
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="w-4 h-4"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={2.5}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M5 13l4 4L19 7"
+                                        />
+                                    </svg>
+                                    Enregistrer les modifications
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
         </>
     );
 }

@@ -35,7 +35,9 @@ export default function ConfirmModal({
 }) {
     // ── Fermeture avec la touche Échap → équivaut à "Non"
     useEffect(() => {
-        const onKey = (e) => { if (e.key === "Escape") onCancel(); };
+        const onKey = (e) => {
+            if (e.key === "Escape") onCancel();
+        };
         document.addEventListener("keydown", onKey);
         return () => document.removeEventListener("keydown", onKey);
     }, [onCancel]);
@@ -45,40 +47,58 @@ export default function ConfirmModal({
     // "warning" → orange (action irréversible neutre)
     // "danger"  → rouge  (annulation / suppression)
     const iconBg = {
-        confirm: dark ? "bg-blue-500/15"   : "bg-blue-50",
-        warning: dark ? "bg-amber-500/15"  : "bg-amber-50",
-        danger:  dark ? "bg-rose-500/15"   : "bg-rose-50",
+        confirm: dark ? "bg-blue-500/15" : "bg-blue-50",
+        warning: dark ? "bg-amber-500/15" : "bg-amber-50",
+        danger: dark ? "bg-rose-500/15" : "bg-rose-50",
     }[type];
 
     const iconColor = {
-        confirm: dark ? "text-blue-400"   : "text-blue-600",
-        warning: dark ? "text-amber-400"  : "text-amber-600",
-        danger:  dark ? "text-rose-400"   : "text-rose-500",
+        confirm: dark ? "text-blue-400" : "text-blue-600",
+        warning: dark ? "text-amber-400" : "text-amber-600",
+        danger: dark ? "text-rose-400" : "text-rose-500",
     }[type];
 
     const btnOui = {
         confirm: "bg-blue-600 hover:bg-blue-500 shadow-blue-600/20",
         warning: "bg-amber-500 hover:bg-amber-400 shadow-amber-500/20",
-        danger:  "bg-rose-600 hover:bg-rose-500 shadow-rose-600/20",
+        danger: "bg-rose-600 hover:bg-rose-500 shadow-rose-600/20",
     }[type];
 
     // ── Icône selon le type
     const Icon = () => {
         if (type === "confirm") {
             return (
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" fill="none"
-                    viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round"
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-7 h-7"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                 </svg>
             );
         }
         // warning et danger → icône point d'exclamation (comme la photo de référence)
         return (
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7" fill="none"
-                viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-7 h-7"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.5}
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
             </svg>
         );
     };
@@ -88,7 +108,9 @@ export default function ConfirmModal({
         // Clic sur l'overlay → onCancel (équivaut à "Non")
         <div
             className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-            onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onCancel();
+            }}
         >
             {/* ── CARTE de confirmation ── */}
             <div
@@ -99,20 +121,26 @@ export default function ConfirmModal({
             >
                 {/* ── Icône dans un cercle coloré ── */}
                 {/* Reproduit le design de la photo de référence */}
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${iconBg}`}>
+                <div
+                    className={`w-14 h-14 rounded-full flex items-center justify-center ${iconBg}`}
+                >
                     <div className={iconColor}>
                         <Icon />
                     </div>
                 </div>
 
                 {/* ── Titre ── */}
-                <h3 className={`text-base font-bold ${dark ? "text-white" : "text-slate-800"}`}>
+                <h3
+                    className={`text-base font-bold ${dark ? "text-white" : "text-slate-800"}`}
+                >
                     {title}
                 </h3>
 
                 {/* ── Message descriptif ── */}
                 {message && (
-                    <p className={`text-sm leading-relaxed ${dark ? "text-slate-400" : "text-slate-500"}`}>
+                    <p
+                        className={`text-sm leading-relaxed ${dark ? "text-slate-400" : "text-slate-500"}`}
+                    >
                         {message}
                     </p>
                 )}
@@ -123,10 +151,11 @@ export default function ConfirmModal({
                     {/* Bouton "Non" — neutre, gris */}
                     <button
                         onClick={onCancel}
-                        className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold transition-all
-                            ${dark
-                                ? "border-white/10 text-slate-300 hover:bg-white/8 hover:border-white/20"
-                                : "border-slate-200 text-slate-600 bg-slate-100 hover:bg-slate-200"
+                        className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold transition-all cursor-pointer
+                            ${
+                                dark
+                                    ? "border-white/10 text-slate-300 hover:bg-white/8 hover:border-white/20"
+                                    : "border-slate-200 text-slate-600 bg-slate-100 hover:bg-slate-200"
                             }`}
                     >
                         {labelNon}
@@ -135,7 +164,7 @@ export default function ConfirmModal({
                     {/* Bouton "Oui" — coloré selon le type */}
                     <button
                         onClick={onConfirm}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all shadow-lg ${btnOui}`}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition-all shadow-lg cursor-pointer ${btnOui}`}
                     >
                         {labelOui}
                     </button>
