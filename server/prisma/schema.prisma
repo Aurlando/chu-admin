@@ -381,7 +381,6 @@ model personnel {
   im                 String?
   date_naissance     DateTime?         @db.Date
   corps              String?
-  grade              String?
   categorie          String?
   classe             String?
   echelon            String?
@@ -397,11 +396,14 @@ model personnel {
   statut             statut_personnel  @default(En_activit_)
   photo_profil       String?           @default("default-avatar.png") @db.VarChar(255)
   date_sortie        DateTime?         @db.Date
+  id_grade_actuel    Int?
   consultation       consultation[]
   hospitalisation    hospitalisation[]
   fonction           fonction?         @relation(fields: [fonction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  grade              grade?            @relation(fields: [id_grade_actuel], references: [id_grade], onUpdate: NoAction)
   service            service?          @relation(fields: [service_id], references: [id])
   auth_user          auth_user?
+  avancements        avancements[]
   diplome            diplome[]
 
   @@schema("chu")
@@ -876,6 +878,37 @@ model types_prestations {
   libelle                String                   @db.VarChar(150)
   prestations            prestations[]
   sous_types_prestations sous_types_prestations[]
+
+  @@schema("ref")
+}
+
+model avancements {
+  id_avancement            Int       @id @default(autoincrement())
+  id_personnel             BigInt
+  id_grade_obtenu          Int
+  num_arrete               String
+  date_signature           DateTime  @db.Date
+  date_effet               DateTime  @db.Date
+  type_mouvement           String
+  date_prochain_avancement DateTime? @db.Date
+  grade                    grade     @relation(fields: [id_grade_obtenu], references: [id_grade], onUpdate: NoAction)
+  personnel                personnel @relation(fields: [id_personnel], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@schema("ref")
+}
+
+model grade {
+  id_grade         Int           @id @default(autoincrement())
+  categorie        String
+  classe           String
+  echelon          Int
+  id_grade_suivant Int?
+  duree_mois       Int           @default(24)
+  indice           Int?
+  personnel        personnel[]
+  avancements      avancements[]
+  grade            grade?        @relation("gradeTograde", fields: [id_grade_suivant], references: [id_grade], onUpdate: NoAction)
+  other_grade      grade[]       @relation("gradeTograde")
 
   @@schema("ref")
 }

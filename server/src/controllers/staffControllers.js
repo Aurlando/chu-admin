@@ -111,7 +111,7 @@ async function addStaff(req, res) {
     // ── 1. Champs obligatoires ────────────────────────────────────
     const {
         nom, prenoms, im, date_naissance,
-        categorie, classe, echelon,
+        id_grade_actuel, num_arrete,
         specialite, telephone, email,
         service_id, fonction_id, statut,
         donner_access, donner_acces, username, password,
@@ -119,7 +119,7 @@ async function addStaff(req, res) {
     } = req.body;
 
     // champs obligatoire pour creer un personnel
-    const champsObligatoires = { nom, prenoms, im, date_naissance, categorie, classe, echelon, telephone, service_id, fonction_id, statut, };
+    const champsObligatoires = { nom, prenoms, im, date_naissance, id_grade_actuel, telephone, service_id, fonction_id, statut, };
     const manquants = Object.entries(champsObligatoires) // transforme l'objet en tableau de tableux; {nom: "", prenoms: "Rakoto", ...} ==> [["nom", ""], ["prenoms", "Rakoto"], ...]
         .filter(([_, valeur]) => !valeur || valeur.toString().trim() === "") // ce qui n'ont pas de valeur ou vide
         .map(([cle]) => cle); // garder only nom du champ
@@ -197,7 +197,8 @@ async function addStaff(req, res) {
             prenoms: prenoms.trim().split(" ").map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" "),
             im: imNormalise,
             date_naissance,
-            categorie, classe, echelon,
+            id_grade_actuel,
+            num_arrete: num_arrete || null,
             specialite: specialite?.trim() || null,
             telephone: telephone.trim(),
             email: email?.trim() || null,

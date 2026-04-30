@@ -175,7 +175,17 @@ async function getStaffById(id) {
                     est_principal: true,
                 },
             },
-
+            grade: {
+                select: {
+                    id_grade:         true,
+                    categorie:        true,
+                    classe:           true,
+                    echelon:          true,
+                    indice:           true,
+                    duree_mois:       true,
+                    id_grade_suivant: true,
+                }
+            },
             auth_user: {
                 select: {
                     username: true,
@@ -202,9 +212,17 @@ async function getStaffById(id) {
         photo_profil: personnel.photo_profil ? `/uploads/${personnel.photo_profil}` : `/uploads/default-avatar.png`,
         date_naissance: dateNaissanceFormatee,
         age: age,
-        categorie: personnel.categorie,
-        classe: personnel.classe,
-        echelon: personnel.echelon,
+        // categorie: personnel.categorie,
+        // classe: personnel.classe,
+        // echelon: personnel.echelon,
+        grade_actuel: personnel.grade ? {
+            id_grade:         personnel.grade.id_grade,
+            categorie:        personnel.grade.categorie,
+            classe:           personnel.grade.classe,
+            echelon:          personnel.grade.echelon,
+            indice:           personnel.grade.indice,
+            est_au_maximum:   personnel.grade.id_grade_suivant === null,
+        } : null,
         date_entree_admin: dateEntreeAdminFormatee,
         annees_exercice: anneesExercice,
         specialite: personnel.specialite,
@@ -217,19 +235,39 @@ async function getStaffById(id) {
         statut: validators.formatStatutPourClient(personnel.statut),
         a_acces_sih: personnel.auth_user?.username ?? null,
         username_sih: personnel.auth_user?.username ?? null,
-        diplomes: personnel.diplomes,
+        diplomes: personnel.diplome,
     }
 }
 
 // ── AJOUT ─────────────────────────────────────────────────────────
 async function addPersonnel({
     nom, prenoms, im, date_naissance,
-    categorie, classe, echelon,
+    id_grade_actuel,
     specialite, telephone, email,
     service_id, fonction_id, statut, photo_profil,
     diplomes = [],
+    num_arrete = null,
     donner_acces = false, username, password_hash,
 }) {
+
+    const grade = await prisma.grade.findUnique({
+        where: { id_grade: parseInt(id_grade_actuel, 10) },
+        select: { duree_mois: true, classe: true },
+    });
+
+    if (!grade) throw new Error(`Grade introuvable : id_grade_actuel = ${id_grade_actuel}`);
+
+    const dateAujourdhui = new Date();
+    const dateProchain = new Date(dateAujourdhui);
+    dateProchain.setMonth(dateProchain.getMonth() + grade.duree_mois);
+
+    let type_mouvement;
+    if (grade.classe === 'STAGIAIRE') {
+        type_mouvement = 'NOMINATION';
+    } else {
+        type_mouvement = 'INITIALISATION';
+    }
+    
     return await prisma.$transaction(async (tx) => {
 
         // INSERT chu.personnel
@@ -239,10 +277,8 @@ async function addPersonnel({
                 prenoms,
                 im,
                 date_naissance: new Date(date_naissance),
-                categorie,
-                classe,
-                echelon,
-                date_entree_admin: new Date(),
+                id_grade_actuel: parseInt(id_grade_actuel, 10),
+                date_entree_admin: dateAujourdhui,
                 specialite,
                 telephone,
                 email,
@@ -255,6 +291,19 @@ async function addPersonnel({
 
         const personnelId = personnel.id;
         const personnelIm = personnel.im;
+
+        // Insertion dans avancements -> grade initial
+        await tx.avancements.create({
+            data: {
+                id_personnel: personnelId,
+                id_grade_obtenu: parseInt(id_grade_actuel, 10),
+                num_arrete: num_arrete || '', // facultatif
+                date_signature: dateAujourdhui,
+                date_effet: dateAujourdhui,
+                date_prochain_avancement: dateProchain,
+                type_mouvement: type_mouvement,
+            },
+        });
 
         // INSERT ref.diplome
         if (diplomes.length > 0) {
