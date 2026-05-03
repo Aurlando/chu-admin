@@ -111,7 +111,7 @@ async function addStaff(req, res) {
     // ── 1. Champs obligatoires ────────────────────────────────────
     const {
         nom, prenoms, im, date_naissance,
-        id_grade_actuel, num_arrete,
+        id_grade_actuel, num_arrete, date_effet,
         specialite, telephone, email,
         service_id, fonction_id, statut,
         donner_access, donner_acces, username, password,
@@ -119,15 +119,13 @@ async function addStaff(req, res) {
     } = req.body;
 
     // champs obligatoire pour creer un personnel
-    const champsObligatoires = { nom, prenoms, im, date_naissance, id_grade_actuel, telephone, service_id, fonction_id, statut, };
+    const champsObligatoires = { nom, prenoms, im, date_naissance, id_grade_actuel, telephone, service_id, fonction_id, statut, date_effet };
     const manquants = Object.entries(champsObligatoires) // transforme l'objet en tableau de tableux; {nom: "", prenoms: "Rakoto", ...} ==> [["nom", ""], ["prenoms", "Rakoto"], ...]
         .filter(([_, valeur]) => !valeur || valeur.toString().trim() === "") // ce qui n'ont pas de valeur ou vide
         .map(([cle]) => cle); // garder only nom du champ
 
     if (manquants.length > 0) {
-        // supprimer le fichier uploaded si validation echoue evitant de stocker des fichiers dans le disque pour ne pas encombrer le serveur
-        // fs.unlinkSync() est synchrone, on bloque ici jusqu'a suppression
-        if (req.file) fs.unlinkSync(req.file.path);
+        validators.supprimerFichierSiExiste(cheminFichier);
 
         return res.status(400).json({
             message: `Champs obligatoires manquants : ${manquants.join(", ")}`,
@@ -136,11 +134,15 @@ async function addStaff(req, res) {
 
     const serviceId = parseInt(service_id, 10);
     const fonctionId = parseInt(fonction_id, 10);
+    const gradeId = parseInt(id_grade_actuel, 10);
     if (Number.isNaN(serviceId) || serviceId <= 0) {
         return erreur400("service_id invalide");
     }
     if (Number.isNaN(fonctionId) || fonctionId <= 0) {
         return erreur400("fonction_id invalide");
+    }
+    if (Number.isNaN(gradeId) || gradeId <= 0) {
+        return erreur400("id_grade_actuel invalide");
     }
 
     const statutNormalise = validators.normaliserStatut(statut);
@@ -197,15 +199,16 @@ async function addStaff(req, res) {
             prenoms: prenoms.trim().split(" ").map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" "),
             im: imNormalise,
             date_naissance,
-            id_grade_actuel,
+            id_grade_actuel: gradeId,
             num_arrete: num_arrete || null,
+            date_effet,
             specialite: specialite?.trim() || null,
             telephone: telephone.trim(),
             email: email?.trim() || null,
             service_id: serviceId,
             fonction_id: fonctionId,
             statut: statutNormalise,
-            photo_profil: req.file ? `photo-profil-${imNormalise.replace(" ", "")}.png` : "default-avatar.png",
+            photo_profil: req.file ? `photo-profil-${imNormalise.replaceAll(" ", "")}.png` : "default-avatar.png",
             diplomes,
             donner_acces: accesBoolean,
             username: accesBoolean ? username.trim() : null,
@@ -216,7 +219,7 @@ async function addStaff(req, res) {
         if(req.file) {
             const dossier = path.join(__dirname, "..", "..", "uploads");
             const ancienChemin = path.join(dossier, req.file.filename);
-            const nouveauNom = `photo-profil-${personnelIm.toString().replace(" ", "")}.png`;
+            const nouveauNom = `photo-profil-${personnelIm.toString().replaceAll(" ", "")}.png`;
             const nouveauChemin = path.join(dossier, nouveauNom);
 
             try {

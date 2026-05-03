@@ -242,7 +242,7 @@ async function getStaffById(id) {
 // ── AJOUT ─────────────────────────────────────────────────────────
 async function addPersonnel({
     nom, prenoms, im, date_naissance,
-    id_grade_actuel,
+    id_grade_actuel, date_effet,
     specialite, telephone, email,
     service_id, fonction_id, statut, photo_profil,
     diplomes = [],
@@ -258,7 +258,8 @@ async function addPersonnel({
     if (!grade) throw new Error(`Grade introuvable : id_grade_actuel = ${id_grade_actuel}`);
 
     const dateAujourdhui = new Date();
-    const dateProchain = new Date(dateAujourdhui);
+    const dateEffetVal = new Date(date_effet);
+    const dateProchain = new Date(dateEffetVal);
     dateProchain.setMonth(dateProchain.getMonth() + grade.duree_mois);
 
     let type_mouvement;
@@ -299,7 +300,7 @@ async function addPersonnel({
                 id_grade_obtenu: parseInt(id_grade_actuel, 10),
                 num_arrete: num_arrete || '', // facultatif
                 date_signature: dateAujourdhui,
-                date_effet: dateAujourdhui,
+                date_effet: dateEffetVal,
                 date_prochain_avancement: dateProchain,
                 type_mouvement: type_mouvement,
             },
