@@ -38,7 +38,7 @@ function ErrorAlert({ message, onRetry, dark }) {
     <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm
       ${dark ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
              : "bg-rose-50 border-rose-200 text-rose-700"}`}>
-      <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round"
           d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
       </svg>
@@ -63,7 +63,7 @@ function CellBtn({ value, onClick, dark, groupIdx }) {
       <button
         onClick={onClick}
         title="Cliquer pour voir la liste nominative"
-        className={`inline-flex items-center justify-center gap-1 min-w-[34px] h-7 px-2.5 rounded-lg
+        className={`inline-flex items-center justify-center gap-1 min-w-8.5 h-7 px-2.5 rounded-lg
           text-sm font-bold border transition-all duration-150
           hover:scale-105 hover:shadow-md cursor-pointer
           ${dark ? pal.dark : pal.light}`}
@@ -71,7 +71,7 @@ function CellBtn({ value, onClick, dark, groupIdx }) {
         {value}
         {/* Icône liste visible au hover = indique que c'est cliquable */}
         <svg
-          className="w-3 h-3 opacity-0 group-hover/cell:opacity-70 transition-opacity duration-150 flex-shrink-0"
+          className="w-3 h-3 opacity-0 group-hover/cell:opacity-70 transition-opacity duration-150 shrink-0"
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
@@ -90,7 +90,7 @@ function StatCard({ icon, value, label, colorClass, bgClass, dark }) {
     : "bg-white border-slate-200 shadow-sm";
   return (
     <div className={`rounded-2xl border p-5 flex items-center gap-4 transition-all hover:shadow-md hover:-translate-y-0.5 ${card}`}>
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${bgClass}`}>
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${bgClass}`}>
         {icon}
       </div>
       <div>
@@ -160,7 +160,7 @@ function DetailModal({ open, onClose, serviceId, groupeId, serviceName, groupeNa
         {/* ── En-tête ── */}
         <div className={`flex items-start justify-between px-6 pt-6 pb-4 border-b ${hdBorder}`}>
           <div className="flex items-start gap-3 min-w-0">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0
               ${dark ? "bg-white/6" : "bg-slate-50 border border-slate-200"}`}>
               <svg className={`w-5 h-5 ${dark ? "text-slate-300" : "text-slate-500"}`}
                 fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}>
@@ -187,7 +187,7 @@ function DetailModal({ open, onClose, serviceId, groupeId, serviceName, groupeNa
             </div>
           </div>
           <button onClick={onClose}
-            className={`flex-shrink-0 w-7 h-7 rounded-lg border flex items-center justify-center ml-3
+            className={`shrink-0 w-7 h-7 rounded-lg border flex items-center justify-center ml-3
               transition-all cursor-pointer ${closeBtn}`}>
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -218,7 +218,7 @@ function DetailModal({ open, onClose, serviceId, groupeId, serviceName, groupeNa
                           ${dark ? "bg-white/4 border-white/8 text-slate-300"
                                  : "bg-slate-50 border-slate-200 text-slate-600"}`}>
                         <span className={`w-5 h-5 rounded-lg flex items-center justify-center
-                          text-[10px] font-bold text-white bg-gradient-to-br ${avatarBg(i)}`}>
+                          text-[10px] font-bold text-white bg--to-br ${avatarBg(i)}`}>
                           {cnt}
                         </span>
                         {fn}
@@ -242,8 +242,8 @@ function DetailModal({ open, onClose, serviceId, groupeId, serviceName, groupeNa
                         ${dark
                           ? "bg-white/3 border-white/6 hover:bg-white/6 hover:border-white/12"
                           : "bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm"}`}>
-                      <div className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center
-                        text-[11px] font-bold text-white bg-gradient-to-br ${avatarBg(p.id)}`}>
+                      <div className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center
+                        text-[11px] font-bold text-white bg-linear-to-br ${avatarBg(p.id)}`}>
                         {initials(p.nom, p.prenoms)}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -256,7 +256,7 @@ function DetailModal({ open, onClose, serviceId, groupeId, serviceName, groupeNa
                           <span className="font-mono opacity-60">{p.matricule}</span>
                         </p>
                       </div>
-                      <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg border
+                      <span className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg border
                         ${p.statut === "En activité"
                           ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                           : "bg-amber-500/10 text-amber-500 border-amber-500/20"}`}>
@@ -443,7 +443,7 @@ export default function StructureHospitaliere({ dark }) {
               ${dark
                 ? "bg-blue-500/5 border-white/4 text-blue-400"
                 : "bg-blue-50/70 border-blue-100 text-blue-600"}`}>
-              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
               Les chiffres colorés sont cliquables — ils affichent la liste nominative du personnel de ce groupe.
@@ -455,7 +455,7 @@ export default function StructureHospitaliere({ dark }) {
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
-                    <th className={`${thCls} text-left pl-6 min-w-[190px]`}>Service</th>
+                    <th className={`${thCls} text-left pl-6 min-w-47.5`}>Service</th>
                     {groupes.map((g, i) => {
                       const pal = GROUP_PALETTE[i % GROUP_PALETTE.length];
                       return (
@@ -469,7 +469,7 @@ export default function StructureHospitaliere({ dark }) {
                     })}
                     <th className={`${thCls} ${dark ? "text-slate-400" : "text-slate-500"} font-extrabold`}>
                       Total
-                    </th>
+                    </th> 
                   </tr>
                 </thead>
                 <tbody>

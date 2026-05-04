@@ -166,7 +166,7 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
     return getValidDraft("add_personnel_form", {
       nom: "", prenoms: "", im: "", date_naissance: "",
       categorie: "", classe: "", echelon: "", specialite: "",
-      telephone: "", email: "",
+      telephone: "", email: "", date_effet: "",
       service_id: "", fonction_id: "",
       statut: "En activité",
       username: "", password: "",
@@ -298,7 +298,9 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
       if (!form.categorie)            e.categorie     = "Requis";
       if (!form.classe)               e.classe        = "Requis";
       if (!form.echelon)              e.echelon       = "Requis";
+      if (!form.date_effet)           e.date_effet    = "Requis";
       if (!form.specialite.trim())    e.specialite    = "Requis";
+
       else if (!noSpecialCharsAlphanumRegex.test(form.specialite)) e.specialite = "Pas de caractères spéciaux";
     }
     if (step === 3) {
@@ -409,6 +411,8 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
       fd.append("classe",         form.classe);
       fd.append("echelon",        form.echelon);
       fd.append("specialite",     form.specialite.trim());
+      fd.append("date_effet",     form.date_effet);
+      fd.append("arrete",         form.arrete.trim());
       fd.append("telephone",      form.telephone.trim());
       fd.append("email",          form.email.trim());
       fd.append("service_id",     form.service_id);
@@ -442,7 +446,7 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
       // Reset complet
       setForm({ nom:"", prenoms:"", im:"", date_naissance:"", categorie:"", classe:"",
         echelon:"", specialite:"", telephone:"", email:"", service_id:"", fonction_id:"",
-        statut:"En activité", username:"", password:"" });
+        date_effet:"", statut:"En activité", username:"", password:"" });
       setDiplomes([{ ...DIPLOME_VIDE, est_principal: true }]);
       setPhotoFile(null); setPhotoPreview(null);
       setCreerCompte(false); setErrors({});
@@ -780,9 +784,17 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                     {STATUTS.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </Field>
+                <Field label="Date d'effet" required dark={dark} error={errors.date_effet}>
+                  <input type="date" value={form.date_effet}
+                    onChange={e => handleChange("date_effet", e.target.value)} className={inp("date_effet")} />
+                </Field>
                 <Field label="Spécialité" required dark={dark} error={errors.specialite}>
                   <input type="text" placeholder="Ex: Médecin spécialiste en chirurgie" value={form.specialite}
                     onChange={e => handleChange("specialite", e.target.value)} className={inp("specialite")} />
+                </Field>
+                <Field label="Arrete" required dark={dark} error={errors.arrete}>
+                  <input type="text" placeholder ="Ex: 11551/2025/MEN" value={form.arrete}
+                    onChange={e => handleChange("arrete", e.target.value)} className={inp("arrete")} />
                 </Field>
               </div>
             </div>

@@ -168,8 +168,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
         im: "",
         date_naissance: "",
         categorie: "",
-        classe: "",
-        echelon: "",
+        id_grade_actuel: "",
         specialite: "",
         telephone: "",
         email: "",
@@ -186,6 +185,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
     // ── Dropdowns
     const [services, setServices] = useState([]);
     const [fonctions, setFonctions] = useState([]);
+    const [grades, setGrades] = useState([]);
 
     // ── Soumission
     const [errors, setErrors] = useState({});
@@ -244,9 +244,8 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                     prenoms: p.prenoms || "",
                     im: p.matricule || "", // la BDD renvoie "matricule" en lecture
                     date_naissance: dateFormatted,
-                    categorie: p.categorie || "",
-                    classe: p.classe || "",
-                    echelon: p.echelon || "",
+                    categorie: p.categorie || (p.grade_actuel ? p.grade_actuel.categorie : ""),
+                    id_grade_actuel: p.grade_actuel ? p.grade_actuel.id_grade : "",
                     specialite: p.specialite || "",
                     telephone: p.telephone || "",
                     email: p.email || "",
@@ -304,6 +303,22 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             })
             .catch(() => {});
     }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ── Chargement des grades lors du changement de catégorie
+    useEffect(() => {
+        if (!form.categorie) {
+            setGrades([]);
+            return;
+        }
+        fetch(`${API_BASE}/avancements/grades/${form.categorie}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then((r) => r.json())
+            .then((json) => {
+                setGrades(json.data || json);
+            })
+            .catch(() => setGrades([]));
+    }, [form.categorie, token]);
 
     // ── Fermer le modal en cliquant sur l'overlay (backdrop)
     const handleBackdropClick = (e) => {
@@ -441,8 +456,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             fd.append("im", form.im.trim());
             fd.append("date_naissance", form.date_naissance);
             fd.append("categorie", form.categorie);
-            fd.append("classe", form.classe);
-            fd.append("echelon", form.echelon);
+            if (form.id_grade_actuel) fd.append("id_grade_actuel", form.id_grade_actuel);
             fd.append("specialite", form.specialite.trim());
             fd.append("telephone", form.telephone.trim());
             fd.append("email", form.email.trim());
@@ -887,55 +901,29 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                             </select>
                                         </Field>
                                         <Field
-                                            label="Classe"
+                                            label="Grade (Classe & Échelon)"
                                             dark={dark}
                                         >
                                             <select
-                                                value={form.classe}
+                                                value={form.id_grade_actuel}
                                                 onChange={(e) =>
                                                     handleChange(
-                                                        "classe",
+                                                        "id_grade_actuel",
                                                         e.target.value,
                                                     )
                                                 }
                                                 className={selectCls}
+                                                disabled={!form.categorie}
                                             >
                                                 <option value="">
                                                     Sélectionner
                                                 </option>
-                                                {CLASSES.map((c) => (
+                                                {grades.map((g) => (
                                                     <option
-                                                        key={c.value}
-                                                        value={c.value}
+                                                        key={g.id_grade}
+                                                        value={g.id_grade}
                                                     >
-                                                        {c.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
-                                        <Field
-                                            label="Échelon"
-                                            dark={dark}
-                                        >
-                                            <select
-                                                value={form.echelon}
-                                                onChange={(e) =>
-                                                    handleChange(
-                                                        "echelon",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className={selectCls}
-                                            >
-                                                <option value="">
-                                                    Sélectionner
-                                                </option>
-                                                {ECHELONS.map((e) => (
-                                                    <option
-                                                        key={e}
-                                                        value={e}
-                                                    >
-                                                        {e}
+                                                        Classe {g.classe} - Échelon {g.echelon} (Indice {g.indice})
                                                     </option>
                                                 ))}
                                             </select>

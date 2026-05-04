@@ -119,6 +119,37 @@ export default function StaffProfile({ id, dark, onBack }) {
     // [NOUVEAU] showUpdateModal : ouvre/ferme le modal de mise à jour
     const [showUpdateModal, setShowUpdateModal] = useState(false);
 
+    // [AJOUTÉ] showArchiveModal : ouvre la modale de confirmation "Fin de service"
+    const [showArchiveModal, setShowArchiveModal] = useState(false);
+    // [AJOUTÉ] archiving : true pendant l'appel PATCH /:id/archiver
+    const [archiving, setArchiving] = useState(false);
+    // [AJOUTÉ] archiveError : message d'erreur si l'archivage échoue
+    const [archiveError, setArchiveError] = useState(null);
+
+    // [AJOUTÉ] handleArchiver : appelle PATCH /staff/:id/archiver
+    // En cas de succès → ferme le modal + retourne au répertoire (onBack)
+    const handleArchiver = async () => {
+        setArchiving(true);
+        setArchiveError(null);
+        try {
+            const res = await fetch(`${API_BASE}/staff/${id}/archiver`, {
+                method: "PATCH",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                throw new Error(json.message || `Erreur ${res.status}`);
+            }
+            // Succès : on referme le modal et on retourne au répertoire
+            setShowArchiveModal(false);
+            onBack();
+        } catch (err) {
+            setArchiveError(err.message);
+        } finally {
+            setArchiving(false);
+        }
+    };
+
     // ── Lecture du token JWT depuis localStorage (voir App.jsx ligne 28)
     const token = localStorage.getItem("token");
 
@@ -197,12 +228,113 @@ export default function StaffProfile({ id, dark, onBack }) {
                 />
             )}
 
+            {/* [AJOUTÉ] Modale de confirmation "Fin de service"
+                Appelle PATCH /staff/:id/archiver au clic sur "Confirmer"
+                Se ferme automatiquement et retourne au répertoire si succès */}
+            {showArchiveModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                    style={{ background: "rgba(5,10,25,0.65)", backdropFilter: "blur(8px)" }}
+                    onClick={() => !archiving && setShowArchiveModal(false)}
+                >
+                    <div
+                        className={`relative w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden
+                            ${dark ? "bg-[#0c1424] border border-white/8" : "bg-white border border-slate-200"}`}
+                        style={{ animation: "modalIn .2s cubic-bezier(.34,1.56,.64,1)" }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Barre rouge en haut */}
+                        <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-rose-500 to-rose-600" />
+
+                        <div className="px-6 py-6 space-y-4">
+                            {/* Icône avertissement */}
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto
+                                ${dark ? "bg-rose-500/15" : "bg-rose-50"}`}>
+                                <svg className="w-6 h-6 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round"
+                                        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                </svg>
+                            </div>
+
+                            {/* Texte */}
+                            <div className="text-center space-y-1.5">
+                                <h3 className={`text-[15px] font-bold ${dark ? "text-white" : "text-slate-800"}`}>
+                                    Confirmer la fin de service
+                                </h3>
+                                <p className={`text-sm leading-relaxed ${dark ? "text-slate-400" : "text-slate-500"}`}>
+                                    Vous êtes sur le point d'archiver{" "}
+                                    <strong className={dark ? "text-slate-200" : "text-slate-700"}>
+                                        {profile?.nom} {profile?.prenoms}
+                                    </strong>
+                                    . Cette action marquera le personnel comme sorti du service.
+                                </p>
+                            </div>
+
+                            {/* Erreur API */}
+                            {archiveError && (
+                                <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-medium
+                                    ${dark ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
+                                           : "bg-rose-50 border-rose-200 text-rose-700"}`}>
+                                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round"
+                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                    </svg>
+                                    {archiveError}
+                                </div>
+                            )}
+
+                            {/* Boutons */}
+                            <div className="flex gap-2 pt-1">
+                                {/* Annuler */}
+                                <button
+                                    onClick={() => setShowArchiveModal(false)}
+                                    disabled={archiving}
+                                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all cursor-pointer
+                                        disabled:opacity-40 disabled:cursor-not-allowed
+                                        ${dark
+                                            ? "border-white/10 text-slate-300 hover:bg-white/6"
+                                            : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                                >
+                                    Annuler
+                                </button>
+                                {/* Confirmer → appelle handleArchiver */}
+                                <button
+                                    onClick={handleArchiver}
+                                    disabled={archiving}
+                                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white
+                                        bg-rose-600 hover:bg-rose-500 border border-rose-600
+                                        transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed
+                                        flex items-center justify-center gap-2"
+                                >
+                                    {archiving ? (
+                                        <>
+                                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                                            </svg>
+                                            Archivage…
+                                        </>
+                                    ) : "Confirmer"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <style>{`
+                        @keyframes modalIn {
+                            from { opacity:0; transform:scale(.93) translateY(12px); }
+                            to   { opacity:1; transform:scale(1)   translateY(0);    }
+                        }
+                    `}</style>
+                </div>
+            )}
+
             <div className="max-w-5xl mx-auto p-4 lg:p-6">
                 {/* ── Fil d'Ariane + bouton retour ── */}
                 <div className="flex items-center gap-2 mb-5 text-sm">
                     <button
                         onClick={onBack} // onBack = setSelectedId(null) dans PersonnelDirectory
-                        className={`flex items-center gap-1.5 transition-colors hover:-translate-x-0.5 transition-transform ${
+                        className={`flex items-center gap-1.5 transition-colors hover:-translate-x-0.5 cursor-pointer ${
                             dark
                                 ? "text-slate-400 hover:text-white"
                                 : "text-slate-500 hover:text-slate-800"
@@ -225,7 +357,7 @@ export default function StaffProfile({ id, dark, onBack }) {
                     </button>
                     <button
                         onClick={onBack}
-                        className={`transition-colors ${breadcr} hover:${dark ? "text-slate-300" : "text-slate-700"}`}
+                        className={`transition-colors cursor-pointer ${breadcr} hover:${dark ? "text-slate-300" : "text-slate-700"}`}
                     >
                         Répertoire du Personnel
                     </button>
@@ -252,51 +384,50 @@ export default function StaffProfile({ id, dark, onBack }) {
                         Détails du Personnel
                     </h1>
                     <div className="flex items-center gap-2 flex-wrap">
-                        {/* Bouton "Mettre à jour" — ouvre UpdateModal */}
-                        <button
-                            onClick={() => setShowUpdateModal(true)}
-                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all hover:-translate-y-0.5 shadow-lg shadow-blue-600/20"
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                />
-                            </svg>
-                            Mettre à jour
-                        </button>
-                        {/* Bouton "Fin de service" — non fonctionnel, prévu pour la suite */}
-                        <button
-                            className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border transition-all hover:-translate-y-0.5 ${
-                                dark
-                                    ? "border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
-                                    : "border-rose-200 text-rose-600 hover:bg-rose-50"
-                            }`}
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
-                                />
-                            </svg>
-                            Fin de service
-                        </button>
+                        {/* [AJOUTÉ] Masquer les boutons si le personnel est archivé (statut "Sorti")
+                            — On vérifie profile.statut après chargement. Quand il est archivé,
+                              on affiche à la place un badge "Archivé" non cliquable. */}
+                        {profile && profile.statut === "Sorti" ? (
+                            <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold
+                                ${dark
+                                    ? "bg-slate-500/10 border-slate-500/20 text-slate-400"
+                                    : "bg-slate-50 border-slate-200 text-slate-500"}`}>
+                                <svg className="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round"
+                                        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                                </svg>
+                                Personnel archivé
+                            </span>
+                        ) : (
+                            <>
+                                {/* Bouton "Mettre à jour" — visible uniquement si non archivé */}
+                                <button
+                                    onClick={() => setShowUpdateModal(true)}
+                                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all hover:-translate-y-0.5 shadow-lg shadow-blue-600/20 cursor-pointer"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round"
+                                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                    Mettre à jour
+                                </button>
+                                {/* Bouton "Fin de service" — visible uniquement si non archivé */}
+                                <button
+                                    onClick={() => { setArchiveError(null); setShowArchiveModal(true); }}
+                                    className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border transition-all hover:-translate-y-0.5 cursor-pointer ${
+                                        dark
+                                            ? "border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                                            : "border-rose-200 text-rose-600 hover:bg-rose-50"
+                                    }`}
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round"
+                                            d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                    </svg>
+                                    Fin de service
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -338,7 +469,7 @@ export default function StaffProfile({ id, dark, onBack }) {
                         </div>
                         <button
                             onClick={() => window.location.reload()}
-                            className="ml-auto underline text-xs"
+                            className="ml-auto underline text-xs cursor-pointer"
                         >
                             Réessayer
                         </button>
@@ -363,7 +494,7 @@ export default function StaffProfile({ id, dark, onBack }) {
                                         />
                                     ) : (
                                         // Fallback : avatar initiales coloré
-                                        <div className="w-28 h-28 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-700 flex items-center justify-center text-3xl font-bold text-white">
+                                        <div className="w-28 h-28 rounded-2xl bg-linear-to-br from-blue-400 to-blue-700 flex items-center justify-center text-3xl font-bold text-white">
                                             {(profile.nom?.[0] || "") +
                                                 (profile.prenoms?.[0] || "")}
                                         </div>
@@ -430,10 +561,13 @@ export default function StaffProfile({ id, dark, onBack }) {
                                             >
                                                 Poste actuel
                                             </p>
+                                            {/* [MODIFIÉ] grade_actuel est maintenant un objet
+                                                Avant : profile.classe
+                                                Après : profile.grade_actuel?.classe */}
                                             <p
                                                 className={`text-sm font-semibold mt-0.5 ${dark ? "text-blue-400" : "text-blue-600"}`}
                                             >
-                                                {profile.classe || "—"}
+                                                {profile.grade_actuel?.classe || "—"}
                                             </p>
                                         </div>
 
@@ -558,7 +692,12 @@ export default function StaffProfile({ id, dark, onBack }) {
                                 <InfoRow
                                     dark={dark}
                                     label="Date d'entrée"
-                                    value={profile.date_entree_admin}
+                                    value={profile.date_entree_admin || null}
+                                />
+                                <InfoRow
+                                    dark={dark}
+                                    label="Accès SIH"
+                                    value={profile.a_acces_sih ? "Oui" : "Non"}
                                 />
 
                                 {/* Diplômes secondaires : est_principal = false — on boucle avec .map() */}
@@ -605,33 +744,76 @@ export default function StaffProfile({ id, dark, onBack }) {
                                     label="Département"
                                     value={profile.departement}
                                 />
+                                {/* [MODIFIÉ] categorie, echelon, classe viennent maintenant
+                                    de l'objet grade_actuel retourné par l'API
+                                    Avant : profile.categorie / profile.echelon / profile.classe
+                                    Après : profile.grade_actuel?.categorie / .echelon / .classe */}
                                 <InfoRow
                                     dark={dark}
                                     label="Catégorie"
-                                    value={profile.categorie}
+                                    value={profile.grade_actuel?.categorie}
                                 />
                                 <InfoRow
                                     dark={dark}
                                     label="Échelon"
-                                    value={profile.echelon}
+                                    value={profile.grade_actuel?.echelon != null
+                                        ? String(profile.grade_actuel.echelon)
+                                        : null}
                                 />
-                                {/* Badge classe (ex: STAGIAIRE, TITULAIRE) */}
-                                {profile.classe && (
+                                {/* [AJOUTÉ] Indice — nouveau champ de grade_actuel */}
+                                {profile.grade_actuel?.indice != null && (
+                                    <InfoRow
+                                        dark={dark}
+                                        label="Indice"
+                                        value={String(profile.grade_actuel.indice)}
+                                    />
+                                )}
+                                {profile.grade_actuel?.date_effet && (
+                                    <InfoRow
+                                        dark={dark}
+                                        label="Date d'effet"
+                                        value={profile.grade_actuel.date_effet}
+                                    />
+                                )}
+                                {profile.grade_actuel?.date_prochain_avancement && (
+                                    <InfoRow
+                                        dark={dark}
+                                        label="Prochain avancement"
+                                        value={profile.grade_actuel.date_prochain_avancement}
+                                    />
+                                )}
+                                {/* Badge classe (ex: STAGIAIRE, PRINCIPALE) — depuis grade_actuel */}
+                                {profile.grade_actuel?.classe && (
                                     <div>
                                         <p
                                             className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${dark ? "text-slate-500" : "text-slate-400"}`}
                                         >
                                             Statut de poste
                                         </p>
-                                        <span
-                                            className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${
-                                                dark
-                                                    ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                                                    : "bg-blue-50 text-blue-700 border-blue-200"
-                                            }`}
-                                        >
-                                            {profile.classe}
-                                        </span>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span
+                                                className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                                                    dark
+                                                        ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                                        : "bg-blue-50 text-blue-700 border-blue-200"
+                                                }`}
+                                            >
+                                                {profile.grade_actuel.classe}
+                                            </span>
+                                            {/* [AJOUTÉ] Badge "Grade maximum" si est_au_maximum = true */}
+                                            {profile.grade_actuel?.est_au_maximum && (
+                                                <span
+                                                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                                                        dark
+                                                            ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                                            : "bg-amber-50 text-amber-700 border-amber-200"
+                                                    }`}
+                                                    title="Ce membre est au grade maximum de sa carrière"
+                                                >
+                                                    ★ Grade max
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </SectionCard>
