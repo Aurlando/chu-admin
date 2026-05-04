@@ -286,6 +286,7 @@ async function updateStaff(req, res) {
     const categorie = ouString(body.categorie);
     const classe = ouString(body.classe);
     const echelon = ouString(body.echelon);
+    const id_grade_actuel = ouInt(body.id_grade_actuel);
     const specialite = ouString(body.specialite);
     const telephone = ouString(body.telephone);
     const email = ouString(body.email);
@@ -305,11 +306,17 @@ async function updateStaff(req, res) {
     if (body.fonction_id !== undefined && fonction_id === undefined) {
         return erreur400("fonction_id invalide");
     }
+    if (body.id_grade_actuel !== undefined && id_grade_actuel === undefined) {
+        return erreur400("id_grade_actuel invalide");
+    }
     if (service_id !== undefined && service_id <= 0) {
         return erreur400("service_id invalide");
     }
     if (fonction_id !== undefined && fonction_id <= 0) {
         return erreur400("fonction_id invalide");
+    }
+    if (id_grade_actuel !== undefined && id_grade_actuel <= 0) {
+        return erreur400("id_grade_actuel invalide");
     }
 
     if (statut !== undefined) {
@@ -407,6 +414,7 @@ async function updateStaff(req, res) {
             categorie,
             classe,
             echelon,
+            id_grade_actuel,
             specialite,
             telephone,
             email,

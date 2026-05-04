@@ -191,13 +191,18 @@ async function getStaffById(id) {
                     username: true,
                 }
             },
+            avancements: {
+                orderBy: { date_effet: 'desc' },
+                take: 1,
+                select: { date_effet: true, date_prochain_avancement: true }
+            },
         },
     });
 
     if (!personnel) return null;
 
     const dateNaissanceFormatee = formaterDate(personnel.date_naissance);
-    const dateEntreeAdminFormatee = formaterDate(personnel.annee_entree_admin);
+    const dateEntreeAdminFormatee = formaterDate(personnel.date_entree_admin);
     const age = calculerAge(personnel.date_naissance);
     const anneesExercice = calculerAge(personnel.date_entree_admin);
 
@@ -222,6 +227,8 @@ async function getStaffById(id) {
             echelon:          personnel.grade.echelon,
             indice:           personnel.grade.indice,
             est_au_maximum:   personnel.grade.id_grade_suivant === null,
+            date_effet:       personnel.avancements[0] ? formaterDate(personnel.avancements[0].date_effet) : null,
+            date_prochain_avancement: personnel.avancements[0] ? formaterDate(personnel.avancements[0].date_prochain_avancement) : null,
         } : null,
         date_entree_admin: dateEntreeAdminFormatee,
         annees_exercice: anneesExercice,
@@ -233,7 +240,7 @@ async function getStaffById(id) {
         departement: toInitCap(personnel.service?.libelle),
         service_id: personnel.service_id,
         statut: validators.formatStatutPourClient(personnel.statut),
-        a_acces_sih: personnel.auth_user?.username ?? null,
+        a_acces_sih: Boolean(personnel.auth_user),
         username_sih: personnel.auth_user?.username ?? null,
         diplomes: personnel.diplome,
     }
@@ -339,7 +346,7 @@ async function addPersonnel({
 async function updatePersonnel({
     id,
     nom, prenoms, date_naissance,
-    categorie, classe, echelon,
+    categorie, classe, echelon, id_grade_actuel,
     specialite, telephone, email,
     service_id, fonction_id, statut,
     photo_profil,
@@ -358,6 +365,7 @@ async function updatePersonnel({
         if (categorie !== undefined) dataToUpdate.categorie = categorie;
         if (classe !== undefined) dataToUpdate.classe = classe;
         if (echelon !== undefined) dataToUpdate.echelon = echelon;
+        if (id_grade_actuel !== undefined) dataToUpdate.id_grade_actuel = id_grade_actuel;
         if (specialite !== undefined) dataToUpdate.specialite = specialite;
         if (telephone !== undefined) dataToUpdate.telephone = telephone;
         if (email !== undefined) dataToUpdate.email = email;
@@ -372,6 +380,35 @@ async function updatePersonnel({
                 where: { id: BigInt(id) },
                 data: dataToUpdate,
             });
+        }
+
+        // Synchronisation muette du dernier avancement (Correction sans nouvel historique)
+        if (id_grade_actuel !== undefined) {
+            const newGrade = await tx.grade.findUnique({
+                where: { id_grade: id_grade_actuel },
+                select: { duree_mois: true }
+            });
+            
+            if (newGrade) {
+                const latestAvancement = await tx.avancements.findFirst({
+                    where: { id_personnel: BigInt(id) },
+                    orderBy: { date_effet: 'desc' },
+                });
+
+                if (latestAvancement) {
+                    const dateEffet = new Date(latestAvancement.date_effet);
+                    const dateProchain = new Date(dateEffet);
+                    dateProchain.setMonth(dateProchain.getMonth() + newGrade.duree_mois);
+
+                    await tx.avancements.update({
+                        where: { id_avancement: latestAvancement.id_avancement },
+                        data: {
+                            id_grade_obtenu: id_grade_actuel,
+                            date_prochain_avancement: dateProchain
+                        }
+                    });
+                }
+            }
         }
 
         // INSERT ou UPDATE
