@@ -1,9 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Sidebar from "./SideBar";
 import PersonnelDirectory from "./PersonnelDirectory";
 import AddPersonnel from "./AddPersonnel";
 import "../App.css";
 import StructureHospitaliere from "./StructureHospitaliere";
+import SecurityCredentials from "./SecurityCredentials";
+// [AJOUTÉ] Page archives du personnel
+import ArchivePage from "./ArchivePage";
+import Avancements from "./Avancements";
 
 const API_URL = "http://localhost:3000/dashboard";
 
@@ -921,6 +925,21 @@ export default function Dashboard({ onLogout }) {
     const [activeNav, setActiveNav] = useState("Dashboard");
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [dark, setDark] = useState(true);
+    // [AJOUTÉ] État du menu déroulant Paramètres
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    // [AJOUTÉ] Ref pour fermer le menu si clic en dehors
+    const settingsRef = useRef(null);
+
+    // [AJOUTÉ] Ferme le menu déroulant si clic en dehors
+    useEffect(() => {
+        const handler = (e) => {
+            if (settingsRef.current && !settingsRef.current.contains(e.target)) {
+                setSettingsOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
 
     const T = {
         pageBg: dark ? "bg-[#0a0f1e]" : "bg-slate-50",
@@ -960,6 +979,14 @@ export default function Dashboard({ onLogout }) {
             // ── [AJOUTÉ] Liaison avec StructureHospitaliere (déjà importé ligne 6)
             case "Structure hospitalière":
                 return <StructureHospitaliere dark={dark} />;
+            // ── [AJOUTÉ] Liaison avec SecurityCredentials (déjà importé ligne 7)
+            case "Sécurité & Credentials":
+                return <SecurityCredentials dark={dark} />;
+            // [AJOUTÉ] Page archives
+            case "Archives":
+                return <ArchivePage dark={dark} />;
+            case "Avancements":
+                return <Avancements dark={dark} />;
             case "Dashboard":
             default:
                 return (
@@ -1046,29 +1073,81 @@ export default function Dashboard({ onLogout }) {
                             <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
                         </button>
 
-                        <button
-                            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${T.iconBtn}`}
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="w-4 h-4 cursor-pointer"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
+                        {/* [AJOUTÉ] Bouton Paramètres avec menu déroulant */}
+                        <div className="relative" ref={settingsRef}>
+                            <button
+                                onClick={() => setSettingsOpen((o) => !o)}
+                                className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${T.iconBtn}
+                                    ${settingsOpen ? (dark ? "bg-white/10 text-white" : "bg-slate-200 text-slate-800") : ""}`}
+                                title="Paramètres"
                             >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                                />
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                />
-                            </svg>
-                        </button>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round"
+                                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                            </button>
+
+                            {/* Menu déroulant */}
+                            {settingsOpen && (
+                                <div
+                                    className={`absolute right-0 top-11 z-50 w-52 rounded-2xl border shadow-2xl overflow-hidden
+                                        ${dark ? "bg-[#0d1526] border-white/10" : "bg-white border-slate-200"}`}
+                                    style={{ animation: "dropIn .18s cubic-bezier(.34,1.56,.64,1)" }}
+                                >
+                                    {/* En-tête menu */}
+                                    <div className={`px-4 py-3 border-b text-[10.5px] font-bold uppercase tracking-widest
+                                        ${dark ? "border-white/6 text-slate-600" : "border-slate-100 text-slate-400"}`}>
+                                        Paramètres
+                                    </div>
+
+                                    {/* Item : Archives */}
+                                    <button
+                                        onClick={() => { setActiveNav("Archives"); setSettingsOpen(false); }}
+                                        className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-all cursor-pointer
+                                            ${dark
+                                                ? "text-slate-300 hover:bg-white/6 hover:text-white"
+                                                : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"}`}
+                                    >
+                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0
+                                            ${dark ? "bg-rose-500/15" : "bg-rose-50"}`}>
+                                            <svg className="w-3.5 h-3.5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round"
+                                                    d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                                            </svg>
+                                        </div>
+                                        Archives
+                                    </button>
+
+                                    {/* Séparateur */}
+                                    <div className={`mx-4 h-px ${dark ? "bg-white/5" : "bg-slate-100"}`} />
+
+                                    {/* Item : Déconnexion */}
+                                    <button
+                                        onClick={() => { setSettingsOpen(false); onLogout && onLogout(); }}
+                                        className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-all cursor-pointer
+                                            ${dark
+                                                ? "text-rose-400 hover:bg-rose-500/8"
+                                                : "text-rose-600 hover:bg-rose-50"}`}
+                                    >
+                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0
+                                            ${dark ? "bg-rose-500/12" : "bg-rose-50"}`}>
+                                            <svg className="w-3.5 h-3.5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                                            </svg>
+                                        </div>
+                                        Déconnexion
+                                    </button>
+                                </div>
+                            )}
+
+                            <style>{`
+                                @keyframes dropIn {
+                                    from { opacity:0; transform:scale(.95) translateY(-6px); }
+                                    to   { opacity:1; transform:scale(1)   translateY(0); }
+                                }
+                            `}</style>
+                        </div>
                     </div>
                 </header>
 
