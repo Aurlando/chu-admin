@@ -25,7 +25,7 @@ async function getAccounts({ search = '', page = 1, limit = 10 } = {}) {
                         nom: true,
                         prenoms: true,
                         im: true,
-                        ref_fonction: { select: { libelle: true } },
+                        fonction: { select: { libelle: true } },
                         service: { select: { libelle: true } },
                     }
                 }
@@ -48,7 +48,7 @@ async function getAccounts({ search = '', page = 1, limit = 10 } = {}) {
                 nom: a.personnel.nom,
                 prenoms: a.personnel.prenoms,
                 matricule: a.personnel.im,
-                fonction: a.personnel.ref_fonction?.libelle || null,
+                fonction: a.personnel.fonction?.libelle || null,
                 service: a.personnel.service?.libelle || null,
             } : null,
         })),
@@ -81,7 +81,7 @@ async function resetPassword({ accountId, newPassword, adminId }) {
             data: { password_hash },
         });
 
-        await tx.audit_log.create({
+        await tx.ref_audit_log.create({
             data: {
                 action: 'RESET_MDP',
                 cible_type: 'auth_user',
@@ -114,7 +114,7 @@ async function toggleActif({ accountId, adminId }) {
             data: { actif: nouvelEtat },
         });
 
-        await tx.audit_log.create({
+        await tx.ref_audit_log.create({
             data: {
                 action: nouvelEtat ? 'ACTIVATION_COMPTE' : 'DESACTIVATION_COMPTE',
                 cible_type: 'auth_user',
@@ -135,7 +135,7 @@ async function toggleActif({ accountId, adminId }) {
 // Historique de toutes les actions admin
 async function getAuditLog({ page = 1, limit = 20 } = {}) {
     const [logs, total] = await Promise.all([
-        prisma.audit_log.findMany({
+        prisma.ref_audit_log.findMany({
             orderBy: { created_at: 'desc' },
             skip: (page - 1) * limit,
             take: limit,
@@ -160,7 +160,7 @@ async function getAuditLog({ page = 1, limit = 20 } = {}) {
                 }
             }
         }),
-        prisma.audit_log.count(),
+        prisma.ref_audit_log.count(),
     ]);
     
     return {
