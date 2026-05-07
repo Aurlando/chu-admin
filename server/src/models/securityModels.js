@@ -61,7 +61,7 @@ async function getAccounts({ search = '', page = 1, limit = 10 } = {}) {
     }
 }
 
-// Réinitialise le mot de passe + enregistre dans audit_log
+// Réinitialise le mot de passe + enregistre dans ref_audit_log
 async function resetPassword({ accountId, newPassword, adminId }) {
     // verification que le compte existe
     const account = await prisma.auth_user.findUnique({
@@ -116,7 +116,7 @@ async function toggleActif({ accountId, adminId }) {
 
         await tx.ref_audit_log.create({
             data: {
-                action: nouvelEtat ? 'ACTIVATION_COMPTE' : 'DESACTIVATION_COMPTE',
+                action: nouvelEtat ? 'ACTIVATION' : 'DESACTIVATION',
                 cible_type: 'auth_user',
                 cible_id: BigInt(accountId),
                 fait_par_id: BigInt(adminId),
@@ -144,7 +144,6 @@ async function getAuditLog({ page = 1, limit = 20 } = {}) {
                 action: true,
                 cible_type: true,
                 cible_id: true,
-                fait_par_id: true,
                 details: true,
                 created_at: true,
                 auth_user: {
