@@ -469,8 +469,60 @@ async function archiverStaff(req, res) {
     }
 }
 
+// ── LISTE DES ARCHIVÉS ─────────────────────────────────────────────────────────
+async function getArchivedStaff(req, res) {
+    const search = req.query.search || "";
+    const department = req.query.department || "";
+    const fonction = req.query.fonction || "";
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+
+    try {
+        const result = await staffModels.getArchivedStaff({ search, department, fonction, page, limit });
+        res.status(200).json({
+            message: "Archives récupérées avec succès",
+            data: result.data,
+            pagination: result.pagination,
+        });
+    } catch (error) {
+        console.error("[getArchivedStaff] Erreur :", error);
+        res.status(500).json({ message: "Erreur interne du serveur" });
+    }
+}
+
+// ── PROFIL D'UN ARCHIVÉ (lecture seule) ───────────────────────────────────────
+async function getArchivedProfile(req, res) {
+    const id = parseInt(req.params.id, 10);
+
+    if (isNaN(id) || id <= 0) {
+        return res.status(400).json({ message: "ID invalide" });
+    }
+
+    try {
+        const profile = await staffModels.getStaffById(id);
+
+        if (!profile) {
+            return res.status(404).json({ message: "Personnel introuvable" });
+        }
+
+        if (profile.statut !== 'Sorti') {
+            return res.status(403).json({ message: "Ce personnel n'est pas archivé" });
+        }
+
+        res.status(200).json({
+            message: "Profil archivé récupéré avec succès",
+            data: profile,
+        });
+    } catch (error) {
+        console.error("[getArchivedProfile] Erreur :", error);
+        res.status(500).json({ message: "Erreur interne du serveur" });
+    }
+}
+
 module.exports = {
     getStaff,
+    getArchivedStaff,
+    getArchivedProfile,
     getDepartments,
     getFonctions,
     getStaffProfile,

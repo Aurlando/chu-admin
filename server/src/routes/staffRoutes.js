@@ -55,4 +55,11 @@ router.patch('/update/:id', upload.single('photo'), staffControllers.updateStaff
 // Route pour mettre fin au service d'un personnel
 router.patch('/:id/archiver', staffControllers.archiverStaff);
 
+// ── ROUTES ARCHIVES (lecture seule) ───────────────────────────────
+// ?search=  &department=  &fonction=  &page=  &limit=
+router.get('/archives',         staffControllers.getArchivedStaff);
+
+// profil complet d'un personnel archivé
+router.get('/archives/:id',     staffControllers.getArchivedProfile);
+
 module.exports = router;

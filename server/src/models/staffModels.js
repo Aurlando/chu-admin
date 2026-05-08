@@ -40,7 +40,10 @@ function formaterDate(date) {
 async function getAllStaff({  search = "", department = "", fonction = "", page = 1, limit = 10, } = {}) {
     // Construction du WHERE dynamique Prisma pour les filtres
     const where = {
-        AND: [],
+        AND: [
+            // Filtre permanent : n'afficher que le personnel actif (non archivé)
+            { statut: { not: 'Sortie' } },
+        ],
     }
 
     // Filtre de recherche (nom, prenoms ou matricule)
@@ -72,8 +75,8 @@ async function getAllStaff({  search = "", department = "", fonction = "", page 
         })
     }
 
-    // si aucun filtre on vide le where
-    const whereClause = where.AND.length > 0 ? where : {};
+    // Le filtre statut est toujours présent, on utilise directement where
+    const whereClause = where;
 
     // Execution en parallele : findMany + count
     const [data, total] = await Promise.all([
@@ -117,6 +120,82 @@ async function getAllStaff({  search = "", department = "", fonction = "", page 
 
     return {
         data: formatedData,
+        pagination: {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+        },
+    };
+}
+
+// ── LISTE DU STAFF ARCHIÉ (statut = Sortie) ──────────────────────────────────
+async function getArchivedStaff({ search = "", department = "", fonction = "", page = 1, limit = 10 } = {}) {
+    const where = {
+        AND: [
+            // Filtre permanent : uniquement les personnels archivés
+            { statut: 'Sortie' },
+        ],
+    };
+
+    if (search) {
+        where.AND.push({
+            OR: [
+                { nom: { contains: search, mode: 'insensitive' } },
+                { prenoms: { contains: search, mode: 'insensitive' } },
+                { im: { contains: search, mode: 'insensitive' } },
+            ]
+        });
+    }
+
+    if (department) {
+        where.AND.push({
+            service: { libelle: { equals: department, mode: 'insensitive' } }
+        });
+    }
+
+    if (fonction) {
+        where.AND.push({
+            fonction: { libelle: { equals: fonction, mode: 'insensitive' } }
+        });
+    }
+
+    const [data, total] = await Promise.all([
+        prisma.personnel.findMany({
+            where,
+            select: {
+                id: true,
+                nom: true,
+                prenoms: true,
+                im: true,
+                date_sortie: true,
+                service: { select: { libelle: true } },
+                fonction: { select: { libelle: true } },
+            },
+            orderBy: [
+                { date_sortie: 'desc' },
+                { nom: 'asc' },
+            ],
+            skip: (page - 1) * limit,
+            take: limit,
+        }),
+        prisma.personnel.count({ where }),
+    ]);
+
+    return {
+        data: data.map(p => ({
+            id: p.id,
+            nom: p.nom,
+            prenoms: p.prenoms,
+            matricule: p.im,
+            date_sortie: formaterDate(p.date_sortie),
+            departement: p.service
+                ? p.service.libelle.charAt(0).toUpperCase() + p.service.libelle.slice(1).toLowerCase()
+                : null,
+            fonction: p.fonction
+                ? p.fonction.libelle.charAt(0).toUpperCase() + p.fonction.libelle.slice(1).toLowerCase()
+                : null,
+        })),
         pagination: {
             total,
             page,
@@ -529,6 +608,7 @@ async function archiverPersonnel(id) {
 
 module.exports = {
     getAllStaff,
+    getArchivedStaff,
     getDistinctDepartments,
     getDistinctFonctions,
     getStaffById,
