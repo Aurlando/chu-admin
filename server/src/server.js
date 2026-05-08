@@ -8,6 +8,8 @@ const path = require('path');
 const cors = require('cors');
 const express = require('express');
 
+const { verifyToken, authorizeRoles } = require('./middlewares/authMiddleware');
+
 const authRoutes = require('./routes/authRoutes')
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const staffRoutes = require('./routes/staffRoutes');
@@ -25,6 +27,11 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads'))); // pour servir les images du dossier uploads  
 app.use('/auth', authRoutes);
+
+// Toutes les routes ci-dessous nécessitent un token valide ET le rôle admin
+app.use(verifyToken);
+app.use(authorizeRoles('admin'));
+
 app.use('/dashboard', dashboardRoutes);
 app.use('/staff', staffRoutes);
 app.use('/structure', structureRoutes);

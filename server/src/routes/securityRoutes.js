@@ -1,10 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const securityControllers = require("../controllers/securityControllers");
-const { verifyToken, authorizeRoles } = require("../middlewares/authMiddleware");
 
-router.use(verifyToken);
-router.use(authorizeRoles("admin"));
+// verifyToken + authorizeRoles('admin') appliqués globalement dans server.js
 
 // Afficher tous les comptes
 router.get("/", securityControllers.getAccounts);
