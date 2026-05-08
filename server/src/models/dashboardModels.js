@@ -83,6 +83,44 @@ async function getDashboardStats() {
     return { cards, graphe };
 }
 
+async function getRecentAuditLogs({ limit = 10 } = {}) {
+    const logs = await prisma.ref_audit_log.findMany({
+        orderBy: { created_at: 'desc' },
+        take: limit,
+        select: {
+            id: true,
+            action: true,
+            cible_type: true,
+            cible_id: true,
+            details: true,
+            created_at: true,
+            auth_user: {
+                select: {
+                    username: true,
+                    personnel: {
+                        select: { nom: true, prenoms: true }
+                    }
+                }
+            }
+        }
+    });
+
+    return logs.map(l => ({
+        id: l.id,
+        action: l.action,
+        cible_type: l.cible_type,
+        cible_id: l.cible_id,
+        details: l.details,
+        created_at: l.created_at,
+        fait_par: {
+            username: l.auth_user?.username || null,
+            nom: l.auth_user?.personnel?.nom || null,
+            prenoms: l.auth_user?.personnel?.prenoms || null,
+        },
+    }));
+}
+
 module.exports = {
     getDashboardStats,
+    getRecentAuditLogs,
 }

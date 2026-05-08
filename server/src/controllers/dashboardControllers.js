@@ -15,6 +15,21 @@ async function getDashboardData(req, res) {
     }
 }
 
+async function getDashboardLogs(req, res) {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
+    try {
+        const logs = await dashboardModels.getRecentAuditLogs({ limit });
+        res.status(200).json({
+            message: "Activité système récupérée avec succès",
+            data: logs,
+        });
+    } catch (error) {
+        console.error('[getDashboardLogs] Erreur :', error);
+        res.status(500).json({ message: "Erreur interne du serveur" });
+    }
+}
+
 module.exports = {
     getDashboardData,
+    getDashboardLogs,
 }
