@@ -111,30 +111,38 @@ async function addStaff(req, res) {
     // ── 1. Champs obligatoires ────────────────────────────────────
     const {
         nom, prenoms, im, date_naissance,
+        categorie, classe, echelon,
         id_grade_actuel, num_arrete, date_effet,
         specialite, telephone, email,
         service_id, fonction_id, statut,
-        donner_access, donner_acces, username, password,
+        donner_access, donner_acces, username, password, role,
         diplomes: diplomesRaw,
     } = req.body;
 
+    // ── Résolution du grade : id_grade_actuel (si fourni) OU
+    //    lookup BDD depuis categorie + classe + echelon
+    let gradeIdResolu = id_grade_actuel;
+    if (!gradeIdResolu && categorie && classe && echelon) {
+        const gradeFound = await staffModels.trouverGrade({ categorie, classe, echelon });
+        if (gradeFound) gradeIdResolu = String(gradeFound.id_grade);
+    }
+
     // champs obligatoire pour creer un personnel
-    const champsObligatoires = { nom, prenoms, im, date_naissance, id_grade_actuel, telephone, service_id, fonction_id, statut, date_effet };
-    const manquants = Object.entries(champsObligatoires) // transforme l'objet en tableau de tableux; {nom: "", prenoms: "Rakoto", ...} ==> [["nom", ""], ["prenoms", "Rakoto"], ...]
-        .filter(([_, valeur]) => !valeur || valeur.toString().trim() === "") // ce qui n'ont pas de valeur ou vide
-        .map(([cle]) => cle); // garder only nom du champ
+    const champsObligatoires = { nom, prenoms, im, date_naissance, id_grade_actuel: gradeIdResolu, telephone, service_id, fonction_id, statut, date_effet };
+    const manquants = Object.entries(champsObligatoires)
+        .filter(([_, valeur]) => !valeur || valeur.toString().trim() === "")
+        .map(([cle]) => cle);
 
     if (manquants.length > 0) {
         validators.supprimerFichierSiExiste(cheminFichier);
-
         return res.status(400).json({
             message: `Champs obligatoires manquants : ${manquants.join(", ")}`,
         });
     }
 
-    const serviceId = parseInt(service_id, 10);
+    const serviceId  = parseInt(service_id, 10);
     const fonctionId = parseInt(fonction_id, 10);
-    const gradeId = parseInt(id_grade_actuel, 10);
+    const gradeId    = parseInt(gradeIdResolu, 10);
     if (Number.isNaN(serviceId) || serviceId <= 0) {
         return erreur400("service_id invalide");
     }
@@ -200,7 +208,8 @@ async function addStaff(req, res) {
             im: imNormalise,
             date_naissance,
             id_grade_actuel: gradeId,
-            num_arrete: num_arrete || null,
+            // Supporte "num_arrete" (nom API) ET "arrete" (ancien nom frontend)
+            num_arrete: (num_arrete || req.body.arrete) || null,
             date_effet,
             specialite: specialite?.trim() || null,
             telephone: telephone.trim(),
@@ -213,6 +222,7 @@ async function addStaff(req, res) {
             donner_acces: accesBoolean,
             username: accesBoolean ? username.trim() : null,
             password_hash,
+            role: accesBoolean ? role : "user",
         });
 
         // ── 8. Renommer le fichier photo ──────────────────────────
@@ -286,7 +296,17 @@ async function updateStaff(req, res) {
     const categorie = ouString(body.categorie);
     const classe = ouString(body.classe);
     const echelon = ouString(body.echelon);
-    const id_grade_actuel = ouInt(body.id_grade_actuel);
+    let id_grade_actuel = ouInt(body.id_grade_actuel);
+
+    if (!id_grade_actuel && categorie && classe && echelon) {
+        const gradeFound = await staffModels.trouverGrade({ categorie, classe, echelon });
+        if (gradeFound) {
+            id_grade_actuel = parseInt(gradeFound.id_grade, 10);
+        } else {
+            validators.supprimerFichierSiExiste(req.file?.path);
+            return res.status(400).json({ message: "Combinaison de grade (catégorie, classe, échelon) invalide" });
+        }
+    }
     const specialite = ouString(body.specialite);
     const telephone = ouString(body.telephone);
     const email = ouString(body.email);
@@ -394,7 +414,7 @@ async function updateStaff(req, res) {
     if(donner_acces) {
         const erreurSIH = validators.validerAccesSIH({
             donner_acces: true,
-            username: body.username,
+            username: body.username?.trim(),
             password: body.password,
             aDejaUnCompte,
         });

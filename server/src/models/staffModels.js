@@ -267,6 +267,7 @@ async function getStaffById(id) {
             },
             auth_user: {
                 select: {
+                    id: true,
                     username: true,
                 }
             },
@@ -287,6 +288,51 @@ async function getStaffById(id) {
 
     // INITCAP sur libelles
     const toInitCap = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : null;
+
+    // Récupération de TOUS les logs d'audit (actions faites PAR lui, ou actions faites SUR lui)
+    const orConditions = [
+        { cible_type: 'personnel', cible_id: personnel.id }
+    ];
+    if (personnel.auth_user) {
+        orConditions.push({ fait_par_id: personnel.auth_user.id });
+        orConditions.push({ cible_type: 'auth_user', cible_id: personnel.auth_user.id });
+    }
+
+    const baseAuditLogs = await prisma.ref_audit_log.findMany({
+        where: { OR: orConditions },
+        orderBy: { created_at: 'desc' },
+        take: 50,
+        select: {
+            id: true,
+            action: true,
+            cible_type: true,
+            cible_id: true,
+            details: true,
+            created_at: true,
+        }
+    });
+
+    // Récupération de tous les avancements pour les inclure dans l'historique d'audit
+    const avancementsData = await prisma.avancements.findMany({
+        where: { id_personnel: personnel.id },
+        orderBy: { date_signature: 'desc' },
+        include: { grade: true }
+    });
+
+    const avancementsLogs = avancementsData.map(av => ({
+        id: `av_${av.id_avancement}`,
+        action: av.type_mouvement === "AVANCEMENT_DECHELON" ? "AVANCEMENT_ECHELON" : "PROMOTION_CLASSE",
+        cible_type: "personnel",
+        cible_id: personnel.id,
+        details: {
+            nouveau_grade: `Cat. ${av.grade.categorie} - Cl. ${av.grade.classe} - Ech. ${av.grade.echelon}`,
+            arrete: av.num_arrete,
+        },
+        created_at: av.date_signature
+    }));
+
+    // Combinaison et tri chronologique descendant
+    const combinedLogs = [...baseAuditLogs, ...avancementsLogs].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     return {
         id: personnel.id,
@@ -322,6 +368,7 @@ async function getStaffById(id) {
         a_acces_sih: Boolean(personnel.auth_user),
         username_sih: personnel.auth_user?.username ?? null,
         diplomes: personnel.diplome,
+        audit_logs: combinedLogs,
     }
 }
 
@@ -333,7 +380,7 @@ async function addPersonnel({
     service_id, fonction_id, statut, photo_profil,
     diplomes = [],
     num_arrete = null,
-    donner_acces = false, username, password_hash,
+    donner_acces = false, username, password_hash, role = 'user',
 }) {
 
     const grade = await prisma.grade.findUnique({
@@ -411,7 +458,7 @@ async function addPersonnel({
                 data: {
                     username,
                     password_hash,
-                    role: 'user',
+                    role: role,
                     id_personnel: personnelId,
                 },
             });
@@ -606,6 +653,18 @@ async function archiverPersonnel(id) {
     return { found: true, dejaArchive: false };
 }
 
+// ── TROUVER UN GRADE par categorie + classe + echelon ──────────────
+async function trouverGrade({ categorie, classe, echelon }) {
+    return prisma.grade.findFirst({
+        where: {
+            categorie,
+            classe,
+            echelon: parseInt(echelon, 10),
+        },
+        select: { id_grade: true, duree_mois: true, classe: true },
+    });
+}
+
 module.exports = {
     getAllStaff,
     getArchivedStaff,
@@ -616,4 +675,5 @@ module.exports = {
     updatePersonnel,
     supprimerAnciennePhoto,
     archiverPersonnel,
+    trouverGrade,
 };
