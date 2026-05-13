@@ -83,7 +83,7 @@ async function getDashboardStats() {
     return { cards, graphe };
 }
 
-async function getRecentAuditLogs({ limit = 10 } = {}) {
+async function getRecentAuditLogs({ limit = 5 } = {}) {
     const logs = await prisma.ref_audit_log.findMany({
         orderBy: { created_at: 'desc' },
         take: limit,
