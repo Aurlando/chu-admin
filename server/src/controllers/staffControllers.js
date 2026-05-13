@@ -116,6 +116,7 @@ async function addStaff(req, res) {
         specialite, telephone, email,
         service_id, fonction_id, statut,
         donner_access, donner_acces, username, password, role,
+        date_entree_admin,
         diplomes: diplomesRaw,
     } = req.body;
 
@@ -223,6 +224,8 @@ async function addStaff(req, res) {
             username: accesBoolean ? username.trim() : null,
             password_hash,
             role: accesBoolean ? role : "user",
+            adminId: req.user?.id,
+            date_entree_admin,
         });
 
         // ── 8. Renommer le fichier photo ──────────────────────────
@@ -472,7 +475,8 @@ async function archiverStaff(req, res) {
     }
 
     try {
-        const result = await staffModels.archiverPersonnel(id);
+        const adminId = req.user?.id;
+        const result = await staffModels.archiverPersonnel(id, adminId);
 
         if (!result.found) {
             return res.status(404).json({ message: 'Personnel introuvable' });

@@ -381,6 +381,7 @@ async function addPersonnel({
     diplomes = [],
     num_arrete = null,
     donner_acces = false, username, password_hash, role = 'user',
+    adminId, date_entree_admin,
 }) {
 
     const grade = await prisma.grade.findUnique({
@@ -391,6 +392,7 @@ async function addPersonnel({
     if (!grade) throw new Error(`Grade introuvable : id_grade_actuel = ${id_grade_actuel}`);
 
     const dateAujourdhui = new Date();
+    const dateEntreeAdmin = date_entree_admin ? new Date(date_entree_admin) : dateAujourdhui;
     const dateEffetVal = new Date(date_effet);
     const dateProchain = new Date(dateEffetVal);
     dateProchain.setMonth(dateProchain.getMonth() + grade.duree_mois);
@@ -412,7 +414,7 @@ async function addPersonnel({
                 im,
                 date_naissance: new Date(date_naissance),
                 id_grade_actuel: parseInt(id_grade_actuel, 10),
-                date_entree_admin: dateAujourdhui,
+                date_entree_admin: dateEntreeAdmin,
                 specialite,
                 telephone,
                 email,
@@ -463,6 +465,18 @@ async function addPersonnel({
                 },
             });
         }
+
+        // INSERT ref_audit_log
+        const dateArrivee = formaterDate(dateEntreeAdmin);
+        await tx.ref_audit_log.create({
+            data: {
+                action: 'AJOUT_PERSONNEL',
+                cible_type: 'personnel',
+                cible_id: personnelId,
+                fait_par_id: adminId ? BigInt(adminId) : null,
+                details: { description: `Nouveau personnel ${nom} ${prenoms} arrive le ${dateArrivee}` },
+            },
+        });
 
         return { personnelId, personnelIm };
     });
@@ -621,10 +635,10 @@ function supprimerAnciennePhoto(photo_profil, anciennePhoto) {
 }
 
 // ── ARCHIVER UN PERSONNEL (soft delete) ───────────────────────────
-async function archiverPersonnel(id) {
+async function archiverPersonnel(id, adminId) {
     const personnel = await prisma.personnel.findUnique({
         where: { id: BigInt(id) },
-        select: { id: true, statut: true },
+        select: { id: true, nom: true, prenoms: true, statut: true },
     });
 
     if (!personnel) return { found: false };
@@ -634,12 +648,13 @@ async function archiverPersonnel(id) {
     }
     
     await prisma.$transaction(async (tx) => {
+        const dateSortie = new Date();
         // update changer statut et date_sortie
         await tx.personnel.update({
             where: { id: BigInt(id) },
             data: {
                 statut: 'Sortie',
-                date_sortie: new Date(),
+                date_sortie: dateSortie,
             },
         });
 
@@ -647,6 +662,17 @@ async function archiverPersonnel(id) {
         await tx.auth_user.updateMany({
             where: { id_personnel: BigInt(id) },
             data:  { actif: false },
+        });
+
+        const dateSortieFormatee = formaterDate(dateSortie);
+        await tx.ref_audit_log.create({
+            data: {
+                action: 'ARCHIVAGE_PERSONNEL',
+                cible_type: 'personnel',
+                cible_id: BigInt(id),
+                fait_par_id: adminId ? BigInt(adminId) : null,
+                details: { description: `Le personnel ${personnel.nom} ${personnel.prenoms} a été archivé le ${dateSortieFormatee}` },
+            },
         });
     });
 
