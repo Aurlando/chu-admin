@@ -98,7 +98,7 @@ async function exportRecapExcel(req, res) {
 
         // Largeurs de colonnes
         worksheet.getColumn(1).width = 6;
-        worksheet.getColumn(2).width = 22;
+        worksheet.getColumn(2).width = 45;
         groupesLibelles.forEach((_, i) => {
             worksheet.getColumn(i + 3).width = 14;
         });

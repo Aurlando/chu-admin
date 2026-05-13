@@ -51,6 +51,16 @@ async function getProches(req, res) {
     }
 }
 
+async function getStatsNotification(req, res) {
+    try {
+        const stats = await avancementsModels.getAvancementStatsNotification();
+        res.status(200).json({ data: stats });
+    } catch (error) {
+        console.error('[getStatsNotification] Erreur :', error);
+        res.status(500).json({ message: 'Erreur interne du serveur' });
+    }
+}
+
 async function effectuerAvancement(req, res) {
     const personnelId = parseInt(req.params.personnelId, 10);
 
@@ -103,5 +113,6 @@ module.exports = {
     getGradesParCategorie,
     getHistorique,
     getProches,
+    getStatsNotification,
     effectuerAvancement,
 };

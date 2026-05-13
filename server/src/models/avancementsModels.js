@@ -95,14 +95,51 @@ async function getAvancementsProches(mois = 3) {
                 personnel_id: p.id,
                 nom: p.nom,
                 prenoms: p.prenoms,
-                matricule: p.im,
+                im: p.im,
                 service: p.service?.libelle || null,
-                grade_actuel: `${p.grade.classe} ${p.grade.echelon}ème échelon`,
-                categorie: p.grade.categorie,
+                grade_actuel: {
+                    categorie: p.grade.categorie,
+                    classe:    p.grade.classe,
+                    echelon:   p.grade.echelon,
+                },
                 date_prochain_avancement: a.date_prochain_avancement,
                 jours_restants: Math.ceil((dateProchain - new Date()) / (1000 * 60 * 60 * 24))
             };
         });
+}
+
+async function getAvancementStatsNotification() {
+    const aujourdhui = new Date();
+    const dateDansUnMois = new Date();
+    dateDansUnMois.setMonth(dateDansUnMois.getMonth() + 1);
+    
+    const dateDansTroisMois = new Date();
+    dateDansTroisMois.setMonth(dateDansTroisMois.getMonth() + 3);
+
+    // On récupère tout ce qui est à avancer dans les 3 mois
+    const tousProches = await getAvancementsProches(3);
+
+    const stats = {
+        total_eligible: tousProches.length,
+        depasse: 0,
+        tres_proche: 0, // < 1 mois
+        details: {
+            depasse_list: [],
+            proche_list: []
+        }
+    };
+
+    tousProches.forEach(p => {
+        if (p.jours_restants <= 0) {
+            stats.depasse++;
+            stats.details.depasse_list.push(p);
+        } else if (p.jours_restants <= 30) {
+            stats.tres_proche++;
+            stats.details.proche_list.push(p);
+        }
+    });
+
+    return stats;
 }
 
 async function effectuerAvancement({ personnelId, num_arrete, date_signature, date_effet }) {
@@ -213,5 +250,6 @@ module.exports = {
     getGradesParCategorie,
     getHistoriqueAvancements,
     getAvancementsProches,
+    getAvancementStatsNotification,
     effectuerAvancement,
 }
