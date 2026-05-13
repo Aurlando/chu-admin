@@ -16,6 +16,7 @@ const staffRoutes = require('./routes/staffRoutes');
 const structureRoutes = require('./routes/structureRoutes');
 const avancementsRoutes = require('./routes/avancementsRoutes');
 const securityRoutes = require('./routes/securityRoutes');
+const auditRoutes = require('./routes/auditRoutes');
 
 const app = express();
 
@@ -31,6 +32,9 @@ app.use('/auth', authRoutes);
 // Toutes les routes ci-dessous nécessitent un token valide ET le rôle admin
 app.use(verifyToken);
 app.use(authorizeRoles('admin'));
+
+// Route globale pour l'historique complet (pour la table dédiée)
+app.use('/audit-logs', auditRoutes);
 
 app.use('/dashboard', dashboardRoutes);
 app.use('/staff', staffRoutes);
