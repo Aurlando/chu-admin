@@ -49,9 +49,11 @@ const CATEGORIES = [
   { value: "X",    label: "X"    },
 ];
 const CLASSES     = [
-  { value: "stagiaire", label: "Stagiaire" },
-  { value: "1",         label: "Classe 1"  },
-  { value: "2",         label: "Classe 2"  },
+  { value: "STAGIAIRE", label: "Stagiaire" },
+  { value: "1ERE_CLASSE",         label: "Classe 1"  },
+  { value: "2EME_CLASSE",         label: "Classe 2"  },
+  { value: "PRINCIPAL", label: "Principal"  },
+  { value: "EXCEPTIONNEL", label: "Exceptionnel" },
 ];
 const ECHELONS = ["1","2","3"];
 const STATUTS  = ["En activité","En absence","Sortie"];
@@ -165,11 +167,12 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
   const [form, setForm] = useState(() => {
     return getValidDraft("add_personnel_form", {
       nom: "", prenoms: "", im: "", date_naissance: "",
+      date_entree_admin: "", // [NOUVEAU] Date d'arrivée réelle à l'administration
       categorie: "", classe: "", echelon: "", specialite: "",
-      telephone: "", email: "", date_effet: "",
+      telephone: "", email: "", date_effet: "", num_arrete: "",
       service_id: "", fonction_id: "",
       statut: "En activité",
-      username: "", password: "",
+      username: "", password: "", role: "user",
     });
   });
 
@@ -411,8 +414,10 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
       fd.append("classe",         form.classe);
       fd.append("echelon",        form.echelon);
       fd.append("specialite",     form.specialite.trim());
-      fd.append("date_effet",     form.date_effet);
-      fd.append("arrete",         form.arrete.trim());
+      fd.append("date_effet",        form.date_effet);
+      fd.append("num_arrete",         form.num_arrete?.trim() || "");
+      // [NOUVEAU] Date d'entrée admin — envoyée uniquement si renseignée
+      if (form.date_entree_admin) fd.append("date_entree_admin", form.date_entree_admin);
       fd.append("telephone",      form.telephone.trim());
       fd.append("email",          form.email.trim());
       fd.append("service_id",     form.service_id);
@@ -426,10 +431,10 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
       // Le back fait : const donnerAccess = req.body.donner_access === "true"
       fd.append("donner_access", String(creerCompte));
 
-      // username et password : envoyés seulement si donner_access = true
       if (creerCompte) {
         fd.append("username", form.username.trim());
         fd.append("password", form.password);
+        fd.append("role", form.role || "user");
       }
 
       const res = await fetch(`${API_BASE}/staff/add`, {
@@ -444,9 +449,10 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
       setSuccess(true);
       clearSavedData();
       // Reset complet
-      setForm({ nom:"", prenoms:"", im:"", date_naissance:"", categorie:"", classe:"",
-        echelon:"", specialite:"", telephone:"", email:"", service_id:"", fonction_id:"",
-        date_effet:"", statut:"En activité", username:"", password:"" });
+      setForm({ nom:"", prenoms:"", im:"", date_naissance:"", date_entree_admin:"",
+        categorie:"", classe:"", echelon:"", specialite:"", telephone:"", email:"",
+        service_id:"", fonction_id:"", statut:"En activité",
+        username:"", password:"", role: "user", date_effet:"", num_arrete:"" });
       setDiplomes([{ ...DIPLOME_VIDE, est_principal: true }]);
       setPhotoFile(null); setPhotoPreview(null);
       setCreerCompte(false); setErrors({});
@@ -663,7 +669,7 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
 
           {/* ── ÉTAPE 1 : IDENTITÉ ── */}
           {currentStep === 1 && (
-            <div className="p-5 lg:p-6 space-y-5">
+            <div key="step-1" className="p-5 lg:p-6 space-y-5">
               <div className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}>
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${dark ? "bg-blue-500/15 text-blue-400" : "bg-blue-50 text-blue-600"}`}>
                   {STEPS[0].icon(true)}
@@ -740,13 +746,20 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                   <input type="date" value={form.date_naissance}
                     onChange={e => handleChange("date_naissance", e.target.value)} className={inp("date_naissance")} />
                 </Field>
+                {/* [NOUVEAU] Date d'entrée dans l'administration (utilisée pour le log AJOUT_PERSONNEL) */}
+                <Field label="Date d'entrée dans l'administration" dark={dark} error={errors.date_entree_admin}>
+                  <input type="date" value={form.date_entree_admin || ""}
+                    onChange={e => handleChange("date_entree_admin", e.target.value)}
+                    className={inp("date_entree_admin")}
+                    max={new Date().toISOString().split("T")[0]} />
+                </Field>
               </div>
             </div>
           )}
 
           {/* ── ÉTAPE 2 : SITUATION ADMINISTRATIVE ── */}
           {currentStep === 2 && (
-            <div className="p-5 lg:p-6 space-y-5">
+            <div key="step-2" className="p-5 lg:p-6 space-y-5">
               <div className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}>
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${dark ? "bg-blue-500/15 text-blue-400" : "bg-blue-50 text-blue-600"}`}>
                   {STEPS[1].icon(true)}
@@ -778,6 +791,8 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                     {ECHELONS.map(e => <option key={e} value={e}>{e}</option>)}
                   </select>
                 </Field>
+
+
                 <Field label="Statut" dark={dark}>
                   <select value={form.statut} onChange={e => handleChange("statut", e.target.value)}
                     className={selectCls}>
@@ -792,17 +807,30 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                   <input type="text" placeholder="Ex: Médecin spécialiste en chirurgie" value={form.specialite}
                     onChange={e => handleChange("specialite", e.target.value)} className={inp("specialite")} />
                 </Field>
-                <Field label="Arrete" required dark={dark} error={errors.arrete}>
-                  <input type="text" placeholder ="Ex: 11551/2025/MEN" value={form.arrete}
-                    onChange={e => handleChange("arrete", e.target.value)} className={inp("arrete")} />
+                <Field label="Numéro d'arrêté" dark={dark} error={errors.num_arrete}>
+                  <input type="text" placeholder ="Ex: 11551/2025/MEN" value={form.num_arrete ?? ""}
+                    onChange={e => handleChange("num_arrete", e.target.value)} className={inp("num_arrete")} />
                 </Field>
+              </div>
+
+              {/* Message d'aide sur les grades */}
+              <div className={`mt-4 p-3 rounded-xl border flex items-start gap-3 transition-all
+                ${dark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50 border-blue-100"}`}>
+                <div className="pt-0.5">
+                  <svg className={`w-4 h-4 ${dark ? "text-blue-400" : "text-blue-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className={`text-[11px] leading-relaxed font-medium ${dark ? "text-blue-300/80" : "text-blue-700/80"}`}>
+                  <span className="font-bold">Note :</span> La combinaison Catégorie + Classe + Échelon doit correspondre à un grade existant dans la base de données de référence pour valider l'enregistrement.
+                </p>
               </div>
             </div>
           )}
 
           {/* ── ÉTAPE 3 : AFFECTATION ── */}
           {currentStep === 3 && (
-            <div className="p-5 lg:p-6 space-y-5">
+            <div key="step-3" className="p-5 lg:p-6 space-y-5">
               <div className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}>
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${dark ? "bg-blue-500/15 text-blue-400" : "bg-blue-50 text-blue-600"}`}>
                   {STEPS[2].icon(true)}
@@ -841,7 +869,7 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
 
           {/* ── ÉTAPE 4 : DIPLÔMES ── */}
           {currentStep === 4 && (
-            <div className="p-5 lg:p-6 space-y-5">
+            <div key="step-4" className="p-5 lg:p-6 space-y-5">
               <div className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}>
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${dark ? "bg-blue-500/15 text-blue-400" : "bg-blue-50 text-blue-600"}`}>
                   {STEPS[3].icon(true)}
@@ -914,7 +942,7 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
 
           {/* ── ÉTAPE 5 : COMPTE + RÉCAPITULATIF ── */}
           {currentStep === 5 && (
-            <div className="p-5 lg:p-6 space-y-5">
+            <div key="step-5" className="p-5 lg:p-6 space-y-5">
               <div className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}>
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${dark ? "bg-blue-500/15 text-blue-400" : "bg-blue-50 text-blue-600"}`}>
                   {STEPS[4].icon(true)}
@@ -967,6 +995,14 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                         onChange={e => handleChange("password", e.target.value)}
                         className={inp("password")} autoComplete="new-password" />
                     </Field>
+                    <Field label="Rôle" required dark={dark}>
+                      <select value={form.role || "user"} onChange={e => handleChange("role", e.target.value)} className={sel("role")}>
+                        <option value="user">Utilisateur (user)</option>
+                        <option value="admin">Administrateur (admin)</option>
+                        <option value="medecin">Médecin (medecin)</option>
+                        <option value="rh">Ressources Humaines (rh)</option>
+                      </select>
+                    </Field>
                   </div>
                 </div>
               )}
@@ -980,6 +1016,9 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                   <RecapRow dark={dark} label="Nom complet" value={`${form.nom} ${form.prenoms}`.trim()} />
                   <RecapRow dark={dark} label="Matricule" value={form.im} />
                   <RecapRow dark={dark} label="Date de naissance" value={form.date_naissance} />
+                  {form.date_entree_admin && (
+                    <RecapRow dark={dark} label="Date d'entrée admin." value={form.date_entree_admin} />
+                  )}
                   <RecapRow dark={dark} label="Catégorie / Classe / Échelon" value={`${form.categorie} / ${form.classe} / ${form.echelon}`} />
                   <RecapRow dark={dark} label="Statut" value={form.statut} />
                   <RecapRow dark={dark} label="Spécialité" value={form.specialite} />
