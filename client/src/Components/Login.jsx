@@ -1,17 +1,34 @@
 import { useState, useEffect } from "react";
 
 export default function Login({ onLoginSuccess }) {
-    const [darkMode, setDarkMode] = useState(false);
+    const [darkMode, setDarkMode] = useState(
+        () => window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+    );
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
-    //    "mounted" sert juste à faire apparaître la carte (opacity + translateY)
     const [mounted, setMounted] = useState(false);
     useEffect(() => {
         setMounted(true);
+    }, []);
+
+    // ── Écouteur pour le thème système
+    // Permet de basculer automatiquement entre les modes clair et sombre en fonction des préférences de l'utilisateur
+    useEffect(() => {
+        if (!window.matchMedia) return;
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = (e) => setDarkMode(e.matches);
+        
+        if (mediaQuery.addEventListener) {
+            mediaQuery.addEventListener('change', handleChange);
+            return () => mediaQuery.removeEventListener('change', handleChange);
+        } else {
+            mediaQuery.addListener(handleChange);
+            return () => mediaQuery.removeListener(handleChange);
+        }
     }, []);
 
     // ── handleSubmit : envoi du formulaire vers l'API back

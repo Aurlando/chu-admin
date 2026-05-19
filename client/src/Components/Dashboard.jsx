@@ -8,6 +8,7 @@ import SecurityCredentials from "./SecurityCredentials";
 // [AJOUTÉ] Page archives du personnel
 import ArchivePage from "./ArchivePage";
 import Avancements from "./Avancements";
+import AuditLogsPage from "./AuditLogsPage";
 
 const API_URL = "http://localhost:3000/dashboard";
 
@@ -158,139 +159,27 @@ const ICONS = {
     ),
 };
 
-// Logs statiques — Activite systeme
-const AUDIT_LOGS = [
-    {
-        id: 1,
-        message: "Nouveau medecin enregistre",
-        detail: "Dr. Rakoto - Service CHIR",
-        time: "Il y a 3 min",
-        darkColor: "text-emerald-400",
-        darkBg: "bg-emerald-400/10",
-        lightColor: "text-emerald-600",
-        lightBg: "bg-emerald-50",
-        icon: (
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-            >
-                <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                />
-            </svg>
-        ),
-    },
-    {
-        id: 2,
-        message: "Mise a jour des credentials",
-        detail: "Dr. Andriamanga - ATU",
-        time: "Il y a 1h",
-        darkColor: "text-blue-400",
-        darkBg: "bg-blue-400/10",
-        lightColor: "text-blue-600",
-        lightBg: "bg-blue-50",
-        icon: (
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-            >
-                <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-                />
-            </svg>
-        ),
-    },
-    {
-        id: 3,
-        message: "Audit log consulte",
-        detail: "Admin - James Miller",
-        time: "Il y a 3h",
-        darkColor: "text-amber-400",
-        darkBg: "bg-amber-400/10",
-        lightColor: "text-amber-600",
-        lightBg: "bg-amber-50",
-        icon: (
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-            >
-                <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-            </svg>
-        ),
-    },
-    {
-        id: 4,
-        message: "Sage-femme ajoutee",
-        detail: "Mme. Rasoa - Service BE",
-        time: "Hier, 16h45",
-        darkColor: "text-purple-400",
-        darkBg: "bg-purple-400/10",
-        lightColor: "text-purple-600",
-        lightBg: "bg-purple-50",
-        icon: (
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-            >
-                <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                />
-            </svg>
-        ),
-    },
-    {
-        id: 5,
-        message: "Service REA mis a jour",
-        detail: "Modification effectif",
-        time: "Hier, 09h20",
-        darkColor: "text-cyan-400",
-        darkBg: "bg-cyan-400/10",
-        lightColor: "text-cyan-600",
-        lightBg: "bg-cyan-50",
-        icon: (
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-            >
-                <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                />
-            </svg>
-        ),
-    },
-];
+// ── Mapping couleurs / icônes pour les actions d'audit
+const ACTION_STYLE = {
+    AJOUT_PERSONNEL:     { dark: "bg-emerald-400/10 text-emerald-400", light: "bg-emerald-50 text-emerald-600", label: "Ajout personnel" },
+    ARCHIVAGE_PERSONNEL: { dark: "bg-rose-400/10 text-rose-400",     light: "bg-rose-50 text-rose-600",     label: "Archivage" },
+    AVANCEMENT_ECHELON:  { dark: "bg-blue-400/10 text-blue-400",     light: "bg-blue-50 text-blue-600",     label: "Avancement" },
+    PROMOTION_CLASSE:    { dark: "bg-violet-400/10 text-violet-400", light: "bg-violet-50 text-violet-600", label: "Promotion" },
+    MODIFICATION:        { dark: "bg-amber-400/10 text-amber-400",   light: "bg-amber-50 text-amber-600",   label: "Modification" },
+};
+const ACTION_DEFAULT = { dark: "bg-slate-400/10 text-slate-400", light: "bg-slate-100 text-slate-500", label: "Activité" };
+
+function auditIcon(action) {
+    if (action === "AJOUT_PERSONNEL")
+        return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>;
+    if (action === "ARCHIVAGE_PERSONNEL")
+        return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>;
+    if (action === "AVANCEMENT_ECHELON" || action === "PROMOTION_CLASSE")
+        return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>;
+    if (action === "MODIFICATION")
+        return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>;
+    return <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
+}
 
 // ════════════════════════════════════════════════════════════════════
 // ThemeToggle
@@ -554,9 +443,32 @@ function ChartLegend({ dark }) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// AuditLogPanel — Activite systeme (logs statiques)
+// AuditLogPanel — Activite systeme (logs réels depuis /audit-logs)
 // ════════════════════════════════════════════════════════════════════
 function AuditLogPanel({ dark, T, onNavigate }) {
+    const [logs, setLogs] = useState([]);
+    const [loadingLogs, setLoadingLogs] = useState(true);
+    const [loadError, setLoadError] = useState(null);
+
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        fetch("http://localhost:3000/audit-logs?limit=5", {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then((res) => {
+                if (!res.ok) throw new Error(`Erreur ${res.status}`);
+                return res.json();
+            })
+            .then((json) => {
+                setLogs(json.data || []);
+                setLoadingLogs(false);
+            })
+            .catch((err) => {
+                setLoadError(err.message);
+                setLoadingLogs(false);
+            });
+    }, []);
+
     return (
         <div
             className={`xl:col-span-2 rounded-2xl border p-5 flex flex-col ${T.cardBg}`}
@@ -564,10 +476,10 @@ function AuditLogPanel({ dark, T, onNavigate }) {
             <div className="flex items-start justify-between mb-4">
                 <div>
                     <h2 className={`text-sm font-bold ${T.cardTitle}`}>
-                        Activite systeme
+                        Activité système
                     </h2>
                     <p className={`text-xs mt-0.5 ${T.cardSub}`}>
-                        Logs recents et mises a jour
+                        Logs récents en temps réel
                     </p>
                 </div>
                 <span className="text-[10px] bg-blue-500/10 text-blue-500 border border-blue-500/20 px-2 py-0.5 rounded-full animate-pulse">
@@ -575,36 +487,67 @@ function AuditLogPanel({ dark, T, onNavigate }) {
                 </span>
             </div>
 
-            <div className="space-y-3 flex-1">
-                {AUDIT_LOGS.map((log) => (
-                    <div
-                        key={log.id}
-                        className="flex items-start gap-3"
-                    >
-                        <div
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0
-                            ${dark ? `${log.darkBg} ${log.darkColor}` : `${log.lightBg} ${log.lightColor}`}`}
-                        >
-                            {log.icon}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div
-                                className={`text-xs font-medium leading-tight ${T.cardTitle}`}
-                            >
-                                {log.message}
-                            </div>
-                            <div className={`text-[10px] mt-0.5 ${T.cardSub}`}>
-                                {log.detail}
-                            </div>
-                            <div
-                                className={`text-[10px] font-medium mt-0.5 ${dark ? log.darkColor : log.lightColor}`}
-                            >
-                                {log.time}
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
+            {/* État chargement */}
+            {loadingLogs && (
+                <div className="flex items-center justify-center h-32">
+                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+            )}
+
+            {/* État erreur */}
+            {!loadingLogs && loadError && (
+                <div className={`text-xs text-center py-6 ${dark ? "text-slate-600" : "text-slate-400"}`}>
+                    Impossible de charger les logs
+                </div>
+            )}
+
+            {/* Logs */}
+            {!loadingLogs && !loadError && (
+                <div className="space-y-3 flex-1">
+                    {logs.length === 0 ? (
+                        <p className={`text-xs text-center py-6 ${T.cardSub}`}>Aucun log disponible</p>
+                    ) : (
+                        logs.map((log) => {
+                            const style = ACTION_STYLE[log.action] || ACTION_DEFAULT;
+                            const colorCls = dark ? style.dark : style.light;
+                            const label = style.label;
+                            // Description : champ details.description ou details.nouveau_grade
+                            const desc = log.details?.description
+                                || log.details?.nouveau_grade
+                                || "";
+                            // Date relative
+                            const dateStr = log.date
+                                ? new Date(log.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })
+                                : "";
+                            // Auteur
+                            const auteur = log.utilisateur?.nom_complet || log.utilisateur?.username || "";
+
+                            return (
+                                <div key={log.id} className="flex items-start gap-3">
+                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${colorCls}`}>
+                                        {auditIcon(log.action)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className={`text-xs font-semibold leading-tight ${T.cardTitle}`}>
+                                            {label}
+                                        </div>
+                                        {desc && (
+                                            <div className={`text-[10px] mt-0.5 truncate ${T.cardSub}`} title={desc}>
+                                                {desc}
+                                            </div>
+                                        )}
+                                        <div className={`text-[10px] font-medium mt-0.5 flex items-center gap-1.5 ${T.cardSub}`}>
+                                            {auteur && <span>{auteur}</span>}
+                                            {auteur && dateStr && <span>·</span>}
+                                            {dateStr && <span>{dateStr}</span>}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+            )}
 
             <button
                 onClick={() => onNavigate?.("Audit Logs")}
@@ -924,11 +867,60 @@ export default function Dashboard({ onLogout }) {
     const [mobileOpen, setMobileOpen] = useState(false);
     const [activeNav, setActiveNav] = useState("Dashboard");
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [dark, setDark] = useState(true);
-    // [AJOUTÉ] État du menu déroulant Paramètres
+    const [dark, setDark] = useState(
+        () => window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+    );
     const [settingsOpen, setSettingsOpen] = useState(false);
     // [AJOUTÉ] Ref pour fermer le menu si clic en dehors
     const settingsRef = useRef(null);
+
+    // [AJOUTÉ] Écouteur pour les changements de thème du système
+    useEffect(() => {
+        if (!window.matchMedia) return;
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = (e) => setDark(e.matches);
+        
+        if (mediaQuery.addEventListener) {
+            mediaQuery.addEventListener('change', handleChange);
+            return () => mediaQuery.removeEventListener('change', handleChange);
+        } else {
+            mediaQuery.addListener(handleChange);
+            return () => mediaQuery.removeListener(handleChange);
+        }
+    }, []);
+    
+    // [AJOUTÉ] États pour les notifications
+    const [notifStats, setNotifStats] = useState(null);
+    const [showNotifMenu, setShowNotifMenu] = useState(false);
+    const notifMenuRef = useRef(null);
+
+    const token = localStorage.getItem("token");
+
+    // [AJOUTÉ] Fetch des stats de notifications (avancements)
+    useEffect(() => {
+        if (!token) return;
+        fetch("http://localhost:3000/avancements/stats", {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+            .then(res => res.ok ? res.json() : null)
+            .then(json => {
+                if (json && json.data) setNotifStats(json.data);
+            })
+            .catch(err => console.error("Error fetching notif stats:", err));
+    }, [token, activeNav]); // On rafraîchit si on revient sur le dashboard ou change de page
+
+    // [AJOUTÉ] Ferme le menu notif si clic en dehors
+    useEffect(() => {
+        const handler = (e) => {
+            if (notifMenuRef.current && !notifMenuRef.current.contains(e.target)) {
+                setShowNotifMenu(false);
+            }
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    const totalNotifs = notifStats ? (notifStats.depasse + notifStats.tres_proche) : 0;
 
     // [AJOUTÉ] Ferme le menu déroulant si clic en dehors
     useEffect(() => {
@@ -981,12 +973,14 @@ export default function Dashboard({ onLogout }) {
                 return <StructureHospitaliere dark={dark} />;
             // ── [AJOUTÉ] Liaison avec SecurityCredentials (déjà importé ligne 7)
             case "Sécurité & Credentials":
-                return <SecurityCredentials dark={dark} />;
+                return <SecurityCredentials dark={dark} onNavigate={setActiveNav} />;
             // [AJOUTÉ] Page archives
             case "Archives":
                 return <ArchivePage dark={dark} />;
             case "Avancements":
                 return <Avancements dark={dark} />;
+            case "Audit Logs":
+                return <AuditLogsPage dark={dark} />;
             case "Dashboard":
             default:
                 return (
@@ -1053,25 +1047,109 @@ export default function Dashboard({ onLogout }) {
                             onToggle={() => setDark((d) => !d)}
                         />
 
-                        <button
-                            className={`relative w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${T.iconBtn}`}
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="w-4 h-4 cursor-pointer"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
+                        <div className="relative" ref={notifMenuRef}>
+                            <button
+                                onClick={() => setShowNotifMenu(!showNotifMenu)}
+                                className={`relative w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${T.iconBtn} ${showNotifMenu ? (dark ? "bg-white/10 border-blue-500/50" : "bg-slate-100 border-blue-400") : ""}`}
                             >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                                />
-                            </svg>
-                            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                        </button>
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className={`w-4 h-4 cursor-pointer transition-colors ${totalNotifs > 0 ? "text-amber-500 animate-swing" : ""}`}
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                                    />
+                                </svg>
+                                {totalNotifs > 0 && (
+                                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white dark:border-[#0a0f1e] animate-bounce">
+                                        {totalNotifs}
+                                    </span>
+                                )}
+                            </button>
+
+                            {/* Menu de notifications */}
+                            {showNotifMenu && (
+                                <div className={`absolute right-0 mt-2 w-80 rounded-2xl border shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 ${
+                                    dark ? "bg-[#0d1526] border-white/10 shadow-black/40" : "bg-white border-slate-200 shadow-slate-200"
+                                }`}>
+                                    <div className={`px-4 py-3 border-b flex items-center justify-between ${dark ? "border-white/5 bg-white/3" : "border-slate-100 bg-slate-50"}`}>
+                                        <h3 className={`text-xs font-bold uppercase tracking-wider ${dark ? "text-slate-400" : "text-slate-500"}`}>Notifications</h3>
+                                        {totalNotifs > 0 && (
+                                            <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[10px] font-bold border border-blue-500/20">
+                                                {totalNotifs} nouvelle{totalNotifs > 1 ? "s" : ""}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="max-h-96 overflow-y-auto">
+                                        {totalNotifs === 0 ? (
+                                            <div className="p-8 text-center">
+                                                <div className={`w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center ${dark ? "bg-white/5 text-slate-600" : "bg-slate-100 text-slate-400"}`}>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                                    </svg>
+                                                </div>
+                                                <p className={`text-sm font-semibold ${dark ? "text-slate-300" : "text-slate-700"}`}>Aucune notification</p>
+                                                <p className={`text-xs mt-1 ${dark ? "text-slate-500" : "text-slate-500"}`}>Tout est à jour pour le moment.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="divide-y dark:divide-white/5 divide-slate-100">
+                                                {notifStats.depasse > 0 && (
+                                                    <button 
+                                                        onClick={() => { setActiveNav("Avancements"); setShowNotifMenu(false); }}
+                                                        className={`w-full text-left p-4 flex gap-3 transition-colors ${dark ? "hover:bg-white/5" : "hover:bg-slate-50"}`}
+                                                    >
+                                                        <div className="w-10 h-10 rounded-xl bg-rose-500/15 flex items-center justify-center shrink-0">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                            </svg>
+                                                        </div>
+                                                        <div>
+                                                            <p className={`text-[13px] font-bold ${dark ? "text-white" : "text-slate-800"}`}>Avancements dépassés</p>
+                                                            <p className={`text-xs mt-0.5 ${dark ? "text-slate-400" : "text-slate-500"}`}>
+                                                                <span className="font-bold text-rose-500">{notifStats.depasse}</span> personnel{notifStats.depasse > 1 ? "s ont" : " a"} dépassé la date d'avancement.
+                                                            </p>
+                                                        </div>
+                                                    </button>
+                                                )}
+                                                {notifStats.tres_proche > 0 && (
+                                                    <button 
+                                                        onClick={() => { setActiveNav("Avancements"); setShowNotifMenu(false); }}
+                                                        className={`w-full text-left p-4 flex gap-3 transition-colors ${dark ? "hover:bg-white/5" : "hover:bg-slate-50"}`}
+                                                    >
+                                                        <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                            </svg>
+                                                        </div>
+                                                        <div>
+                                                            <p className={`text-[13px] font-bold ${dark ? "text-white" : "text-slate-800"}`}>Avancements imminents</p>
+                                                            <p className={`text-xs mt-0.5 ${dark ? "text-slate-400" : "text-slate-500"}`}>
+                                                                <span className="font-bold text-amber-500">{notifStats.tres_proche}</span> personnel{notifStats.tres_proche > 1 ? "s sont" : " est"} très proche de l'éligibilité.
+                                                            </p>
+                                                        </div>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button 
+                                        onClick={() => { setActiveNav("Avancements"); setShowNotifMenu(false); }}
+                                        className={`w-full py-3 text-center text-xs font-bold transition-all border-t ${
+                                            dark ? "bg-white/3 border-white/5 text-blue-400 hover:bg-white/8 hover:text-blue-300" 
+                                                 : "bg-slate-50 border-slate-100 text-blue-600 hover:bg-slate-100 hover:text-blue-700"
+                                        }`}
+                                    >
+                                        Voir tous les détails
+                                    </button>
+                                </div>
+                            )}
+                        </div>
 
                         {/* [AJOUTÉ] Bouton Paramètres avec menu déroulant */}
                         <div className="relative" ref={settingsRef}>
