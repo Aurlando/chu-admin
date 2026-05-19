@@ -4,6 +4,37 @@ import "../App.css";
 
 const API_BASE = "http://localhost:3000";
 
+const formatClasse = (classe) => {
+    if (!classe) return "";
+    const mapping = {
+        STAGIAIRE: "Stagiaire",
+        "1ERE_CLASSE": "1ère classe",
+        "2EME_CLASSE": "2ème classe",
+        PRINCIPAL: "Principal",
+        EXCEPTIONNEL: "Exceptionnel",
+    };
+    return mapping[classe] || classe;
+};
+
+// [AJOUTÉ] Calcul de l'ancienneté en front-end à partir de la date d'entrée
+const getSeniorityLabel = (dateEntreeStr) => {
+    if (!dateEntreeStr) return null;
+    const [d, m, y] = dateEntreeStr.split("/").map(Number);
+    const entryDate = new Date(y, m - 1, d);
+    const today = new Date();
+
+    let years = today.getFullYear() - entryDate.getFullYear();
+    const monthDiff = today.getMonth() - entryDate.getMonth();
+    if (
+        monthDiff < 0 ||
+        (monthDiff === 0 && today.getDate() < entryDate.getDate())
+    ) {
+        years--;
+    }
+    if (years <= 0) return "Moins d'un an";
+    return `${years} an${years > 1 ? "s" : ""}`;
+};
+
 // ── Badge de statut — même logique que PersonnelDirectory.jsx ligne 23
 function StatutBadge({ statut = "En activité", dark }) {
     // Normalisation : les valeurs de l'API peuvent varier
@@ -30,9 +61,9 @@ function StatutBadge({ statut = "En activité", dark }) {
 
     return (
         <span
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wide ${styles[normalized] || styles["Actif"]}`}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wide flex-shrink-0 whitespace-nowrap ${styles[normalized] || styles["Actif"]}`}
         >
-            <span className="w-1.5 translate-y- h-1.5 rounded-full bg-current whitespace-nowrap"/>
+            <span className="w-1.5 translate-y- h-1.5 rounded-full bg-current whitespace-nowrap" />
             {statut}
         </span>
     );
@@ -110,14 +141,28 @@ function SectionCard({ icon, title, children, dark }) {
 // ════════════════════════════════════════════════════════════════════
 // Composant principal StaffProfile
 // ════════════════════════════════════════════════════════════════════
-export default function StaffProfile({ id, dark, onBack }) {
+export default function StaffProfile({ id, dark, onBack, showToast }) {
+    // Add showToast prop
     const [profile, setProfile] = useState(null);
-     const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [imgError, setImgError] = useState(false);
+    const [refreshTrigger, setRefreshTrigger] = useState(0); // [AJOUTÉ] Déclencheur de rafraîchissement
 
     // [NOUVEAU] showUpdateModal : ouvre/ferme le modal de mise à jour
     const [showUpdateModal, setShowUpdateModal] = useState(false);
+
+    // Local toast function if not passed from parent, or use parent's if available
+    // For this scenario, it's better to use the one passed from PersonnelDirectory
+    // or Dashboard if it's a global toast. Let's assume it's passed.
+    const localShowToast =
+        showToast ||
+        ((msg, type) => {
+            console.log(`Toast: ${type} - ${msg}`);
+            // Fallback for development or if showToast is not passed
+            // In a real app, you'd integrate a proper toast library here.
+            alert(msg);
+        });
 
     // [AJOUTÉ] showArchiveModal : ouvre la modale de confirmation "Fin de service"
     const [showArchiveModal, setShowArchiveModal] = useState(false);
@@ -170,7 +215,7 @@ export default function StaffProfile({ id, dark, onBack }) {
         })
             .then((res) => {
                 if (!res.ok) throw new Error(`Erreur ${res.status}`);
-                return res.json()
+                return res.json();
             })
             .then((json) => {
                 // L'API retourne { message, data: { nom, prenoms, matricule, diplomes: [...], ... } }
@@ -185,7 +230,7 @@ export default function StaffProfile({ id, dark, onBack }) {
                 setError(err.message);
                 setLoading(false);
             });
-    }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [id, refreshTrigger]); // [MODIFIÉ] refreshTrigger ajouté aux dépendances
 
     // ── Tokens thème
     const bg = dark ? "bg-[#0a0f1e]" : "bg-slate-50";
@@ -219,12 +264,25 @@ export default function StaffProfile({ id, dark, onBack }) {
                     id={id}
                     dark={dark}
                     onClose={() => setShowUpdateModal(false)}
-                    onSaved={() => {
+                    onSaved={(success, message) => {
                         setShowUpdateModal(false);
-                        // Recharge le profil pour afficher les nouvelles données
-                        setLoading(true);
-                        setError(null);
+                        if (success) {
+                            localShowToast(
+                                message || "Profil mis à jour avec succès !",
+                            );
+                            setRefreshTrigger((prev) => prev + 1); // [MODIFIÉ] Déclenche le rechargement réel
+                        } else {
+                            localShowToast(
+                                message ||
+                                    "Erreur lors de la mise à jour du profil.",
+                                "error",
+                            );
+                            setLoading(true); // Re-fetch to revert to actual state if optimistic update failed
+                            setError(null);
+                        }
                     }}
+                    // No need to pass showToast to UpdateModal itself, as onSaved handles the toast via parent.
+                    // showToast={localShowToast} // Removed as per final decision
                 />
             )}
 
@@ -234,13 +292,19 @@ export default function StaffProfile({ id, dark, onBack }) {
             {showArchiveModal && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4"
-                    style={{ background: "rgba(5,10,25,0.65)", backdropFilter: "blur(8px)" }}
+                    style={{
+                        background: "rgba(5,10,25,0.65)",
+                        backdropFilter: "blur(8px)",
+                    }}
                     onClick={() => !archiving && setShowArchiveModal(false)}
                 >
                     <div
                         className={`relative w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden
                             ${dark ? "bg-[#0c1424] border border-white/8" : "bg-white border border-slate-200"}`}
-                        style={{ animation: "modalIn .2s cubic-bezier(.34,1.56,.64,1)" }}
+                        style={{
+                            animation:
+                                "modalIn .2s cubic-bezier(.34,1.56,.64,1)",
+                        }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Barre rouge en haut */}
@@ -248,36 +312,72 @@ export default function StaffProfile({ id, dark, onBack }) {
 
                         <div className="px-6 py-6 space-y-4">
                             {/* Icône avertissement */}
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto
-                                ${dark ? "bg-rose-500/15" : "bg-rose-50"}`}>
-                                <svg className="w-6 h-6 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round"
-                                        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                            <div
+                                className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto
+                                ${dark ? "bg-rose-500/15" : "bg-rose-50"}`}
+                            >
+                                <svg
+                                    className="w-6 h-6 text-rose-500"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                                    />
                                 </svg>
                             </div>
 
                             {/* Texte */}
                             <div className="text-center space-y-1.5">
-                                <h3 className={`text-[15px] font-bold ${dark ? "text-white" : "text-slate-800"}`}>
+                                <h3
+                                    className={`text-[15px] font-bold ${dark ? "text-white" : "text-slate-800"}`}
+                                >
                                     Confirmer la fin de service
                                 </h3>
-                                <p className={`text-sm leading-relaxed ${dark ? "text-slate-400" : "text-slate-500"}`}>
+                                <p
+                                    className={`text-sm leading-relaxed ${dark ? "text-slate-400" : "text-slate-500"}`}
+                                >
                                     Vous êtes sur le point d'archiver{" "}
-                                    <strong className={dark ? "text-slate-200" : "text-slate-700"}>
+                                    <strong
+                                        className={
+                                            dark
+                                                ? "text-slate-200"
+                                                : "text-slate-700"
+                                        }
+                                    >
                                         {profile?.nom} {profile?.prenoms}
                                     </strong>
-                                    . Cette action marquera le personnel comme sorti du service.
+                                    . Cette action marquera le personnel comme
+                                    sorti du service.
                                 </p>
                             </div>
 
                             {/* Erreur API */}
                             {archiveError && (
-                                <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-medium
-                                    ${dark ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
-                                           : "bg-rose-50 border-rose-200 text-rose-700"}`}>
-                                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round"
-                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                <div
+                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-medium
+                                    ${
+                                        dark
+                                            ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
+                                            : "bg-rose-50 border-rose-200 text-rose-700"
+                                    }`}
+                                >
+                                    <svg
+                                        className="w-3.5 h-3.5 shrink-0"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                                        />
                                     </svg>
                                     {archiveError}
                                 </div>
@@ -291,9 +391,11 @@ export default function StaffProfile({ id, dark, onBack }) {
                                     disabled={archiving}
                                     className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all cursor-pointer
                                         disabled:opacity-40 disabled:cursor-not-allowed
-                                        ${dark
-                                            ? "border-white/10 text-slate-300 hover:bg-white/6"
-                                            : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                                        ${
+                                            dark
+                                                ? "border-white/10 text-slate-300 hover:bg-white/6"
+                                                : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                                        }`}
                                 >
                                     Annuler
                                 </button>
@@ -308,13 +410,30 @@ export default function StaffProfile({ id, dark, onBack }) {
                                 >
                                     {archiving ? (
                                         <>
-                                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                                            <svg
+                                                className="w-4 h-4 animate-spin"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <circle
+                                                    className="opacity-25"
+                                                    cx="12"
+                                                    cy="12"
+                                                    r="10"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                />
+                                                <path
+                                                    className="opacity-75"
+                                                    fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8v8z"
+                                                />
                                             </svg>
                                             Archivage…
                                         </>
-                                    ) : "Confirmer"}
+                                    ) : (
+                                        "Confirmer"
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -384,17 +503,33 @@ export default function StaffProfile({ id, dark, onBack }) {
                         Détails du Personnel
                     </h1>
                     <div className="flex items-center gap-2 flex-wrap">
-                        {/* [AJOUTÉ] Masquer les boutons si le personnel est archivé (statut "Sorti")
-                            — On vérifie profile.statut après chargement. Quand il est archivé,
-                              on affiche à la place un badge "Archivé" non cliquable. */}
-                        {profile && profile.statut === "Sorti" ? (
-                            <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold
-                                ${dark
-                                    ? "bg-slate-500/10 border-slate-500/20 text-slate-400"
-                                    : "bg-slate-50 border-slate-200 text-slate-500"}`}>
-                                <svg className="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round"
-                                        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                        {/* Masquer les boutons si le personnel est archivé.
+                            On normalise en minuscules pour couvrir toutes les variantes
+                            retournées par l'API : "Sorti", "Sortie", "SORTIE", "sorti", "Archivé"... */}
+                        {profile &&
+                        ["sorti", "sortie", "archivé", "archive"].includes(
+                            profile.statut?.toLowerCase(),
+                        ) ? (
+                            <span
+                                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-semibold
+                                ${
+                                    dark
+                                        ? "bg-slate-500/10 border-slate-500/20 text-slate-400"
+                                        : "bg-slate-50 border-slate-200 text-slate-500"
+                                }`}
+                            >
+                                <svg
+                                    className="w-4 h-4 text-rose-500"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                                    />
                                 </svg>
                                 Personnel archivé
                             </span>
@@ -405,24 +540,47 @@ export default function StaffProfile({ id, dark, onBack }) {
                                     onClick={() => setShowUpdateModal(true)}
                                     className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all hover:-translate-y-0.5 shadow-lg shadow-blue-600/20 cursor-pointer"
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round"
-                                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="w-4 h-4"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                        />
                                     </svg>
                                     Mettre à jour
                                 </button>
                                 {/* Bouton "Fin de service" — visible uniquement si non archivé */}
                                 <button
-                                    onClick={() => { setArchiveError(null); setShowArchiveModal(true); }}
+                                    onClick={() => {
+                                        setArchiveError(null);
+                                        setShowArchiveModal(true);
+                                    }}
                                     className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border transition-all hover:-translate-y-0.5 cursor-pointer ${
                                         dark
                                             ? "border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
                                             : "border-rose-200 text-rose-600 hover:bg-rose-50"
                                     }`}
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 cursor-pointer" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round"
-                                            d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className="w-4 h-4 cursor-pointer"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                                        />
                                     </svg>
                                     Fin de service
                                 </button>
@@ -534,7 +692,8 @@ export default function StaffProfile({ id, dark, onBack }) {
                                             />
                                         </svg>
                                         {profile.specialite ||
-                                            profile.service ||
+                                            profile.service || // Fonction/Titre du poste
+                                            profile.departement || // Département
                                             "Professionnel de santé"}
                                     </p>
 
@@ -559,15 +718,12 @@ export default function StaffProfile({ id, dark, onBack }) {
                                             <p
                                                 className={`text-[10px] font-bold uppercase tracking-widest ${txtSub}`}
                                             >
-                                                Poste actuel
+                                                Fonction
                                             </p>
-                                            {/* [MODIFIÉ] grade_actuel est maintenant un objet
-                                                Avant : profile.classe
-                                                Après : profile.grade_actuel?.classe */}
                                             <p
                                                 className={`text-sm font-semibold mt-0.5 ${dark ? "text-blue-400" : "text-blue-600"}`}
                                             >
-                                                {profile.grade_actuel?.classe || "—"}
+                                                {profile.service || "—"}
                                             </p>
                                         </div>
 
@@ -580,8 +736,8 @@ export default function StaffProfile({ id, dark, onBack }) {
                                             <p
                                                 className={`text-sm font-semibold mt-0.5 ${txtTitle}`}
                                             >
-                                                {profile.annees_exercice
-                                                    ? `${profile.annees_exercice} ans de service`
+                                                {profile.date_entree_admin
+                                                    ? `${getSeniorityLabel(profile.date_entree_admin)} de service`
                                                     : "—"}
                                             </p>
                                         </div>
@@ -755,17 +911,31 @@ export default function StaffProfile({ id, dark, onBack }) {
                                 />
                                 <InfoRow
                                     dark={dark}
+                                    label="Classe"
+                                    value={formatClasse(
+                                        profile.grade_actuel?.classe,
+                                    )}
+                                />
+
+                                <InfoRow
+                                    dark={dark}
                                     label="Échelon"
-                                    value={profile.grade_actuel?.echelon != null
-                                        ? String(profile.grade_actuel.echelon)
-                                        : null}
+                                    value={
+                                        profile.grade_actuel?.echelon != null
+                                            ? String(
+                                                  profile.grade_actuel.echelon,
+                                              )
+                                            : null
+                                    }
                                 />
                                 {/* [AJOUTÉ] Indice — nouveau champ de grade_actuel */}
                                 {profile.grade_actuel?.indice != null && (
                                     <InfoRow
                                         dark={dark}
                                         label="Indice"
-                                        value={String(profile.grade_actuel.indice)}
+                                        value={String(
+                                            profile.grade_actuel.indice,
+                                        )}
                                     />
                                 )}
                                 {profile.grade_actuel?.date_effet && (
@@ -775,49 +945,293 @@ export default function StaffProfile({ id, dark, onBack }) {
                                         value={profile.grade_actuel.date_effet}
                                     />
                                 )}
-                                {profile.grade_actuel?.date_prochain_avancement && (
+                                {profile.grade_actuel
+                                    ?.date_prochain_avancement && (
                                     <InfoRow
                                         dark={dark}
                                         label="Prochain avancement"
-                                        value={profile.grade_actuel.date_prochain_avancement}
+                                        value={
+                                            profile.grade_actuel
+                                                .date_prochain_avancement
+                                        }
                                     />
-                                )}
-                                {/* Badge classe (ex: STAGIAIRE, PRINCIPALE) — depuis grade_actuel */}
-                                {profile.grade_actuel?.classe && (
-                                    <div>
-                                        <p
-                                            className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${dark ? "text-slate-500" : "text-slate-400"}`}
-                                        >
-                                            Statut de poste
-                                        </p>
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span
-                                                className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${
-                                                    dark
-                                                        ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                                                        : "bg-blue-50 text-blue-700 border-blue-200"
-                                                }`}
-                                            >
-                                                {profile.grade_actuel.classe}
-                                            </span>
-                                            {/* [AJOUTÉ] Badge "Grade maximum" si est_au_maximum = true */}
-                                            {profile.grade_actuel?.est_au_maximum && (
-                                                <span
-                                                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border ${
-                                                        dark
-                                                            ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                                            : "bg-amber-50 text-amber-700 border-amber-200"
-                                                    }`}
-                                                    title="Ce membre est au grade maximum de sa carrière"
-                                                >
-                                                    ★ Grade max
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
                                 )}
                             </SectionCard>
                         </div>
+
+                        {/* ── SECTION LOGS D'AUDIT (fusion audit_logs + avancements) ── */}
+                        {profile.audit_logs &&
+                            profile.audit_logs.length > 0 && (
+                                <div
+                                    className={`rounded-2xl border overflow-hidden ${
+                                        dark
+                                            ? "bg-white/4 border-white/8"
+                                            : "bg-white border-slate-200 shadow-sm"
+                                    }`}
+                                >
+                                    {/* En-tête */}
+                                    <div
+                                        className={`flex items-center gap-2.5 px-5 py-4 border-b ${
+                                            dark
+                                                ? "border-white/8"
+                                                : "border-slate-100"
+                                        }`}
+                                    >
+                                        <div
+                                            className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                                                dark
+                                                    ? "bg-violet-500/15 text-violet-400"
+                                                    : "bg-violet-50 text-violet-600"
+                                            }`}
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                className="w-4 h-4"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                                strokeWidth={2}
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                                />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h3
+                                                className={`text-sm font-bold ${dark ? "text-white" : "text-slate-800"}`}
+                                            >
+                                                Historique & Activité
+                                            </h3>
+                                            <p
+                                                className={`text-xs ${dark ? "text-slate-500" : "text-slate-400"}`}
+                                            >
+                                                {profile.audit_logs.length}{" "}
+                                                entrée(s)
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Timeline */}
+                                    <div className="px-5 py-4 space-y-3">
+                                        {profile.audit_logs.map((log, i) => {
+                                            // Couleurs par type d'action
+                                            const actionColors = {
+                                                AJOUT_PERSONNEL: {
+                                                    dark: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
+                                                    light: "bg-emerald-50 text-emerald-700 border-emerald-200",
+                                                },
+                                                AVANCEMENT_ECHELON: {
+                                                    dark: "bg-blue-500/15 text-blue-400 border-blue-500/25",
+                                                    light: "bg-blue-50 text-blue-700 border-blue-200",
+                                                },
+                                                PROMOTION_CLASSE: {
+                                                    dark: "bg-violet-500/15 text-violet-400 border-violet-500/25",
+                                                    light: "bg-violet-50 text-violet-700 border-violet-200",
+                                                },
+                                                ARCHIVAGE_PERSONNEL: {
+                                                    dark: "bg-rose-500/15 text-rose-400 border-rose-500/25",
+                                                    light: "bg-rose-50 text-rose-700 border-rose-200",
+                                                },
+                                                MODIFICATION: {
+                                                    dark: "bg-amber-500/15 text-amber-400 border-amber-500/25",
+                                                    light: "bg-amber-50 text-amber-700 border-amber-200",
+                                                },
+                                            };
+                                            const colors = actionColors[
+                                                log.action
+                                            ] || {
+                                                dark: "bg-slate-500/15 text-slate-400 border-slate-500/25",
+                                                light: "bg-slate-100 text-slate-600 border-slate-300",
+                                            };
+                                            const colorCls = dark
+                                                ? colors.dark
+                                                : colors.light;
+
+                                            // Libellé lisible
+                                            const actionLabels = {
+                                                AJOUT_PERSONNEL: "Ajout",
+                                                AVANCEMENT_ECHELON:
+                                                    "Avancement",
+                                                PROMOTION_CLASSE: "Promotion",
+                                                ARCHIVAGE_PERSONNEL:
+                                                    "Archivage",
+                                                MODIFICATION: "Modification",
+                                            };
+                                            const label =
+                                                actionLabels[log.action] ||
+                                                log.action;
+
+                                            const isGradeEvent =
+                                                log.action ===
+                                                    "AVANCEMENT_ECHELON" ||
+                                                log.action ===
+                                                    "PROMOTION_CLASSE";
+
+                                            // On améliore le rendu du grade pour les promotions et avancements
+                                            let contentUI = null;
+
+                                            if (
+                                                isGradeEvent &&
+                                                log.details?.nouveau_grade
+                                            ) {
+                                                // On décompose la chaîne "Cat. X - Cl. Y - Ech. Z" reçue du serveur
+                                                const parts =
+                                                    log.details.nouveau_grade.split(
+                                                        " - ",
+                                                    );
+                                                const cat =
+                                                    parts[0]?.replace(
+                                                        "Cat. ",
+                                                        "",
+                                                    ) || "—";
+                                                const cl =
+                                                    parts[1]?.replace(
+                                                        "Cl. ",
+                                                        "",
+                                                    ) || "—";
+                                                const ech =
+                                                    parts[2]?.replace(
+                                                        "Ech. ",
+                                                        "",
+                                                    ) || "—";
+
+                                                contentUI = (
+                                                    <div className="mt-2 space-y-2">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span
+                                                                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${dark ? "bg-blue-500/10 border-blue-500/20 text-blue-400" : "bg-blue-50 border-blue-200 text-blue-700"}`}
+                                                            >
+                                                                Cat. {cat}
+                                                            </span>
+                                                            <span
+                                                                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${dark ? "bg-violet-500/10 border-violet-500/20 text-violet-400" : "bg-violet-50 border-violet-200 text-violet-700"}`}
+                                                            >
+                                                                {formatClasse(
+                                                                    cl,
+                                                                )}
+                                                            </span>
+                                                            <span
+                                                                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border ${dark ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}
+                                                            >
+                                                                Échelon {ech}
+                                                            </span>
+                                                        </div>
+                                                        {log.details
+                                                            ?.arrete && (
+                                                            <p
+                                                                className={`text-[10px] font-medium flex items-center gap-1 ${dark ? "text-slate-500" : "text-slate-400"}`}
+                                                            >
+                                                                <svg
+                                                                    className="w-3 h-3"
+                                                                    fill="none"
+                                                                    viewBox="0 0 24 24"
+                                                                    stroke="currentColor"
+                                                                >
+                                                                    <path
+                                                                        strokeLinecap="round"
+                                                                        strokeLinejoin="round"
+                                                                        strokeWidth={
+                                                                            2
+                                                                        }
+                                                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                                                    />
+                                                                </svg>
+                                                                Arrêté :{" "}
+                                                                {
+                                                                    log.details
+                                                                        .arrete
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                );
+                                            } else {
+                                                const description =
+                                                    log.details?.description ||
+                                                    log.details
+                                                        ?.ancienne_classe ||
+                                                    "";
+                                                contentUI = description && (
+                                                    <p
+                                                        className={`text-xs mt-1.5 leading-relaxed ${dark ? "text-slate-400" : "text-slate-600"}`}
+                                                    >
+                                                        {description}
+                                                    </p>
+                                                );
+                                            }
+
+                                            // Date formatée
+                                            const dateStr = log.created_at
+                                                ? new Date(
+                                                      log.created_at,
+                                                  ).toLocaleDateString(
+                                                      "fr-FR",
+                                                      {
+                                                          day: "2-digit",
+                                                          month: "short",
+                                                          year: "numeric",
+                                                      },
+                                                  )
+                                                : "";
+
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className={`relative pl-4 border-l-2 ${
+                                                        i === 0
+                                                            ? dark
+                                                                ? "border-violet-500"
+                                                                : "border-violet-400"
+                                                            : dark
+                                                              ? "border-white/10"
+                                                              : "border-slate-200"
+                                                    }`}
+                                                >
+                                                    {/* Pastille de la timeline */}
+                                                    <div
+                                                        className={`absolute -left-1.5 top-2 w-2.5 h-2.5 rounded-full ${
+                                                            i === 0
+                                                                ? dark
+                                                                    ? "bg-violet-500"
+                                                                    : "bg-violet-400"
+                                                                : dark
+                                                                  ? "bg-white/20"
+                                                                  : "bg-slate-300"
+                                                        }`}
+                                                    />
+
+                                                    <div
+                                                        className={`p-3 rounded-xl border transition-all ${
+                                                            dark
+                                                                ? "bg-white/3 border-white/6 hover:bg-white/5"
+                                                                : "bg-slate-50 border-slate-100 hover:bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2 mb-1">
+                                                            <span
+                                                                className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold border ${colorCls}`}
+                                                            >
+                                                                {label}
+                                                            </span>
+                                                            {dateStr && (
+                                                                <span
+                                                                    className={`text-[10px] shrink-0 ${dark ? "text-slate-600" : "text-slate-400"}`}
+                                                                >
+                                                                    {dateStr}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {contentUI}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                         {/* ── Note de bas de page (documents RH) ── */}
                         <div
