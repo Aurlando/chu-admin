@@ -1,7 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import "../App.css";
 
 const API_BASE = "http://localhost:3000";
+
+const formatClasse = (classe) => {
+  if (!classe) return "";
+  const mapping = {
+    "STAGIAIRE": "Stagiaire",
+    "1ERE_CLASSE": "1ère classe",
+    "2EME_CLASSE": "2ème classe",
+    "PRINCIPAL": "Principal",
+    "EXCEPTIONNEL": "Exceptionnel"
+  };
+  return mapping[classe] || classe;
+};
+
+const formatGrade = (grade) => {
+  if (!grade) return "";
+  return `Cat. ${grade.categorie} - ${formatClasse(grade.classe)} - Ech. ${grade.echelon}`;
+};
 
 // --- Composant Historique / Formulaire de promotion ---
 function PromotionModal({ personnelId, personnelName, dark, onClose, onPromoted }) {
@@ -18,11 +35,7 @@ function PromotionModal({ personnelId, personnelName, dark, onClose, onPromoted 
 
   const token = localStorage.getItem("token");
 
-  useEffect(() => {
-    fetchHistory();
-  }, [personnelId]);
-
-  const fetchHistory = () => {
+  const fetchHistory = useCallback(() => {
     setLoading(true);
     fetch(`${API_BASE}/avancements/${personnelId}`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -39,7 +52,11 @@ function PromotionModal({ personnelId, personnelName, dark, onClose, onPromoted 
       setError(err.message);
       setLoading(false);
     });
-  };
+  }, [personnelId, token]);
+
+  useEffect(() => {
+    fetchHistory();
+  }, [fetchHistory]);
 
   const handlePromote = async (e) => {
     e.preventDefault();
@@ -122,7 +139,7 @@ function PromotionModal({ personnelId, personnelName, dark, onClose, onPromoted 
                       </div>
                       {h.grade && (
                         <p className={`text-sm font-semibold mt-2 ${textTitle}`}>
-                          Catégorie {h.grade.categorie} - Classe {h.grade.classe} - Échelon {h.grade.echelon}
+                          {formatGrade(h.grade)}
                         </p>
                       )}
                       <p className={`text-xs mt-1 ${textSub}`}>Indice: {h.grade?.indice} {h.num_arrete ? `• Arrêté: ${h.num_arrete}` : ""}</p>
@@ -181,13 +198,24 @@ export default function Avancements({ dark }) {
 
   const [selectedAgent, setSelectedAgent] = useState(null);
 
+  // [NOUVEAU] Stats de notifications : dépassé / très proches / total
+  const [notifStats, setNotifStats] = useState(null);
+
   const token = localStorage.getItem("token");
 
+  // [NOUVEAU] Fetch des stats de notifications au montage
   useEffect(() => {
-    fetchEligible();
-  }, []);
+    fetch(`${API_BASE}/avancements/stats`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (json?.data) setNotifStats(json.data);
+      })
+      .catch(() => {}); // silencieux — la bannière est facultative
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchEligible = () => {
+  const fetchEligible = useCallback(() => {
     setLoading(true);
     fetch(`${API_BASE}/avancements/proches`, {
       headers: { Authorization: `Bearer ${token}` }
@@ -204,7 +232,11 @@ export default function Avancements({ dark }) {
       setError(err.message);
       setLoading(false);
     });
-  };
+  }, [token]);
+
+  useEffect(() => {
+    fetchEligible();
+  }, [fetchEligible]);
 
   const bg = dark ? "bg-[#0a0f1e]" : "bg-slate-50";
   const card = dark ? "bg-[#0d1526] border-white/8" : "bg-white border-slate-200 shadow-sm";
@@ -231,6 +263,59 @@ export default function Avancements({ dark }) {
         <h1 className={`text-2xl lg:text-3xl font-bold ${textTitle}`}>Gestion des Avancements</h1>
         <p className={`text-sm mt-1 ${textSub}`}>Liste des agents dont la date de prochain avancement est passée ou proche</p>
       </div>
+
+      {/* [NOUVEAU] Bannière statistiques de notifications */}
+      {notifStats && (notifStats.depasse > 0 || notifStats.tres_proche > 0) && (
+        <div className={`mb-5 rounded-2xl border p-4 ${
+          dark ? "bg-amber-500/5 border-amber-500/20" : "bg-amber-50 border-amber-200"
+        }`}>
+          <div className="flex items-start gap-3">
+            {/* Icône alerte */}
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+              dark ? "bg-amber-500/15 text-amber-400" : "bg-amber-100 text-amber-600"
+            }`}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className={`text-sm font-bold mb-2 ${dark ? "text-amber-300" : "text-amber-800"}`}>
+                Avancements nécessitant une attention
+              </p>
+              {/* 3 compteurs */}
+              <div className="flex flex-wrap gap-3">
+                {/* Dépassé */}
+                {notifStats.depasse > 0 && (
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold ${
+                    dark ? "bg-rose-500/10 border-rose-500/20 text-rose-400" : "bg-rose-50 border-rose-200 text-rose-700"
+                  }`}>
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
+                    <span className="font-bold text-sm">{notifStats.depasse}</span>
+                    Dépassé{notifStats.depasse > 1 ? "s" : ""}
+                  </div>
+                )}
+                {/* Très proche */}
+                {notifStats.tres_proche > 0 && (
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold ${
+                    dark ? "bg-amber-500/10 border-amber-500/20 text-amber-400" : "bg-amber-100 border-amber-200 text-amber-700"
+                  }`}>
+                    <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                    <span className="font-bold text-sm">{notifStats.tres_proche}</span>
+                    Très proche{notifStats.tres_proche > 1 ? "s" : ""}
+                  </div>
+                )}
+                {/* Total éligible */}
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold ${
+                  dark ? "bg-blue-500/10 border-blue-500/20 text-blue-400" : "bg-blue-50 border-blue-200 text-blue-700"
+                }`}>
+                  <span className="font-bold text-sm">{notifStats.total_eligible}</span>
+                  Total éligible{notifStats.total_eligible > 1 ? "s" : ""}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={`rounded-2xl border ${card} overflow-hidden`}>
         <div className={`px-5 py-4 border-b ${dark ? "border-white/8" : "border-slate-100"} flex items-center justify-between`}>
@@ -279,7 +364,7 @@ export default function Avancements({ dark }) {
                       <td className="px-5 py-3.5">
                         {a.grade_actuel && (
                           <div className={textTitle}>
-                            Cat. {a.grade_actuel.categorie} - Cl. {a.grade_actuel.classe} - Ech. {a.grade_actuel.echelon}
+                            {formatGrade(a.grade_actuel)}
                           </div>
                         )}
                       </td>
