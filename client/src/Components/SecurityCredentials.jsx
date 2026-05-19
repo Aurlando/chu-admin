@@ -92,6 +92,7 @@ function StatCard({ icon, value, label, colorClass, bgClass, dark }) {
             <div
                 className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${bgClass}`}
             >
+            
                 {icon}
             </div>
             <div>
@@ -388,7 +389,7 @@ export default function SecurityCredentials({ dark }) {
     const [stats, setStats] = useState({
         actifs: 0,
         reveals24h: 0,
-        encryption: "AES-256",
+        encryption: "bcrypt",
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -406,9 +407,9 @@ export default function SecurityCredentials({ dark }) {
     const showToast = (msg) => {
         if (toastTimer.current) clearTimeout(toastTimer.current);
         setToast({ show: true, msg });
-        toastTimer.current = setTimeout(
-            () => setToast({ show: false, msg: "" }),
-            3200,
+        toastTimer.current = setTimeout(() =>
+            setToast({ show: false, msg: "" }),
+            1500, // Disparition rapide après 1.5 secondes
         );
     };
 
@@ -432,7 +433,7 @@ export default function SecurityCredentials({ dark }) {
                 setStats({
                     actifs: json.stats?.actifs ?? json.pagination?.total ?? 0,
                     reveals24h: json.stats?.reveals24h ?? 0,
-                    encryption: json.stats?.encryption ?? "AES-256",
+                    encryption: json.stats?.encryption ?? "bcrypt",
                 });
             })
             .catch((err) => setError(err.message))
@@ -717,7 +718,7 @@ export default function SecurityCredentials({ dark }) {
                     />
                     <StatCard
                         dark={dark}
-                        value={stats.encryption ?? "AES-256"}
+                        value={stats.encryption ?? "bcrypt"}
                         label="Chiffrement actif"
                         colorClass={
                             dark ? "text-emerald-400" : "text-emerald-600"
@@ -765,9 +766,24 @@ export default function SecurityCredentials({ dark }) {
                                 type="text"
                                 placeholder="Filtrer par nom, rôle ou identifiant…"
                                 onChange={(e) => handleSearch(e.target.value)}
-                                className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm outline-none
+                                className={`w-full pl-9 pr-10 py-2.5 rounded-xl border text-sm outline-none
                   transition-all font-[inherit] ${inputCls}`}
                             />
+                            {search && (
+                                <button
+                                    onClick={() => {
+                                        setSearch("");
+                                        setPage(1);
+                                        // No need to call handleSearch here, as setting search state will trigger useEffect
+                                    }}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
+                                    title="Effacer la recherche"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
                         </div>
                         <button
                             onClick={() => showToast("Export déclenché")}

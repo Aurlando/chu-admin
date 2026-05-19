@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import StaffProfile from "./StaffProfile";
 
 const API_BASE = "http://localhost:3000";
 const PER_PAGE = 10;
@@ -32,7 +33,7 @@ function ErrorAlert({ message, onRetry, dark }) {
         <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm mb-4
       ${dark ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
              : "bg-rose-50 border-rose-200 text-rose-700"}`}>
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round"
                     d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
@@ -83,7 +84,7 @@ function DeleteModal({ open, onClose, onConfirm, staff, deleting, deleteError, d
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Barre rose */}
-                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-rose-500 to-rose-600" />
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-rose-500 to-rose-600" />
 
                 <div className="px-6 py-6 space-y-4">
                     {/* Icône */}
@@ -114,7 +115,7 @@ function DeleteModal({ open, onClose, onConfirm, staff, deleting, deleteError, d
                         <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-xs
               ${dark ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
                      : "bg-rose-50 border-rose-200 text-rose-700"}`}>
-                            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round"
                                     d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                             </svg>
@@ -179,6 +180,9 @@ export default function ArchivePage({ dark }) {
     const [deleting,   setDeleting]   = useState(false);
     const [deleteError,setDeleteError]= useState(null);
     const [toast,      setToast]      = useState({ show: false, msg: "", type: "success" });
+    // [AJOUTÉ] selectedId : id de la personne archivée à afficher en profil lecture seule
+    // null = liste, number = affiche le profil via GET /staff/archives/:id
+    const [selectedId, setSelectedId] = useState(null);
 
     const searchTimer = useRef(null);
     const toastTimer  = useRef(null);
@@ -186,7 +190,7 @@ export default function ArchivePage({ dark }) {
     const showToast = (msg, type = "success") => {
         if (toastTimer.current) clearTimeout(toastTimer.current);
         setToast({ show: true, msg, type });
-        toastTimer.current = setTimeout(() => setToast(t => ({ ...t, show: false })), 3500);
+        toastTimer.current = setTimeout(() => setToast(t => ({ ...t, show: false })), 1500); // Disparition rapide après 1.5 secondes
     };
 
     // ── GET /staff/archives?page=X&limit=10&search=Y
@@ -274,6 +278,21 @@ export default function ArchivePage({ dark }) {
         ? "border-white/10 text-slate-400 hover:bg-white/8"
         : "border-slate-200 text-slate-500 hover:bg-slate-100";
 
+    // [AJOUTÉ] Si selectedId défini → afficher le profil archivé en lecture seule
+    // readOnly=true masque tous les boutons d'action dans StaffProfile
+    // apiOverride="staff/archives" → StaffProfile appelle GET /staff/archives/:id
+    if (selectedId !== null) {
+        return (
+            <StaffProfile
+                id={selectedId}
+                dark={dark}
+                readOnly={true}
+                apiOverride="staff/archives"
+                onBack={() => setSelectedId(null)}
+            />
+        );
+    }
+
     return (
         <div className={`flex-1 overflow-auto ${bg}`}>
 
@@ -293,7 +312,7 @@ export default function ArchivePage({ dark }) {
         shadow-2xl text-sm font-medium transition-all duration-300
         ${toast.show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"}
         ${dark ? "bg-[#0d1526] border border-white/10 text-slate-200" : "bg-slate-800 text-white"}`}>
-                <svg className={`w-4 h-4 flex-shrink-0 ${toast.type === "success" ? "text-emerald-400" : "text-rose-400"}`}
+                <svg className={`w-4 h-4 shrink-0 ${toast.type === "success" ? "text-emerald-400" : "text-rose-400"}`}
                     fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     {toast.type === "success"
                         ? <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -331,7 +350,7 @@ export default function ArchivePage({ dark }) {
                 <div className={`flex items-start gap-3 px-4 py-3.5 rounded-xl border text-[12.5px] leading-relaxed
           ${dark ? "bg-rose-500/8 border-rose-500/15 text-rose-400"
                  : "bg-rose-50 border-rose-200 text-rose-800"}`}>
-                    <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round"
                             d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
@@ -353,11 +372,23 @@ export default function ArchivePage({ dark }) {
                             </svg>
                             <input
                                 type="text"
+                                value={search}
                                 placeholder="Rechercher dans les archives…"
                                 onChange={(e) => handleSearch(e.target.value)}
-                                className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm outline-none
+                                className={`w-full pl-9 pr-8 py-2.5 rounded-xl border text-sm outline-none
                   transition-all font-[inherit] ${inputCls}`}
                             />
+                            {search && (
+                                <button
+                                    onClick={() => handleSearch("")}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
+                                    title="Effacer la recherche"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -390,7 +421,7 @@ export default function ArchivePage({ dark }) {
                                                 <div className="flex items-center gap-3">
                                                     <div
                                                         className="w-9 h-9 rounded-full flex items-center justify-center
-                              text-[11px] font-bold text-white flex-shrink-0 opacity-70"
+                              text-[11px] font-bold text-white shrink-0 opacity-70"
                                                         style={{ background: avatarColor(p.id) }}
                                                     >
                                                         {initials(p.nom, p.prenoms)}
@@ -433,25 +464,25 @@ export default function ArchivePage({ dark }) {
                                                         : "—"}
                                                 </span>
                                             </td>
-                                            {/* Bouton supprimer */}
+                                            {/* [AJOUTÉ] Bouton Voir — ouvre le profil en lecture seule
+                                                 Appelle GET /staff/archives/:id via prop apiOverride dans StaffProfile */}
                                             <td className={`${tdCls} text-right`}>
                                                 <button
-                                                    onClick={() => {
-                                                        setDeleteError(null);
-                                                        setModal({ open: true, staff: p });
-                                                    }}
+                                                    onClick={() => setSelectedId(p.id)}
                                                     className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl
                               text-xs font-bold border transition-all cursor-pointer
                               hover:-translate-y-0.5 hover:shadow-md
                               ${dark
-                                                            ? "border-rose-500/25 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/40"
-                                                            : "border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300"}`}
+                                                            ? "border-blue-500/25 text-blue-400 hover:bg-blue-500/10 hover:border-blue-500/40"
+                                                            : "border-blue-200 text-blue-600 hover:bg-blue-50 hover:border-blue-300"}`}
                                                 >
                                                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                                         <path strokeLinecap="round" strokeLinejoin="round"
-                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                        <path strokeLinecap="round" strokeLinejoin="round"
+                                                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                                     </svg>
-                                                    Supprimer
+                                                    Voir
                                                 </button>
                                             </td>
                                         </tr>

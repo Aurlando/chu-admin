@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import StaffProfile from "./StaffProfile";
 import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
 import "../App.css";
@@ -94,8 +94,21 @@ function EditIcon() {
 export default function PersonnelDirectory({ dark, onNavigate }) {
     // selectedId : null = liste, valeur = vue profil détail
     const [selectedId, setSelectedId] = useState(null);
-
     const [selectedIdUpdate, setSelectedIdUpdate] = useState(null);
+    const [refreshKey, setRefreshKey] = useState(0); // Pour forcer le rafraîchissement de la liste
+
+    // [AJOUTÉ] Logique de notification (Toast) manquante
+    const [toast, setToast] = useState({ show: false, msg: "", type: "success" });
+    const toastTimer = useRef(null);
+
+    const showToast = (msg, type = "success") => {
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        setToast({ show: true, msg, type });
+        toastTimer.current = setTimeout(() => 
+            setToast(prev => ({ ...prev, show: false })), 
+            2000
+        );
+    };
 
     // Vue profil — remplace toute la page
     if (selectedId !== null) {
@@ -104,6 +117,7 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
                 id={selectedId}
                 dark={dark}
                 onBack={() => setSelectedId(null)}
+                showToast={showToast} // Pass showToast to StaffProfile
             />
         );
     }
@@ -116,15 +130,34 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
                     id={selectedIdUpdate}
                     dark={dark}
                     onClose={() => setSelectedIdUpdate(null)}
-                    onSaved={() => setSelectedIdUpdate(null)}
+                    onSaved={(success, message) => {
+                        setSelectedIdUpdate(null);
+                        if (success) {
+                            showToast(message || "Mise à jour réussie");
+                            setRefreshKey(prev => prev + 1); // Rafraîchit la liste
+                        } else {
+                            showToast(message, "error");
+                        }
+                    }}
                 />
             )}
             <PersonnelList
+                key={refreshKey}
                 dark={dark}
                 onSelectId={setSelectedId}
                 onSelectIdUpdate={setSelectedIdUpdate}
                 onNavigate={onNavigate}
             />
+
+            {/* Composant Toast */}
+            <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl text-sm font-medium transition-all duration-300
+                ${toast.show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"}
+                ${dark ? "bg-[#0d1526] border border-white/10 text-slate-200" : "bg-slate-800 text-white"}`}>
+                <div className={toast.type === "success" ? "text-emerald-400" : "text-rose-400"}>
+                    {toast.type === "success" ? "✓" : "✕"}
+                </div>
+                {toast.msg}
+            </div>
         </>
     );
 }
@@ -323,7 +356,7 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
             <div className={`rounded-2xl border p-4 mb-5 ${T.card}`}>
                 <div className="flex flex-nowrap gap-3 items-center">
                     {/* Barre de recherche → ?search= → cherche nom, prenoms, matricule */}
-                    <div className="relative flex-1 min-w-[150px]">
+                    <div className="relative flex-1 min-w-37.5">
                         <svg
                             className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${T.iconColor}`}
                             fill="none"
@@ -349,6 +382,7 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
                                 onClick={() => handleSearch("")}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
                                 title="Effacer la recherche"
+                                type="button"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -376,6 +410,7 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
                         {filterDept && (
                             <button
                                 onClick={() => handleFilterDept("")}
+                                    type="button"
                                 className="absolute right-7 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -404,6 +439,7 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
                         {filterFonc && (
                             <button
                                 onClick={() => handleFilterFonc("")}
+                                    type="button"
                                 className="absolute right-7 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>

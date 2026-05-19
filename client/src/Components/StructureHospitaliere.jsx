@@ -310,7 +310,30 @@ export default function StructureHospitaliere({ dark }) {
 
   useEffect(() => { fetchRecap(); }, [fetchRecap]);
 
-  const handleExport = () => window.open(`${API_BASE}/recap/export`, "_blank");
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch(`${API_BASE}/recap/export`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'recap_ressources_humaines.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('Erreur lors de l\'export : ' + e.message);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const openModal = (serviceId, groupeId, serviceName, groupeName, groupIdx) =>
     setModal({ open: true, serviceId, groupeId, serviceName, groupeName, groupIdx });
@@ -359,17 +382,21 @@ export default function StructureHospitaliere({ dark }) {
           </div>
           <button
             onClick={handleExport}
-            disabled={loading || !!error}
+            disabled={loading || !!error || exporting}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
               border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed
               ${dark
                 ? "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"
                 : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 shadow-sm"}`}
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-            </svg>
-            Exporter Excel
+            {exporting ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+            )}
+            {exporting ? 'Export...' : 'Exporter Excel'}
           </button>
         </div>
 
@@ -451,11 +478,11 @@ export default function StructureHospitaliere({ dark }) {
           )}
 
           {!loading && !error && recap && (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
+          <div className="overflow-x-auto">
+              <table className="w-full border-collapse table-fixed">
                 <thead>
                   <tr>
-                    <th className={`${thCls} text-left pl-6 min-w-47.5`}>Service</th>
+                    <th className={`${thCls} text-left pl-6 w-48`}>Service</th>
                     {groupes.map((g, i) => {
                       const pal = GROUP_PALETTE[i % GROUP_PALETTE.length];
                       return (
@@ -469,7 +496,7 @@ export default function StructureHospitaliere({ dark }) {
                     })}
                     <th className={`${thCls} ${dark ? "text-slate-400" : "text-slate-500"} font-extrabold`}>
                       Total
-                    </th> 
+                    </th>
                   </tr>
                 </thead>
                 <tbody>

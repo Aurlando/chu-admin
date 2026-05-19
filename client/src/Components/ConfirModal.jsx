@@ -1,26 +1,3 @@
-// ════════════════════════════════════════════════════════════════════
-// ConfirmModal.jsx — Modal de confirmation réutilisable
-//
-// RÔLE : Affiche une boîte de dialogue de confirmation par-dessus
-//        n'importe quelle page, similaire à la photo de référence.
-//        Utilisé pour confirmer :
-//          - L'enregistrement d'un nouveau personnel (AddPersonnel)
-//          - L'annulation d'un formulaire (AddPersonnel)
-//          - La mise à jour d'un personnel (UpdateModal)
-//          - L'annulation d'une mise à jour (UpdateModal)
-//
-// PROPS reçues :
-//   - dark        : booléen thème sombre/clair
-//   - type        : "confirm" | "warning" | "danger"
-//                   → change la couleur de l'icône et du bouton de validation
-//   - title       : titre de la boîte de dialogue (ex: "Enregistrer le personnel ?")
-//   - message     : texte descriptif sous le titre
-//   - labelOui    : texte du bouton de confirmation (ex: "Oui, enregistrer")
-//   - labelNon    : texte du bouton d'annulation (ex: "Non, continuer")
-//   - onConfirm   : fonction appelée si l'utilisateur clique sur "Oui"
-//   - onCancel    : fonction appelée si l'utilisateur clique sur "Non" ou l'overlay
-// ════════════════════════════════════════════════════════════════════
-
 import { useEffect } from "react";
 
 export default function ConfirmModal({
