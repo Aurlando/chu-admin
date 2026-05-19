@@ -16,9 +16,11 @@ const CATEGORIES = [
     "X",
 ];
 const CLASSES = [
-    { value: "stagiaire", label: "Stagiaire" },
-    { value: "1", label: "Classe 1" },
-    { value: "2", label: "Classe 2" },
+    { value: "STAGIAIRE", label: "Stagiaire" },
+    { value: "1ERE_CLASSE", label: "Classe 1" },
+    { value: "2EME_CLASSE", label: "Classe 2" },
+    { value: "PRINCIPAL", label: "Principal" },
+    { value: "EXCEPTIONNEL", label: "Exceptionnel" },
 ];
 const ECHELONS = ["1", "2", "3"];
 const STATUTS = ["En activité", "En absence", "Sortie"];
@@ -168,7 +170,8 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
         im: "",
         date_naissance: "",
         categorie: "",
-        id_grade_actuel: "",
+        classe: "",
+        echelon: "",
         specialite: "",
         telephone: "",
         email: "",
@@ -185,7 +188,6 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
     // ── Dropdowns
     const [services, setServices] = useState([]);
     const [fonctions, setFonctions] = useState([]);
-    const [grades, setGrades] = useState([]);
 
     // ── Soumission
     const [errors, setErrors] = useState({});
@@ -242,10 +244,11 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                 setForm({
                     nom: p.nom || "",
                     prenoms: p.prenoms || "",
-                    im: p.matricule || "", // la BDD renvoie "matricule" en lecture
+                    im: (p.matricule || "").replace(/\s/g, ""), // la BDD renvoie "matricule" en lecture
                     date_naissance: dateFormatted,
-                    categorie: p.categorie || (p.grade_actuel ? p.grade_actuel.categorie : ""),
-                    id_grade_actuel: p.grade_actuel ? p.grade_actuel.id_grade : "",
+                    categorie: p.grade_actuel ? p.grade_actuel.categorie : "",
+                    classe: p.grade_actuel ? p.grade_actuel.classe : "",
+                    echelon: p.grade_actuel ? p.grade_actuel.echelon : "",
                     specialite: p.specialite || "",
                     telephone: p.telephone || "",
                     email: p.email || "",
@@ -303,22 +306,6 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             })
             .catch(() => {});
     }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    // ── Chargement des grades lors du changement de catégorie
-    useEffect(() => {
-        if (!form.categorie) {
-            setGrades([]);
-            return;
-        }
-        fetch(`${API_BASE}/avancements/grades/${form.categorie}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then((r) => r.json())
-            .then((json) => {
-                setGrades(json.data || json);
-            })
-            .catch(() => setGrades([]));
-    }, [form.categorie, token]);
 
     // ── Fermer le modal en cliquant sur l'overlay (backdrop)
     const handleBackdropClick = (e) => {
@@ -395,6 +382,8 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             const m = today.getMonth() - birthDate.getMonth();
             if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate()))
                 age--;
+            if (age > 70)
+                e.date_naissance = "L'âge ne doit pas dépasser 70 ans";
             if (age < 16)
                 e.date_naissance = "L'âge doit être de 16 ans minimum";
         }
@@ -436,8 +425,24 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             setErrors(e);
 
             // [AJOUT] Redirection automatique vers l'onglet contenant la première erreur
-            if (e.nom || e.prenoms || e.im) setActiveTab("identite");
-            else if (e.diplome0) setActiveTab("diplomes");
+            if (e.nom || e.prenoms || e.im || e.date_naissance)
+                setActiveTab("identite");
+            else if (
+                e.categorie ||
+                e.classe ||
+                e.echelon ||
+                e.statut ||
+                e.specialite
+            )
+                setActiveTab("situation");
+            else if (e.service_id || e.fonction_id || e.telephone || e.email)
+                setActiveTab("affectation");
+            else if (
+                Object.keys(e).some(
+                    (k) => k.startsWith("diplome") || k.startsWith("etab"),
+                )
+            )
+                setActiveTab("diplomes");
 
             return;
         }
@@ -445,18 +450,19 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
         setSubmitting(true);
         setApiError(null);
 
+        onClose(); // Ferme le modal immédiatement pour la mise à jour optimiste
+        onSaved(true, "Mise à jour en cours..."); // Signale un succès optimiste au parent
+
         try {
             const fd = new FormData();
-
-            // Photo : seulement si l'utilisateur en a choisi une nouvelle
             if (photoFile) fd.append("photo_profil", photoFile);
-
             fd.append("nom", form.nom.trim());
             fd.append("prenoms", form.prenoms.trim());
             fd.append("im", form.im.trim());
             fd.append("date_naissance", form.date_naissance);
             fd.append("categorie", form.categorie);
-            if (form.id_grade_actuel) fd.append("id_grade_actuel", form.id_grade_actuel);
+            if (form.classe) fd.append("classe", form.classe);
+            if (form.echelon) fd.append("echelon", form.echelon);
             fd.append("specialite", form.specialite.trim());
             fd.append("telephone", form.telephone.trim());
             fd.append("email", form.email.trim());
@@ -475,10 +481,6 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                 const json = await res.json().catch(() => ({}));
                 throw new Error(json.message || `Erreur ${res.status}`);
             }
-
-            // Succès → informe le parent de rafraîchir puis ferme le modal
-            onSaved();
-            onClose();
         } catch (err) {
             setApiError(err.message);
             const msg = err.message.toLowerCase();
@@ -841,7 +843,10 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     onChange={(e) =>
                                                         handleChange(
                                                             "im",
-                                                            e.target.value,
+                                                            e.target.value.replace(
+                                                                /\s/g,
+                                                                "",
+                                                            ),
                                                         )
                                                     }
                                                     className={inp("im")}
@@ -901,29 +906,55 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                             </select>
                                         </Field>
                                         <Field
-                                            label="Grade (Classe & Échelon)"
+                                            label="Classe"
                                             dark={dark}
                                         >
                                             <select
-                                                value={form.id_grade_actuel}
+                                                value={form.classe}
                                                 onChange={(e) =>
                                                     handleChange(
-                                                        "id_grade_actuel",
+                                                        "classe",
                                                         e.target.value,
                                                     )
                                                 }
                                                 className={selectCls}
-                                                disabled={!form.categorie}
                                             >
                                                 <option value="">
                                                     Sélectionner
                                                 </option>
-                                                {grades.map((g) => (
+                                                {CLASSES.map((c) => (
                                                     <option
-                                                        key={g.id_grade}
-                                                        value={g.id_grade}
+                                                        key={c.value}
+                                                        value={c.value}
                                                     >
-                                                        Classe {g.classe} - Échelon {g.echelon} (Indice {g.indice})
+                                                        {c.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </Field>
+                                        <Field
+                                            label="Échelon"
+                                            dark={dark}
+                                        >
+                                            <select
+                                                value={form.echelon}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "echelon",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={selectCls}
+                                            >
+                                                <option value="">
+                                                    Sélectionner
+                                                </option>
+                                                {ECHELONS.map((e) => (
+                                                    <option
+                                                        key={e}
+                                                        value={e}
+                                                    >
+                                                        {e}
                                                     </option>
                                                 ))}
                                             </select>
@@ -1105,7 +1136,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                                     index,
                                                                 )
                                                             }
-                                                        className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors cursor-pointer"
+                                                            className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors cursor-pointer"
                                                         >
                                                             <svg
                                                                 xmlns="http://www.w3.org/2000/svg"

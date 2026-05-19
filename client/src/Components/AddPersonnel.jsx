@@ -293,15 +293,28 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();
         const m = today.getMonth() - birthDate.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+        if (age > 70) {
+          e.date_naissance = "L'âge ne doit pas dépasser 70 ans";
+        }
         if (age < 16) e.date_naissance = "L'âge doit être de 16 ans minimum";
+      }
+
+      if (form.date_entree_admin && form.date_naissance && new Date(form.date_entree_admin) < new Date(form.date_naissance)) {
+        e.date_entree_admin = "La date d'entrée ne peut pas être inférieur ou égal à la date de naissance";
       }
     }
     if (step === 2) {
       if (!form.categorie)            e.categorie     = "Requis";
       if (!form.classe)               e.classe        = "Requis";
       if (!form.echelon)              e.echelon       = "Requis";
-      if (!form.date_effet)           e.date_effet    = "Requis";
+      if (!form.date_effet) {
+        e.date_effet = "Requis";
+      } else if (form.date_naissance && new Date(form.date_effet) < new Date(form.date_naissance)) {
+        e.date_effet = "La date d'effet ne peut pas être inférieure ou égal à la date de naissance";
+      }
       if (!form.specialite.trim())    e.specialite    = "Requis";
 
       else if (!noSpecialCharsAlphanumRegex.test(form.specialite)) e.specialite = "Pas de caractères spéciaux";
@@ -740,7 +753,7 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                 </Field>
                 <Field label="Matricule (IM)" required dark={dark} error={errors.im}>
                   <input type="text" placeholder="Ex: 371815" value={form.im}
-                    onChange={e => handleChange("im", e.target.value)} className={inp("im")} />
+                    onChange={e => handleChange("im", e.target.value.replace(/\s/g, ''))} className={inp("im")} />
                 </Field>
                 <Field label="Date de naissance" required dark={dark} error={errors.date_naissance}>
                   <input type="date" value={form.date_naissance}
