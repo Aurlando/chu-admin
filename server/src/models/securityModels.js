@@ -66,13 +66,29 @@ async function resetPassword({ accountId, newPassword, adminId }) {
     // verification que le compte existe
     const account = await prisma.auth_user.findUnique({
         where: { id: BigInt(accountId) },
-        select: { id: true, username: true },
+        select: {
+            id: true,
+            username: true,
+            personnel: {
+                select: { nom: true, prenoms: true },
+            },
+        },
     });
 
     if (!account) return { found: false };
 
     // Hachage du nouveau mot de passe
     const password_hash = await bcrypt.hash(newPassword, 10);
+
+    const maintenant = new Date();
+    const dateFormatee = maintenant.toLocaleDateString('fr-FR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+    });
+
+    const nomProprietaire = account.personnel
+        ? `${account.personnel.nom}${account.personnel.prenoms ? ' ' + account.personnel.prenoms : ''}`
+        : account.username;
 
     // Transaction : update + log ensemble
     await prisma.$transaction(async (tx) => {
@@ -88,7 +104,10 @@ async function resetPassword({ accountId, newPassword, adminId }) {
                 cible_id: BigInt(accountId),
                 fait_par_id: BigInt(adminId),
                 details: {
+                    description: `Mot de passe de ${nomProprietaire} (${account.username}) réinitialisé le ${dateFormatee}`,
                     username_cible: account.username,
+                    proprietaire: nomProprietaire,
+                    date_reinitialisation: maintenant.toISOString(),
                 },
             },
         });

@@ -494,6 +494,7 @@ async function updatePersonnel({
     diplomes = [],
     donner_acces,
     username, password_hash,
+    adminId,
 }) {
     await prisma.$transaction(async (tx) => {
         const dataToUpdate = {};
@@ -617,6 +618,41 @@ async function updatePersonnel({
                 })
             }
         }
+
+        // ── Audit log de modification ─────────────────────────────
+        // On récupère le nom du personnel pour le log (peut être le nouveau nom ou l'ancien)
+        const personnelPourLog = await tx.personnel.findUnique({
+            where: { id: BigInt(id) },
+            select: { nom: true, prenoms: true },
+        });
+        const nomComplet = personnelPourLog
+            ? `${personnelPourLog.nom}${personnelPourLog.prenoms ? ' ' + personnelPourLog.prenoms : ''}`
+            : `ID ${id}`;
+
+        // Liste des champs effectivement modifiés
+        const champsModifies = Object.keys(dataToUpdate)
+            .filter(c => c !== 'photo_profil'); // la photo n'est pas informative à logguer
+        if (diplomes.length > 0) champsModifies.push('diplomes');
+        if (donner_acces && username) champsModifies.push('acces_sih');
+
+        const maintenant = new Date();
+        const dateFormatee = maintenant.toLocaleDateString('fr-FR', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit',
+        });
+
+        await tx.ref_audit_log.create({
+            data: {
+                action: 'MODIFICATION_PERSONNEL',
+                cible_type: 'personnel',
+                cible_id: BigInt(id),
+                fait_par_id: adminId ? BigInt(adminId) : null,
+                details: {
+                    description: `Modification de ${nomComplet} le ${dateFormatee}`,
+                    champs_modifies: champsModifies,
+                },
+            },
+        });
     });
 
     return { success: true };

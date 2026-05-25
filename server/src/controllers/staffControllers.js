@@ -553,6 +553,7 @@ async function updateStaff(req, res) {
             donner_acces: donner_acces || undefined,
             username: donner_acces ? body.username?.trim() : undefined,
             password_hash,
+            adminId: req.user?.id,
         });
 
         // Supprimer l'ancienne photo après la mise à jour en BDD

@@ -86,6 +86,7 @@ async function effectuerAvancement(req, res) {
             num_arrete: num_arrete.trim(),
             date_signature,
             date_effet,
+            adminId: req.user?.id,
         });
 
         if (!result.found) {
