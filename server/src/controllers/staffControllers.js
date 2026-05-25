@@ -107,29 +107,60 @@ async function addStaff(req, res) {
     const erreur400 = (message) => {
         validators.supprimerFichierSiExiste(cheminFichier);
         return res.status(400).json({ message });
-    }
+    };
     // ── 1. Champs obligatoires ────────────────────────────────────
     const {
-        nom, prenoms, im, date_naissance,
-        categorie, classe, echelon,
-        id_grade_actuel, num_arrete, date_effet,
-        specialite, telephone, email,
-        service_id, fonction_id, statut,
-        donner_access, donner_acces, username, password, role,
+        nom,
+        prenoms,
+        im,
+        date_naissance,
+        categorie,
+        classe,
+        echelon,
+        id_grade_actuel,
+        num_arrete,
+        date_effet,
+        specialite,
+        telephone,
+        email,
+        service_id,
+        fonction_id,
+        statut,
+        donner_access,
+        donner_acces,
+        username,
+        password,
+        role,
         date_entree_admin,
         diplomes: diplomesRaw,
     } = req.body;
 
     // ── Résolution du grade : id_grade_actuel (si fourni) OU
     //    lookup BDD depuis categorie + classe + echelon
+    //    Pour la classe STAGIAIRE, l'échelon est optionnel
+    const estStagiaire = classe?.toString().toUpperCase() === 'STAGIAIRE';
     let gradeIdResolu = id_grade_actuel;
-    if (!gradeIdResolu && categorie && classe && echelon) {
-        const gradeFound = await staffModels.trouverGrade({ categorie, classe, echelon });
+    if (!gradeIdResolu && categorie && classe && (echelon || estStagiaire)) {
+        const gradeFound = await staffModels.trouverGrade({
+            categorie,
+            classe,
+            echelon: estStagiaire ? null : echelon,
+        });
         if (gradeFound) gradeIdResolu = String(gradeFound.id_grade);
     }
 
     // champs obligatoire pour creer un personnel
-    const champsObligatoires = { nom, prenoms, im, date_naissance, id_grade_actuel: gradeIdResolu, telephone, service_id, fonction_id, statut, date_effet };
+    const champsObligatoires = {
+        nom,
+        prenoms,
+        im,
+        date_naissance,
+        telephone,
+        service_id,
+        fonction_id,
+        statut,
+        date_effet,
+    };
     const manquants = Object.entries(champsObligatoires)
         .filter(([_, valeur]) => !valeur || valeur.toString().trim() === "")
         .map(([cle]) => cle);
@@ -141,9 +172,20 @@ async function addStaff(req, res) {
         });
     }
 
-    const serviceId  = parseInt(service_id, 10);
+    // Si le grade n'a pas pu être résolu
+    // (uniquement si des infos de grade ont été fournies mais ne correspondent à rien)
+    if (!gradeIdResolu && (categorie || classe)) {
+        validators.supprimerFichierSiExiste(cheminFichier);
+        return res.status(400).json({
+            message: estStagiaire
+                ? `Grade STAGIAIRE introuvable pour la catégorie ${categorie}. Veuillez vérifier la configuration des grades.`
+                : `Grade introuvable pour la combinaison : Catégorie ${categorie}, Classe ${classe}, Échelon ${echelon}. Veuillez vérifier la configuration des grades.`,
+        });
+    }
+
+    const serviceId = parseInt(service_id, 10);
     const fonctionId = parseInt(fonction_id, 10);
-    const gradeId    = parseInt(gradeIdResolu, 10);
+    const gradeId = parseInt(gradeIdResolu, 10);
     if (Number.isNaN(serviceId) || serviceId <= 0) {
         return erreur400("service_id invalide");
     }
@@ -159,28 +201,45 @@ async function addStaff(req, res) {
 
     // ── 2. Validations métier ─────────────────────────────────────
     const erreurIM = validators.validerIM(im);
-    if(erreurIM) return erreur400(erreurIM);
+    if (erreurIM) return erreur400(erreurIM);
 
     const erreurAge = validators.validerAge(date_naissance);
-    if(erreurAge) return erreur400(erreurAge);
+    if (erreurAge) return erreur400(erreurAge);
+
+    const erreurEntree = validators.validerChronologie(
+        date_naissance,
+        date_entree_admin,
+        "date d'entrée",
+    );
+    if (erreurEntree) return erreur400(erreurEntree);
+
+    const erreurEffet = validators.validerChronologie(
+        date_naissance,
+        date_effet,
+        "date d'effet",
+    );
+    if (erreurEffet) return erreur400(erreurEffet);
 
     const erreurTel = validators.validerTelephone(telephone);
-    if(erreurTel) return erreur400(erreurTel);
+    if (erreurTel) return erreur400(erreurTel);
 
     const erreurEmail = validators.validerEmail(email);
-    if(erreurEmail) return erreur400(erreurEmail);
+    if (erreurEmail) return erreur400(erreurEmail);
 
     // ── 3. Accès SIH ──────────────────────────────────────────────
     const accesBoolean = (donner_access ?? donner_acces) === "true";
     const erreurSIH = validators.validerAccesSIH({
-        donner_acces: accesBoolean, username, password,
-        aDejaUnCompte: false
-    })
-    if(erreurSIH) return erreur400(erreurSIH);
+        donner_acces: accesBoolean,
+        username,
+        password,
+        aDejaUnCompte: false,
+    });
+    if (erreurSIH) return erreur400(erreurSIH);
 
     // ── 4. Diplômes ───────────────────────────────────────────────
-    const { erreur: erreurDiplomes, diplomes } = validators.normaliserDiplomes(diplomesRaw);
-    if(erreurDiplomes) return erreur400(erreurDiplomes);
+    const { erreur: erreurDiplomes, diplomes } =
+        validators.normaliserDiplomes(diplomesRaw);
+    if (erreurDiplomes) return erreur400(erreurDiplomes);
 
     // ── 5. IM normalisé + unicité BDD ─────────────────────────────
     const imNormalise = validators.formatIM(im);
@@ -190,14 +249,14 @@ async function addStaff(req, res) {
         telephone: telephone?.trim(),
         email: email?.trim() || null,
     });
-    if(erreurUnicite) {
+    if (erreurUnicite) {
         validators.supprimerFichierSiExiste(cheminFichier);
         return res.status(409).json({ message: erreurUnicite });
     }
 
     // ── 6. Hachage mot de passe ───────────────────────────────────
     let password_hash = null;
-    if(accesBoolean) {
+    if (accesBoolean) {
         password_hash = await bcrypt.hash(password, 10);
     }
 
@@ -205,12 +264,18 @@ async function addStaff(req, res) {
     try {
         const { personnelId, personnelIm } = await staffModels.addPersonnel({
             nom: nom.trim().toUpperCase(),
-            prenoms: prenoms.trim().split(" ").map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" "),
+            prenoms: prenoms
+                .trim()
+                .split(" ")
+                .map(
+                    (p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase(),
+                )
+                .join(" "),
             im: imNormalise,
             date_naissance,
             id_grade_actuel: gradeId,
             // Supporte "num_arrete" (nom API) ET "arrete" (ancien nom frontend)
-            num_arrete: (num_arrete || req.body.arrete) || null,
+            num_arrete: num_arrete || req.body.arrete || null,
             date_effet,
             specialite: specialite?.trim() || null,
             telephone: telephone.trim(),
@@ -218,7 +283,9 @@ async function addStaff(req, res) {
             service_id: serviceId,
             fonction_id: fonctionId,
             statut: statutNormalise,
-            photo_profil: req.file ? `photo-profil-${imNormalise.replaceAll(" ", "")}.png` : "default-avatar.png",
+            photo_profil: req.file
+                ? `photo-profil-${imNormalise.replaceAll(" ", "")}.png`
+                : "default-avatar.png",
             diplomes,
             donner_acces: accesBoolean,
             username: accesBoolean ? username.trim() : null,
@@ -229,7 +296,7 @@ async function addStaff(req, res) {
         });
 
         // ── 8. Renommer le fichier photo ──────────────────────────
-        if(req.file) {
+        if (req.file) {
             const dossier = path.join(__dirname, "..", "..", "uploads");
             const ancienChemin = path.join(dossier, req.file.filename);
             const nouveauNom = `photo-profil-${personnelIm.toString().replaceAll(" ", "")}.png`;
@@ -240,19 +307,24 @@ async function addStaff(req, res) {
             } catch (error) {
                 validators.supprimerFichierSiExiste(ancienChemin);
                 console.error("[addStaff] Erreur renommage photo :", error);
-                return res.status(500).json({ message: "Erreur lors du traitement de la photo" });
+                return res
+                    .status(500)
+                    .json({ message: "Erreur lors du traitement de la photo" });
             }
         }
 
         res.status(201).json({
             message: "Personnel ajouté avec succès",
             personnelId,
-            matricule: personnelIm
+            matricule: personnelIm,
         });
     } catch (error) {
         validators.supprimerFichierSiExiste(cheminFichier);
         console.error("[addStaff] Erreur :", error);
-        if (error.code === 'P2002') return res.status(409).json({ message: 'Ce matricule ou username existe déjà.' });
+        if (error.code === "P2002")
+            return res
+                .status(409)
+                .json({ message: "Ce matricule ou username existe déjà." });
         res.status(500).json({ message: "Erreur interne du serveur" });
     }
 }
@@ -262,9 +334,8 @@ async function addStaff(req, res) {
 async function updateStaff(req, res) {
     const id = parseInt(req.params.id, 10);
 
-
     // ── 1. Valider l'id ───────────────────────────────────────────
-    if(isNaN(id) || id <= 0) {
+    if (isNaN(id) || id <= 0) {
         validators.supprimerFichierSiExiste(req.file?.path);
         return res.status(400).json({ message: "ID invalide" });
     }
@@ -279,14 +350,17 @@ async function updateStaff(req, res) {
         return res.status(500).json({ message: "Erreur interne du serveur" });
     }
 
-    if(!existant) {
+    if (!existant) {
         validators.supprimerFichierSiExiste(req.file?.path);
         return res.status(404).json({ message: "Personnel introuvable" });
     }
 
     // Helper : lit req.body et retourne undifined si le champ est absent/vide
     const body = req.body;
-    const ouString = (valeur) => (valeur !== undefined && valeur.trim?.() !== "" ? valeur.trim() : undefined);
+    const ouString = (valeur) =>
+        valeur !== undefined && valeur.trim?.() !== ""
+            ? valeur.trim()
+            : undefined;
     const ouInt = (valeur) => {
         const num = parseInt(valeur, 10);
         return isNaN(num) ? undefined : num;
@@ -301,13 +375,24 @@ async function updateStaff(req, res) {
     const echelon = ouString(body.echelon);
     let id_grade_actuel = ouInt(body.id_grade_actuel);
 
-    if (!id_grade_actuel && categorie && classe && echelon) {
-        const gradeFound = await staffModels.trouverGrade({ categorie, classe, echelon });
+    const estStagiaire = classe?.toUpperCase() === 'STAGIAIRE';
+    if (!id_grade_actuel && categorie && classe && (echelon || estStagiaire)) {
+        const gradeFound = await staffModels.trouverGrade({
+            categorie,
+            classe,
+            echelon: estStagiaire ? null : echelon,
+        });
         if (gradeFound) {
             id_grade_actuel = parseInt(gradeFound.id_grade, 10);
         } else {
             validators.supprimerFichierSiExiste(req.file?.path);
-            return res.status(400).json({ message: "Combinaison de grade (catégorie, classe, échelon) invalide" });
+            return res
+                .status(400)
+                .json({
+                    message: estStagiaire
+                        ? `Grade STAGIAIRE introuvable pour la catégorie ${categorie}. Veuillez vérifier la configuration des grades.`
+                        : `Combinaison de grade (catégorie, classe, échelon) invalide`,
+                });
         }
     }
     const specialite = ouString(body.specialite);
@@ -322,7 +407,7 @@ async function updateStaff(req, res) {
         validators.supprimerFichierSiExiste(req.file?.path);
         return res.status(400).json({ message });
     };
-    
+
     if (body.service_id !== undefined && service_id === undefined) {
         return erreur400("service_id invalide");
     }
@@ -349,62 +434,68 @@ async function updateStaff(req, res) {
 
     // ── 4. Validations — seulement pour les champs présents ───────
     // Si un champ est undefined (non envoyé), on ne le valide pas car il ne sera pas modifié de toute façon
-    if(date_naissance !== undefined) {
+    if (date_naissance !== undefined) {
         const erreurAge = validators.validerAge(date_naissance);
-        if(erreurAge) return erreur400(erreurAge);
+        if (erreurAge) return erreur400(erreurAge);
     }
 
-    if(telephone !== undefined) {
+    if (telephone !== undefined) {
         const erreurTel = validators.validerTelephone(telephone);
-        if(erreurTel) return erreur400(erreurTel);
+        if (erreurTel) return erreur400(erreurTel);
     }
 
-    if(email !== undefined) {
+    if (email !== undefined) {
         const erreurEmail = validators.validerEmail(email);
-        if(erreurEmail) return erreur400(erreurEmail);
+        if (erreurEmail) return erreur400(erreurEmail);
     }
 
     // ── 5. Unicité BDD — en excluant le personnel actuel ─────────
     // On ne vérifie que les champs qui ont effectivement changé
     const champsUnicite = {};
-    if(telephone !== undefined) champsUnicite.telephone = telephone;
-    if(email !== undefined) champsUnicite.email = email;
+    if (telephone !== undefined) champsUnicite.telephone = telephone;
+    if (email !== undefined) champsUnicite.email = email;
 
-    if(Object.keys(champsUnicite).length > 0) {
+    if (Object.keys(champsUnicite).length > 0) {
         const erreurUnicite = await validators.verifierUniciteBDD({
             ...champsUnicite,
             excludedId: id,
         });
-        
-        if(erreurUnicite) {
+
+        if (erreurUnicite) {
             validators.supprimerFichierSiExiste(req.file?.path);
             return res.status(409).json({ message: erreurUnicite });
         }
     }
 
     // ── 6. Diplômes ───────────────────────────────────────────────
-    const { erreur: erreurDiplomes, diplomes } = validators.normaliserDiplomes(body.diplomes);
-    if(erreurDiplomes) return erreur400(erreurDiplomes);
+    const { erreur: erreurDiplomes, diplomes } = validators.normaliserDiplomes(
+        body.diplomes,
+    );
+    if (erreurDiplomes) return erreur400(erreurDiplomes);
 
     // ── 7. Photo de profil ────────────────────────────────────────
     const matricule = existant.matricule;
-    
-    const anciennePhoto = existant.photo_profil ? existant.photo_profil.replace("/uploads/", "") : null;
+
+    const anciennePhoto = existant.photo_profil
+        ? existant.photo_profil.replace("/uploads/", "")
+        : null;
     let photo_profil = undefined; // si pas de changement
 
-    if(req.file) {
-        const nomFinal     = `photo-profil-${matricule.toString().replace(" ", "")}.png`;
-        const dossier      = path.join(__dirname, "..", "..", "uploads");
+    if (req.file) {
+        const nomFinal = `photo-profil-${matricule.toString().replace(" ", "")}.png`;
+        const dossier = path.join(__dirname, "..", "..", "uploads");
         const ancienChemin = path.join(dossier, req.file.filename);
         const nouveauChemin = path.join(dossier, nomFinal);
 
         try {
             fs.renameSync(ancienChemin, nouveauChemin);
-            photo_profil = nomFinal
+            photo_profil = nomFinal;
         } catch (error) {
             validators.supprimerFichierSiExiste(req.file.path);
-            console.error("[updateStaff] Erreur renommage photo :", error)
-            return res.status(500).json({ message: "Erreur lors du traitement de la photo" });
+            console.error("[updateStaff] Erreur renommage photo :", error);
+            return res
+                .status(500)
+                .json({ message: "Erreur lors du traitement de la photo" });
         }
     }
 
@@ -414,7 +505,7 @@ async function updateStaff(req, res) {
 
     let password_hash = undefined;
 
-    if(donner_acces) {
+    if (donner_acces) {
         const erreurSIH = validators.validerAccesSIH({
             donner_acces: true,
             username: body.username?.trim(),
@@ -422,7 +513,7 @@ async function updateStaff(req, res) {
             aDejaUnCompte,
         });
 
-        if(body.password) {
+        if (body.password) {
             password_hash = await bcrypt.hash(body.password, 10);
         }
     }
@@ -431,8 +522,17 @@ async function updateStaff(req, res) {
     try {
         await staffModels.updatePersonnel({
             id,
-            nom:          nom ? nom.toUpperCase() : undefined,
-            prenoms:      prenoms ? prenoms.split(" ").map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(" ") : undefined,
+            nom: nom ? nom.toUpperCase() : undefined,
+            prenoms: prenoms
+                ? prenoms
+                      .split(" ")
+                      .map(
+                          (p) =>
+                              p.charAt(0).toUpperCase() +
+                              p.slice(1).toLowerCase(),
+                      )
+                      .join(" ")
+                : undefined,
             date_naissance,
             categorie,
             classe,
@@ -443,12 +543,15 @@ async function updateStaff(req, res) {
             email,
             service_id,
             fonction_id,
-            statut: statut !== undefined ? validators.normaliserStatut(statut) : undefined,
+            statut:
+                statut !== undefined
+                    ? validators.normaliserStatut(statut)
+                    : undefined,
             photo_profil,
-            anciennePhoto, 
+            anciennePhoto,
             diplomes,
             donner_acces: donner_acces || undefined,
-            username:     donner_acces ? body.username?.trim() : undefined,
+            username: donner_acces ? body.username?.trim() : undefined,
             password_hash,
         });
 
@@ -457,11 +560,16 @@ async function updateStaff(req, res) {
 
         res.status(200).json({ message: "Personnel mis à jour avec succès" });
     } catch (error) {
-        if(req.file && photo_profil) {
-            validators.supprimerFichierSiExiste(path.join(__dirname, "..", "..", "uploads", photo_profil));
+        if (req.file && photo_profil) {
+            validators.supprimerFichierSiExiste(
+                path.join(__dirname, "..", "..", "uploads", photo_profil),
+            );
         }
         console.error("[updateStaff] Erreur :", error);
-        if (error.code === 'P2002') return res.status(409).json({ message: 'Ce username existe déjà.' });
+        if (error.code === "P2002")
+            return res
+                .status(409)
+                .json({ message: "Ce username existe déjà." });
         res.status(500).json({ message: "Erreur interne du serveur" });
     }
 }
@@ -471,7 +579,7 @@ async function archiverStaff(req, res) {
     const id = parseInt(req.params.id, 10);
 
     if (isNaN(id) || id <= 0) {
-        return res.status(400).json({ message: 'ID invalide' });
+        return res.status(400).json({ message: "ID invalide" });
     }
 
     try {
@@ -479,17 +587,19 @@ async function archiverStaff(req, res) {
         const result = await staffModels.archiverPersonnel(id, adminId);
 
         if (!result.found) {
-            return res.status(404).json({ message: 'Personnel introuvable' });
+            return res.status(404).json({ message: "Personnel introuvable" });
         }
 
         if (result.dejaArchive) {
-            return res.status(409).json({ message: 'Ce personnel est déjà sorti du service' });
+            return res
+                .status(409)
+                .json({ message: "Ce personnel est déjà sorti du service" });
         }
 
-        res.status(200).json({ message: 'Personnel archivé avec succès' });
+        res.status(200).json({ message: "Personnel archivé avec succès" });
     } catch (error) {
-        console.error('[archiverStaff] Erreur :', error);
-        res.status(500).json({ message: 'Erreur interne du serveur' });
+        console.error("[archiverStaff] Erreur :", error);
+        res.status(500).json({ message: "Erreur interne du serveur" });
     }
 }
 
@@ -499,10 +609,19 @@ async function getArchivedStaff(req, res) {
     const department = req.query.department || "";
     const fonction = req.query.fonction || "";
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
+    const limit = Math.min(
+        Math.max(parseInt(req.query.limit, 10) || 10, 1),
+        100,
+    );
 
     try {
-        const result = await staffModels.getArchivedStaff({ search, department, fonction, page, limit });
+        const result = await staffModels.getArchivedStaff({
+            search,
+            department,
+            fonction,
+            page,
+            limit,
+        });
         res.status(200).json({
             message: "Archives récupérées avec succès",
             data: result.data,
@@ -529,8 +648,10 @@ async function getArchivedProfile(req, res) {
             return res.status(404).json({ message: "Personnel introuvable" });
         }
 
-        if (profile.statut !== 'Sorti') {
-            return res.status(403).json({ message: "Ce personnel n'est pas archivé" });
+        if (profile.statut !== "Sorti") {
+            return res
+                .status(403)
+                .json({ message: "Ce personnel n'est pas archivé" });
         }
 
         res.status(200).json({

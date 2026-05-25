@@ -1,13 +1,13 @@
 // const pool = require('../config/db');
-const prisma = require('../config/prisma');
+const prisma = require("../config/prisma");
 // ------------------------------------------------------------------
 //  verification de l'age (>= 16 ans)
 // ------------------------------------------------------------------
-function validerAge(date_naissance){
+function validerAge(date_naissance) {
     const naissance = new Date(date_naissance);
 
     // verification si date de naissance n'est pas un nombre
-    if(isNaN(naissance.getTime())) {
+    if (isNaN(naissance.getTime())) {
         return "Date de naissance invalide.";
     }
 
@@ -18,11 +18,18 @@ function validerAge(date_naissance){
     // monthdiff < 0 => annif pas encore passé
     // monthdiff === 0 et jour pas encore passé => annif pas encore passé
     const monthDiff = today.getMonth() - naissance.getMonth();
-    if(monthDiff < 0 || (monthDiff === 0 && today.getDate() < naissance.getDate())) {
+    if (
+        monthDiff < 0 ||
+        (monthDiff === 0 && today.getDate() < naissance.getDate())
+    ) {
         age--;
     }
 
-    if(age <= 16) {
+    if (age > 70) {
+        return "L'âge ne doit pas dépasser 70 ans.";
+    }
+
+    if (age <= 16) {
         return "L'âge doit être supérieur à 16 ans.";
     }
 
@@ -32,11 +39,23 @@ function validerAge(date_naissance){
 /// ------------------------------------------------------------------
 //  verification de l'email
 // ------------------------------------------------------------------
-function validerEmail(email) {
-    if(!email) return null;
 
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // @gmail.com, @chu-anosiala.com, @blabla.com 
-    if(!regex.test(email)) {
+// ------------------------------------------------------------------
+//  Vérification de la chronologie des dates
+// ------------------------------------------------------------------
+function validerChronologie(dateNaissance, dateTest, label) {
+    if (!dateNaissance || !dateTest) return null;
+    if (new Date(dateTest) < new Date(dateNaissance)) {
+        return `La ${label} ne peut pas être antérieure à la date de naissance.`;
+    }
+    return null;
+}
+
+function validerEmail(email) {
+    if (!email) return null;
+
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // @gmail.com, @chu-anosiala.com, @blabla.com
+    if (!regex.test(email)) {
         return "L'adresse mail n'est pas valide.";
     }
 
@@ -48,12 +67,12 @@ function validerEmail(email) {
 // ------------------------------------------------------------------
 // 0340000000 - 034 00 000 00 - +261 34 00 000 00
 function validerTelephone(telephone) {
-    if(!telephone) return "Le numero de telephone est requis.";
+    if (!telephone) return "Le numero de telephone est requis.";
 
     const tel = telephone.trim().replace(/[\s\-]/g, ""); // retire les espaces et tirets
     const telRegex = /^(\+261\d{9}|0\d{9})$/;
 
-    if(!telRegex.test(tel)) {
+    if (!telRegex.test(tel)) {
         return "Le numero de telephone n'est pas valide (format attendu : 034 00 000 00 ou +261 34 000 0000).";
     }
 
@@ -64,16 +83,16 @@ function validerTelephone(telephone) {
 //  verification du matricule 6 chiffres (obligatoire)
 // ------------------------------------------------------------------
 function validerIM(im) {
-    if(!im) return "Le matricule est requis."
+    if (!im) return "Le matricule est requis.";
 
     const imFormatter = im.toString().trim().replace(/\s+/g, "");
-    
-    if(imFormatter.length !== 6) {
-        return "Le matricule doit contenir 6 chiffres."
+
+    if (imFormatter.length !== 6) {
+        return "Le matricule doit contenir 6 chiffres.";
     }
 
-    if(!/^\d+$/.test(imFormatter)) {
-        return "Le matricule doit contenir uniquement des chiffres."
+    if (!/^\d+$/.test(imFormatter)) {
+        return "Le matricule doit contenir uniquement des chiffres.";
     }
 
     return null;
@@ -84,9 +103,9 @@ function validerIM(im) {
 // ------------------------------------------------------------------
 function formatIM(im) {
     const chiffres = im.toString().trim().replace(/\s+/g, "");
-    
-    if(chiffres.length >= 6) {
-        return `${chiffres.slice(0, 3)} ${chiffres.slice(3)}`
+
+    if (chiffres.length >= 6) {
+        return `${chiffres.slice(0, 3)} ${chiffres.slice(3)}`;
     }
 
     return chiffres;
@@ -98,9 +117,9 @@ function formatIM(im) {
 const STATUTS_ENUM_MAP = {
     "En activité": "En_activit_",
     "En absence": "En_absence",
-    "Sortie": "Sortie",
-    "En_activit_": "En_activit_",
-    "En_absence": "En_absence",
+    Sortie: "Sortie",
+    En_activit_: "En_activit_",
+    En_absence: "En_absence",
 };
 
 const STATUTS_LABEL_MAP = {
@@ -121,26 +140,33 @@ function formatStatutPourClient(statutEnum) {
 }
 
 function normaliserDiplomes(diplomesRaw) {
-    if(!diplomesRaw) {
-        return { erreur: null, diplomes: [] } // diplomes non obligatoires
+    if (!diplomesRaw) {
+        return { erreur: null, diplomes: [] }; // diplomes non obligatoires
     }
 
     try {
-        const diplomesParsed = typeof diplomesRaw === 'string'
-            ? JSON.parse(diplomesRaw)
-            : diplomesRaw;
+        const diplomesParsed =
+            typeof diplomesRaw === "string"
+                ? JSON.parse(diplomesRaw)
+                : diplomesRaw;
 
-        if(!Array.isArray(diplomesParsed)) throw new Error("Format Diplomes invalide.");
+        if (!Array.isArray(diplomesParsed))
+            throw new Error("Format Diplomes invalide.");
 
-        const diplomes = diplomesParsed.map(d => ({
-            // id present => modification, sinon creation
-            ...(d?.id ? { id: parseInt(d.id, 10) } : {}),
-            libelle: d.libelle?.trim() || "",
-            etablissement: d.etablissement?.trim() || null,
-            annee_obtention: d?.annee_obtention && Number.isFinite(Number(d.annee_obtention)) ? Number(d.annee_obtention) : null,
-            est_principal: Boolean(d?.est_principal),
-        }))
-        .filter(d => d.libelle !== "");
+        const diplomes = diplomesParsed
+            .map((d) => ({
+                // id present => modification, sinon creation
+                ...(d?.id ? { id: parseInt(d.id, 10) } : {}),
+                libelle: d.libelle?.trim() || "",
+                etablissement: d.etablissement?.trim() || null,
+                annee_obtention:
+                    d?.annee_obtention &&
+                    Number.isFinite(Number(d.annee_obtention))
+                        ? Number(d.annee_obtention)
+                        : null,
+                est_principal: Boolean(d?.est_principal),
+            }))
+            .filter((d) => d.libelle !== "");
 
         return { erreur: null, diplomes };
     } catch (error) {
@@ -153,29 +179,29 @@ function normaliserDiplomes(diplomesRaw) {
 // ------------------------------------------------------------------
 async function verifierUniciteBDD({ im, telephone, email, excludedId = null }) {
     const exclusion = excludedId ? { NOT: { id: BigInt(excludedId) } } : {}; // si excludedId existe, on l'exclut de la verification
-    
+
     if (im !== undefined) {
         const doublon = await prisma.personnel.findFirst({
             where: { im, ...exclusion },
         });
-        if(doublon) return "Ce matricule existe déjà.";
+        if (doublon) return "Ce matricule existe déjà.";
     }
 
     if (telephone !== undefined && telephone !== null) {
         const doublon = await prisma.personnel.findFirst({
             where: { telephone, ...exclusion },
         });
-        if(doublon) return "Ce numero de telephone existe déjà.";
+        if (doublon) return "Ce numero de telephone existe déjà.";
     }
 
-    if(email !== undefined && email !== null) {
+    if (email !== undefined && email !== null) {
         const doublon = await prisma.personnel.findFirst({
             where: { email, ...exclusion },
         });
-        if(doublon) return "Cet email existe déjà.";
+        if (doublon) return "Cet email existe déjà.";
     }
 
-    return null; // pas de doublon 
+    return null; // pas de doublon
 }
 
 // ------------------------------------------------------------------
@@ -185,14 +211,19 @@ async function verifierUniciteBDD({ im, telephone, email, excludedId = null }) {
 //      - Si donner_access = true ET compte existant => password optionnel
 //        (si avec password : on change le mdp sinon on keep l'ancien)
 // ------------------------------------------------------------------
-function validerAccesSIH({ donner_acces, username, password, aDejaUnCompte = false }) {
-    if(!donner_acces) return null;
+function validerAccesSIH({
+    donner_acces,
+    username,
+    password,
+    aDejaUnCompte = false,
+}) {
+    if (!donner_acces) return null;
 
-    if(!username || username.trim() === "") {
+    if (!username || username.trim() === "") {
         return "Le username est requis pour donner accès au SIH.";
     }
 
-    if(!aDejaUnCompte && (!password || password.trim() === "")) {
+    if (!aDejaUnCompte && (!password || password.trim() === "")) {
         return "Le password est requis pour créer un compte.";
     }
 
@@ -203,10 +234,10 @@ function validerAccesSIH({ donner_acces, username, password, aDejaUnCompte = fal
 //  supprimer un fichier du disque si validation echoue
 // ------------------------------------------------------------------
 function supprimerFichierSiExiste(chemin) {
-    const fs = require('fs');
+    const fs = require("fs");
 
     try {
-        if(chemin && fs.existsSync(chemin)) {
+        if (chemin && fs.existsSync(chemin)) {
             fs.unlinkSync(chemin);
         }
     } catch {}
@@ -223,5 +254,6 @@ module.exports = {
     formatStatutPourClient,
     verifierUniciteBDD,
     validerAccesSIH,
-    supprimerFichierSiExiste
-}
+    supprimerFichierSiExiste,
+    validerChronologie,
+};

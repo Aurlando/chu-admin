@@ -665,13 +665,14 @@ async function archiverPersonnel(id, adminId) {
         });
 
         const dateSortieFormatee = formaterDate(dateSortie);
+        const nomComplet = `${personnel.nom}${personnel.prenoms ? ' ' + personnel.prenoms : ''}`;
         await tx.ref_audit_log.create({
             data: {
                 action: 'ARCHIVAGE_PERSONNEL',
                 cible_type: 'personnel',
                 cible_id: BigInt(id),
                 fait_par_id: adminId ? BigInt(adminId) : null,
-                details: { description: `Le personnel ${personnel.nom} ${personnel.prenoms} a été archivé le ${dateSortieFormatee}` },
+                details: { description: `${nomComplet} a été archivé le ${dateSortieFormatee}` },
             },
         });
     });
@@ -680,13 +681,17 @@ async function archiverPersonnel(id, adminId) {
 }
 
 // ── TROUVER UN GRADE par categorie + classe + echelon ──────────────
+// Pour la classe STAGIAIRE, l'échelon est absent (null) : on cherche uniquement par categorie + classe
 async function trouverGrade({ categorie, classe, echelon }) {
+    const where = { categorie, classe };
+
+    // N'ajouter le filtre echelon que s'il est fourni (pas pour les STAGIAIRES)
+    if (echelon !== null && echelon !== undefined && echelon !== '') {
+        where.echelon = parseInt(echelon, 10);
+    }
+
     return prisma.grade.findFirst({
-        where: {
-            categorie,
-            classe,
-            echelon: parseInt(echelon, 10),
-        },
+        where,
         select: { id_grade: true, duree_mois: true, classe: true },
     });
 }
