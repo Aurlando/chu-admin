@@ -196,6 +196,7 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
   const [submitting, setSubmitting] = useState(false);
   const [success,    setSuccess]    = useState(false);
   const [apiError,   setApiError]   = useState(null);
+  const [showPassword, setShowPassword] = useState(false); // [AJOUTÉ] État pour afficher/masquer le mot de passe
 
   const [confirmSave, setConfirmSave] = useState(false);
   const [confirmleave, setConfirmLeave] = useState(false);
@@ -1003,10 +1004,57 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                         onChange={e => handleChange("username", e.target.value)}
                         className={inp("username")} autoComplete="new-password" />
                     </Field>
-                    <Field label="Mot de passe" required dark={dark} error={errors.password}>
-                      <input type="password" placeholder="Minimum 6 caractères" value={form.password}
-                        onChange={e => handleChange("password", e.target.value)}
-                        className={inp("password")} autoComplete="new-password" />
+                    <Field label="Mot de passe" required dark={dark} error={errors.password}> {/* [MODIFIÉ] */}
+                      <div className="relative"> {/* [AJOUTÉ] Conteneur pour l'icône */}
+                        <input
+                          type={showPassword ? "text" : "password"} // [MODIFIÉ] Type dynamique
+                          placeholder="Minimum 6 caractères"
+                          value={form.password}
+                          onChange={e => handleChange("password", e.target.value)}
+                          className={inp("password")}
+                          autoComplete="new-password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)} // [AJOUTÉ] Toggle la visibilité
+                          className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center
+                            ${dark ? "text-slate-500 hover:text-slate-300" : "text-slate-400 hover:text-slate-600"}`}
+                          title={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                        >
+                          {showPassword ? (
+                            <svg // Icône "œil barré"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                              />
+                            </svg>
+                          ) : (
+                            <svg // Icône "œil"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </Field>
                     <Field label="Rôle" required dark={dark}>
                       <select value={form.role || "user"} onChange={e => handleChange("role", e.target.value)} className={sel("role")}>
