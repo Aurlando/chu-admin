@@ -142,7 +142,7 @@ async function getAvancementStatsNotification() {
     return stats;
 }
 
-async function effectuerAvancement({ personnelId, num_arrete, date_signature, date_effet }) {
+async function effectuerAvancement({ personnelId, num_arrete, date_signature, date_effet, adminId }) {
     const dateEffet  = new Date(date_effet);
     const dateSignature = new Date(date_signature);
 
@@ -153,6 +153,8 @@ async function effectuerAvancement({ personnelId, num_arrete, date_signature, da
             select: {
                 id: true,
                 statut: true,
+                nom: true,
+                prenoms: true,
                 grade: {
                     select: {
                         id_grade: true,
@@ -233,6 +235,22 @@ async function effectuerAvancement({ personnelId, num_arrete, date_signature, da
                 date_effet: dateEffet,
                 date_prochain_avancement: dateProchain,
                 type_mouvement,
+            },
+        });
+
+        const dSig = new Date(dateSignature);
+        const dateSignatureFormatee = `${String(dSig.getDate()).padStart(2, '0')}/${String(dSig.getMonth() + 1).padStart(2, '0')}/${dSig.getFullYear()}`;
+        const nomComplet = `${personnel.nom}${personnel.prenoms ? ' ' + personnel.prenoms : ''}`;
+        const libelleGrade = `${gradeSuivant.categorie} - ${gradeSuivant.classe} - Echelon ${gradeSuivant.echelon}`;
+        const actionStr = type_mouvement === 'AVANCEMENT_DECHELON' ? 'AVANCEMENT_ECHELON' : 'PROMOTION_CLASSE';
+
+        await tx.ref_audit_log.create({
+            data: {
+                action: actionStr,
+                cible_type: 'personnel',
+                cible_id: BigInt(personnelId),
+                fait_par_id: adminId ? BigInt(adminId) : null,
+                details: { description: `${nomComplet} a ete promu au ${libelleGrade} le ${dateSignatureFormatee}` },
             },
         });
 

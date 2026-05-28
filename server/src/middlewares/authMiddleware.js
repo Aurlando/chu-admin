@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const prisma = require("../config/prisma");
 
 function parseBearerToken(authHeader) {
     if (typeof authHeader !== "string") {
@@ -17,7 +18,7 @@ function parseBearerToken(authHeader) {
     return token.trim();
 }
 
-function verifyToken(req, res, next) {
+async function verifyToken(req, res, next) {
     const authHeader =
         req.headers["authorization"] || req.headers["Authorization"];
     const token = parseBearerToken(authHeader);
@@ -28,14 +29,29 @@ function verifyToken(req, res, next) {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+        // Vérifier si l'utilisateur existe toujours en base et est actif
+        const user = await prisma.auth_user.findUnique({
+            where: { id: BigInt(decoded.id) },
+        });
+
+        if (!user || !user.actif) {
+            return res
+                .status(401)
+                .json({
+                    message: "Session invalide ou utilisateur introuvable",
+                });
+        }
+
         req.user = decoded;
         next();
     } catch (error) {
-        if (error.name === "TokenExpiredError") {
-            return res.status(401).json({ message: "Token expiré" });
-        }
+        const message =
+            error.name === "TokenExpiredError"
+                ? "Token expiré"
+                : "Token invalide";
 
-        return res.status(403).json({ message: "Token invalide" });
+        return res.status(401).json({ message });
     }
 }
 

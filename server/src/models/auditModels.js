@@ -33,7 +33,7 @@ async function getAllAuditLogs({ page = 1, limit = 20 } = {}) {
     ]);
 
     return {
-        data: logs.map(l = ({
+        data: logs.map(l => ({
             id: l.id,
             action: l.action,
             cible_type: l.cible_type,
