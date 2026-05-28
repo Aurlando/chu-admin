@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import SearchInput from "./SearchInput";
 
 // ── À adapter selon ton backend
 const API_BASE = "http://localhost:3000";
@@ -92,7 +93,6 @@ function StatCard({ icon, value, label, colorClass, bgClass, dark }) {
             <div
                 className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${bgClass}`}
             >
-            
                 {icon}
             </div>
             <div>
@@ -111,7 +111,6 @@ function StatCard({ icon, value, label, colorClass, bgClass, dark }) {
         </div>
     );
 }
-
 
 // ════════════════════════════════════
 // ResetPasswordModal
@@ -381,7 +380,7 @@ function ResetPasswordModal({
         </div>
     );
 }
-export default function SecurityCredentials({ dark }) {
+export default function SecurityCredentials({ dark, onNavigate }) {
     const token = localStorage.getItem("token");
 
     const [staff, setStaff] = useState([]);
@@ -407,8 +406,8 @@ export default function SecurityCredentials({ dark }) {
     const showToast = (msg) => {
         if (toastTimer.current) clearTimeout(toastTimer.current);
         setToast({ show: true, msg });
-        toastTimer.current = setTimeout(() =>
-            setToast({ show: false, msg: "" }),
+        toastTimer.current = setTimeout(
+            () => setToast({ show: false, msg: "" }),
             1500, // Disparition rapide après 1.5 secondes
         );
     };
@@ -453,8 +452,6 @@ export default function SecurityCredentials({ dark }) {
         }, 400);
     };
 
-
-
     // ── PATCH /security/:id/reset-password
     const handleResetPassword = (accountId, newPassword) => {
         setResetting(true);
@@ -495,11 +492,12 @@ export default function SecurityCredentials({ dark }) {
                 const text = await r.text();
                 const json = text ? JSON.parse(text) : {};
                 showToast(json.message ?? "Statut du compte mis à jour");
-                const newActif = json.actif ?? json.data?.actif ?? !member.actif;
+                const newActif =
+                    json.actif ?? json.data?.actif ?? !member.actif;
                 setStaff((prev) =>
                     prev.map((s) =>
-                        s.id === member.id ? { ...s, actif: newActif } : s
-                    )
+                        s.id === member.id ? { ...s, actif: newActif } : s,
+                    ),
                 );
             })
             .catch((err) => showToast(`Erreur : ${err.message}`))
@@ -508,10 +506,7 @@ export default function SecurityCredentials({ dark }) {
 
     // ── GET /security/audit-log
     const handleViewAuditLog = () => {
-        showToast("Chargement des audit logs...");
-        // Vous pouvez ajouter une navigation ici ou ouvrir un modal avec les audit logs
-        // Pour maintenant, on affiche juste un toast
-        window.open(`${API_SECURITY}/audit-log`, "_blank");
+        onNavigate?.("Audit Logs");
     };
 
     // Pagination
@@ -555,7 +550,6 @@ export default function SecurityCredentials({ dark }) {
 
     return (
         <div className={`flex-1 overflow-auto ${bg}`}>
-
             {/* Modal reset password */}
             <ResetPasswordModal
                 open={resetModal.open}
@@ -748,63 +742,16 @@ export default function SecurityCredentials({ dark }) {
                     <div
                         className={`flex items-center gap-3 px-4 py-3.5 border-b ${border}`}
                     >
-                        <div className="relative flex-1">
-                            <svg
-                                className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${sub}`}
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                                />
-                            </svg>
-                            <input
-                                type="text"
-                                placeholder="Filtrer par nom, rôle ou identifiant…"
-                                onChange={(e) => handleSearch(e.target.value)}
-                                className={`w-full pl-9 pr-10 py-2.5 rounded-xl border text-sm outline-none
-                  transition-all font-[inherit] ${inputCls}`}
-                            />
-                            {search && (
-                                <button
-                                    onClick={() => {
-                                        setSearch("");
-                                        setPage(1);
-                                        // No need to call handleSearch here, as setting search state will trigger useEffect
-                                    }}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
-                                    title="Effacer la recherche"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            )}
-                        </div>
-                        <button
-                            onClick={() => showToast("Export déclenché")}
-                            className={`w-9 h-9 rounded-xl border flex items-center justify-center
-                shrink-0 transition-all cursor-pointer ${iconBtn}`}
-                            title="Exporter"
-                        >
-                            <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                                />
-                            </svg>
-                        </button>
+                        <SearchInput
+                            value={search}
+                            onChange={(val) => {
+                                handleSearch(val);
+                                if (!val) setPage(1);
+                            }}
+                            dark={dark}
+                            placeholder="Filtrer par nom, rôle ou identifiant…"
+                            className="flex-1"
+                        />
                     </div>
 
                     {/* Erreur */}

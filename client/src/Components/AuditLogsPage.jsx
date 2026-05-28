@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import SearchInput from "./SearchInput";
 import "../App.css";
 
 const API_BASE = "http://localhost:3000";
@@ -446,50 +447,13 @@ export default function AuditLogsPage({ dark }) {
                 <div
                     className={`rounded-2xl border p-4 flex flex-col sm:flex-row gap-3 ${card}`}
                 >
-                    <div className="relative flex-1">
-                        <svg
-                            className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${sub}`}
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                            />
-                        </svg>
-                        <input
-                            type="text"
-                            placeholder="Rechercher par description ou auteur…"
-                            value={searchText}
-                            onChange={(e) => setSearchText(e.target.value)}
-                            className={`${inputCls} w-full pl-9 pr-8`}
-                        />
-                        {searchText && (
-                            <button
-                                onClick={() => setSearchText("")}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
-                                title="Effacer la recherche"
-                            >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="w-4 h-4"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={3}
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M6 18L18 6M6 6l12 12"
-                                    />
-                                </svg>
-                            </button>
-                        )}
-                    </div>
+                <SearchInput 
+                    value={searchText} 
+                    onChange={setSearchText} 
+                    dark={dark} 
+                    placeholder="Rechercher par description ou auteur…" 
+                    className="flex-1"
+                />
                     <select
                         value={filterAction}
                         onChange={(e) => setFilterAction(e.target.value)}
