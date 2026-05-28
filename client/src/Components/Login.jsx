@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
+import ToggleMode from "./ToggleMode";
 
 export default function Login({ onLoginSuccess }) {
     const [darkMode, setDarkMode] = useState(
-        () => window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        () =>
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches,
     );
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
@@ -19,12 +22,12 @@ export default function Login({ onLoginSuccess }) {
     // Permet de basculer automatiquement entre les modes clair et sombre en fonction des préférences de l'utilisateur
     useEffect(() => {
         if (!window.matchMedia) return;
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
         const handleChange = (e) => setDarkMode(e.matches);
-        
+
         if (mediaQuery.addEventListener) {
-            mediaQuery.addEventListener('change', handleChange);
-            return () => mediaQuery.removeEventListener('change', handleChange);
+            mediaQuery.addEventListener("change", handleChange);
+            return () => mediaQuery.removeEventListener("change", handleChange);
         } else {
             mediaQuery.addListener(handleChange);
             return () => mediaQuery.removeListener(handleChange);
@@ -65,56 +68,22 @@ export default function Login({ onLoginSuccess }) {
 
     return (
         <div
-            className={`min-h-screen flex items-center justify-center transition-colors duration-500 ${
+            className={`relative min-h-screen flex items-center justify-center transition-colors duration-500 ${
                 darkMode
                     ? "bg-gray-950"
                     : "bg-linear-to-br from-slate-200 via-blue-100 to-indigo-200"
             }`}
         >
             {/* ── Bouton Toggle Nuit/Jour — coin supérieur droit ── */}
-            <button
-                onClick={() => setDarkMode(!darkMode)}
-                className={`fixed top-5 right-5 z-50 w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 cursor-pointer ${
-                    darkMode
-                        ? "bg-indigo-500 text-white hover:bg-indigo-400"
-                        : "bg-white text-indigo-600 hover:bg-indigo-50"
+            <ToggleMode
+                dark={darkMode}
+                onToggle={() => setDarkMode(!darkMode)}
+                className={`absolute bottom-75 left-260 shadow-xl transition-all duration-700 ${
+                    mounted
+                        ? "opacity-100 translate-y-0"
+                        : "opacity-0 -translate-y-4"
                 }`}
-                title={darkMode ? "Mode jour" : "Mode nuit"}
-            >
-                {darkMode ? (
-                    // Icône Soleil (mode jour)
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="w-5 h-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"
-                        />
-                    </svg>
-                ) : (
-                    // Icône Lune (mode nuit)
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="w-5 h-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"
-                        />
-                    </svg>
-                )}
-            </button>
+            />
 
             {/* ── Carte principale (animation d'entrée via mounted) ── */}
             <div
