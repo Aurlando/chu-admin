@@ -1,8 +1,7 @@
-const prisma = require('../config/prisma');
-const path = require('path');
-const fs = require('fs');
-const validators = require('../validators/staffValidators');
-
+const prisma = require("../config/prisma");
+const path = require("path");
+const fs = require("fs");
+const validators = require("../validators/staffValidators");
 
 // Calculer l'age à partir de la date de naissance
 // Équivalent de DATE_PART('year', AGE(date_naissance))
@@ -15,7 +14,10 @@ function calculerAge(date) {
     const today = new Date();
     let age = today.getFullYear() - naissance.getFullYear();
     const moisDiff = today.getMonth() - naissance.getMonth();
-    if (moisDiff < 0 || (moisDiff === 0 && today.getDate() < naissance.getDate())) {
+    if (
+        moisDiff < 0 ||
+        (moisDiff === 0 && today.getDate() < naissance.getDate())
+    ) {
         age--;
     }
     return age;
@@ -29,50 +31,56 @@ function formaterDate(date) {
     const d = new Date(date);
     if (isNaN(d.getTime())) return null;
 
-    const jour = String(d.getDate()).padStart(2, '0');
-    const mois = String(d.getMonth() + 1).padStart(2, '0');
+    const jour = String(d.getDate()).padStart(2, "0");
+    const mois = String(d.getMonth() + 1).padStart(2, "0");
     const annee = d.getFullYear();
 
     return `${jour}/${mois}/${annee}`;
 }
 
 // ── LISTE DU STAFF ────────────────────────────────────────────────
-async function getAllStaff({  search = "", department = "", fonction = "", page = 1, limit = 10, } = {}) {
+async function getAllStaff({
+    search = "",
+    department = "",
+    fonction = "",
+    page = 1,
+    limit = 10,
+} = {}) {
     // Construction du WHERE dynamique Prisma pour les filtres
     const where = {
         AND: [
             // Filtre permanent : n'afficher que le personnel actif (non archivé)
-            { statut: { not: 'Sortie' } },
+            { statut: { not: "Sortie" } },
         ],
-    }
+    };
 
     // Filtre de recherche (nom, prenoms ou matricule)
     if (search) {
         where.AND.push({
             OR: [
-                { nom: { contains: search, mode: 'insensitive' } },
-                { prenoms: { contains: search, mode: 'insensitive' } },
-                { im: { contains: search, mode: 'insensitive' } },
-            ]
-        })
+                { nom: { contains: search, mode: "insensitive" } },
+                { prenoms: { contains: search, mode: "insensitive" } },
+                { im: { contains: search, mode: "insensitive" } },
+            ],
+        });
     }
 
     // Filtre de departement
     if (department) {
         where.AND.push({
             service: {
-                libelle: { equals: department, mode: 'insensitive' }
-            }
-        })
+                libelle: { equals: department, mode: "insensitive" },
+            },
+        });
     }
 
     // Filtre de fonction
     if (fonction) {
         where.AND.push({
             fonction: {
-                libelle: { equals: fonction, mode: 'insensitive' }
-            }
-        })
+                libelle: { equals: fonction, mode: "insensitive" },
+            },
+        });
     }
 
     // Le filtre statut est toujours présent, on utilise directement where
@@ -88,16 +96,13 @@ async function getAllStaff({  search = "", department = "", fonction = "", page 
                 prenoms: true,
                 im: true,
                 service: {
-                    select: { libelle: true }
+                    select: { libelle: true },
                 },
                 fonction: {
-                    select: { libelle: true }
+                    select: { libelle: true },
                 },
             },
-            orderBy: [
-                { nom: 'asc' },
-                { prenoms: 'asc' },
-            ],
+            orderBy: [{ nom: "asc" }, { prenoms: "asc" }],
             // Pagination : skip = OFFSET, take = LIMIT
             skip: (page - 1) * limit,
             take: limit,
@@ -105,16 +110,18 @@ async function getAllStaff({  search = "", department = "", fonction = "", page 
         prisma.personnel.count({ where: whereClause }),
     ]);
 
-    const formatedData = data.map(p => ({
+    const formatedData = data.map((p) => ({
         id: p.id,
         nom: p.nom,
         prenoms: p.prenoms,
         matricule: p.im,
         departement: p.service
-            ? p.service.libelle.charAt(0).toUpperCase() + p.service.libelle.slice(1).toLowerCase()
+            ? p.service.libelle.charAt(0).toUpperCase() +
+              p.service.libelle.slice(1).toLowerCase()
             : null,
         service: p.fonction
-            ? p.fonction.libelle.charAt(0).toUpperCase() + p.fonction.libelle.slice(1).toLowerCase()
+            ? p.fonction.libelle.charAt(0).toUpperCase() +
+              p.fonction.libelle.slice(1).toLowerCase()
             : null,
     }));
 
@@ -130,33 +137,39 @@ async function getAllStaff({  search = "", department = "", fonction = "", page 
 }
 
 // ── LISTE DU STAFF ARCHIÉ (statut = Sortie) ──────────────────────────────────
-async function getArchivedStaff({ search = "", department = "", fonction = "", page = 1, limit = 10 } = {}) {
+async function getArchivedStaff({
+    search = "",
+    department = "",
+    fonction = "",
+    page = 1,
+    limit = 10,
+} = {}) {
     const where = {
         AND: [
             // Filtre permanent : uniquement les personnels archivés
-            { statut: 'Sortie' },
+            { statut: "Sortie" },
         ],
     };
 
     if (search) {
         where.AND.push({
             OR: [
-                { nom: { contains: search, mode: 'insensitive' } },
-                { prenoms: { contains: search, mode: 'insensitive' } },
-                { im: { contains: search, mode: 'insensitive' } },
-            ]
+                { nom: { contains: search, mode: "insensitive" } },
+                { prenoms: { contains: search, mode: "insensitive" } },
+                { im: { contains: search, mode: "insensitive" } },
+            ],
         });
     }
 
     if (department) {
         where.AND.push({
-            service: { libelle: { equals: department, mode: 'insensitive' } }
+            service: { libelle: { equals: department, mode: "insensitive" } },
         });
     }
 
     if (fonction) {
         where.AND.push({
-            fonction: { libelle: { equals: fonction, mode: 'insensitive' } }
+            fonction: { libelle: { equals: fonction, mode: "insensitive" } },
         });
     }
 
@@ -172,10 +185,7 @@ async function getArchivedStaff({ search = "", department = "", fonction = "", p
                 service: { select: { libelle: true } },
                 fonction: { select: { libelle: true } },
             },
-            orderBy: [
-                { date_sortie: 'desc' },
-                { nom: 'asc' },
-            ],
+            orderBy: [{ date_sortie: "desc" }, { nom: "asc" }],
             skip: (page - 1) * limit,
             take: limit,
         }),
@@ -183,17 +193,19 @@ async function getArchivedStaff({ search = "", department = "", fonction = "", p
     ]);
 
     return {
-        data: data.map(p => ({
+        data: data.map((p) => ({
             id: p.id,
             nom: p.nom,
             prenoms: p.prenoms,
             matricule: p.im,
             date_sortie: formaterDate(p.date_sortie),
             departement: p.service
-                ? p.service.libelle.charAt(0).toUpperCase() + p.service.libelle.slice(1).toLowerCase()
+                ? p.service.libelle.charAt(0).toUpperCase() +
+                  p.service.libelle.slice(1).toLowerCase()
                 : null,
             fonction: p.fonction
-                ? p.fonction.libelle.charAt(0).toUpperCase() + p.fonction.libelle.slice(1).toLowerCase()
+                ? p.fonction.libelle.charAt(0).toUpperCase() +
+                  p.fonction.libelle.slice(1).toLowerCase()
                 : null,
         })),
         pagination: {
@@ -210,12 +222,14 @@ async function getArchivedStaff({ search = "", department = "", fonction = "", p
 async function getDistinctDepartments() {
     const services = await prisma.service.findMany({
         select: { id: true, libelle: true },
-        orderBy: { libelle: 'asc' },
+        orderBy: { libelle: "asc" },
     });
 
-    return services.map(s => ({
+    return services.map((s) => ({
         id: s.id,
-        libelle: s.libelle.charAt(0).toUpperCase() + s.libelle.slice(1).toLowerCase(),
+        libelle:
+            s.libelle.charAt(0).toUpperCase() +
+            s.libelle.slice(1).toLowerCase(),
     }));
 }
 
@@ -223,14 +237,16 @@ async function getDistinctDepartments() {
 async function getDistinctFonctions() {
     const fonctions = await prisma.fonction.findMany({
         select: { id: true, libelle: true },
-        orderBy: { libelle: 'asc' },
+        orderBy: { libelle: "asc" },
     });
 
-    return fonctions.map(f => ({
+    return fonctions.map((f) => ({
         id: f.id,
-        libelle: f.libelle.charAt(0).toUpperCase() + f.libelle.slice(1).toLowerCase(),
+        libelle:
+            f.libelle.charAt(0).toUpperCase() +
+            f.libelle.slice(1).toLowerCase(),
     }));
-};
+}
 
 // ── PROFIL ────────────────────────────────────────────────────────
 async function getStaffById(id) {
@@ -239,13 +255,13 @@ async function getStaffById(id) {
 
         include: {
             service: {
-                select: { id: true, libelle: true }
+                select: { id: true, libelle: true },
             },
             fonction: {
-                select: { id: true, libelle: true }
+                select: { id: true, libelle: true },
             },
             diplome: {
-                orderBy: { est_principal: 'desc' },
+                orderBy: { est_principal: "desc" },
                 select: {
                     id: true,
                     libelle: true,
@@ -256,25 +272,25 @@ async function getStaffById(id) {
             },
             grade: {
                 select: {
-                    id_grade:         true,
-                    categorie:        true,
-                    classe:           true,
-                    echelon:          true,
-                    indice:           true,
-                    duree_mois:       true,
+                    id_grade: true,
+                    categorie: true,
+                    classe: true,
+                    echelon: true,
+                    indice: true,
+                    duree_mois: true,
                     id_grade_suivant: true,
-                }
+                },
             },
             auth_user: {
                 select: {
                     id: true,
                     username: true,
-                }
+                },
             },
             avancements: {
-                orderBy: { date_effet: 'desc' },
+                orderBy: { date_effet: "desc" },
                 take: 1,
-                select: { date_effet: true, date_prochain_avancement: true }
+                select: { date_effet: true, date_prochain_avancement: true },
             },
         },
     });
@@ -287,20 +303,22 @@ async function getStaffById(id) {
     const anneesExercice = calculerAge(personnel.date_entree_admin);
 
     // INITCAP sur libelles
-    const toInitCap = (str) => str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : null;
+    const toInitCap = (str) =>
+        str ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase() : null;
 
     // Récupération de TOUS les logs d'audit (actions faites PAR lui, ou actions faites SUR lui)
-    const orConditions = [
-        { cible_type: 'personnel', cible_id: personnel.id }
-    ];
+    const orConditions = [{ cible_type: "personnel", cible_id: personnel.id }];
     if (personnel.auth_user) {
         orConditions.push({ fait_par_id: personnel.auth_user.id });
-        orConditions.push({ cible_type: 'auth_user', cible_id: personnel.auth_user.id });
+        orConditions.push({
+            cible_type: "auth_user",
+            cible_id: personnel.auth_user.id,
+        });
     }
 
     const baseAuditLogs = await prisma.ref_audit_log.findMany({
         where: { OR: orConditions },
-        orderBy: { created_at: 'desc' },
+        orderBy: { created_at: "desc" },
         take: 50,
         select: {
             id: true,
@@ -309,52 +327,67 @@ async function getStaffById(id) {
             cible_id: true,
             details: true,
             created_at: true,
-        }
+        },
     });
 
     // Récupération de tous les avancements pour les inclure dans l'historique d'audit
     const avancementsData = await prisma.avancements.findMany({
         where: { id_personnel: personnel.id },
-        orderBy: { date_signature: 'desc' },
-        include: { grade: true }
+        orderBy: { date_signature: "desc" },
+        include: { grade: true },
     });
 
-    const avancementsLogs = avancementsData.map(av => ({
+    const avancementsLogs = avancementsData.map((av) => ({
         id: `av_${av.id_avancement}`,
-        action: av.type_mouvement === "AVANCEMENT_DECHELON" ? "AVANCEMENT_ECHELON" : "PROMOTION_CLASSE",
+        action:
+            av.type_mouvement === "AVANCEMENT_DECHELON"
+                ? "AVANCEMENT_ECHELON"
+                : "PROMOTION_CLASSE",
         cible_type: "personnel",
         cible_id: personnel.id,
         details: {
             nouveau_grade: `Cat. ${av.grade.categorie} - Cl. ${av.grade.classe} - Ech. ${av.grade.echelon}`,
             arrete: av.num_arrete,
         },
-        created_at: av.date_signature
+        created_at: av.date_signature,
     }));
 
     // Combinaison et tri chronologique descendant
-    const combinedLogs = [...baseAuditLogs, ...avancementsLogs].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const combinedLogs = [...baseAuditLogs, ...avancementsLogs].sort(
+        (a, b) => new Date(b.created_at) - new Date(a.created_at),
+    );
 
     return {
         id: personnel.id,
         nom: personnel.nom,
         prenoms: personnel.prenoms,
         matricule: personnel.im,
-        photo_profil: personnel.photo_profil ? `/uploads/${personnel.photo_profil}` : `/uploads/default-avatar.png`,
+        photo_profil: personnel.photo_profil
+            ? `/uploads/${personnel.photo_profil}`
+            : `/uploads/default-avatar.png`,
         date_naissance: dateNaissanceFormatee,
         age: age,
         // categorie: personnel.categorie,
         // classe: personnel.classe,
         // echelon: personnel.echelon,
-        grade_actuel: personnel.grade ? {
-            id_grade:         personnel.grade.id_grade,
-            categorie:        personnel.grade.categorie,
-            classe:           personnel.grade.classe,
-            echelon:          personnel.grade.echelon,
-            indice:           personnel.grade.indice,
-            est_au_maximum:   personnel.grade.id_grade_suivant === null,
-            date_effet:       personnel.avancements[0] ? formaterDate(personnel.avancements[0].date_effet) : null,
-            date_prochain_avancement: personnel.avancements[0] ? formaterDate(personnel.avancements[0].date_prochain_avancement) : null,
-        } : null,
+        grade_actuel: personnel.grade
+            ? {
+                  id_grade: personnel.grade.id_grade,
+                  categorie: personnel.grade.categorie,
+                  classe: personnel.grade.classe,
+                  echelon: personnel.grade.echelon,
+                  indice: personnel.grade.indice,
+                  est_au_maximum: personnel.grade.id_grade_suivant === null,
+                  date_effet: personnel.avancements[0]
+                      ? formaterDate(personnel.avancements[0].date_effet)
+                      : null,
+                  date_prochain_avancement: personnel.avancements[0]
+                      ? formaterDate(
+                            personnel.avancements[0].date_prochain_avancement,
+                        )
+                      : null,
+              }
+            : null,
         date_entree_admin: dateEntreeAdminFormatee,
         annees_exercice: anneesExercice,
         specialite: personnel.specialite,
@@ -369,47 +402,63 @@ async function getStaffById(id) {
         username_sih: personnel.auth_user?.username ?? null,
         diplomes: personnel.diplome,
         audit_logs: combinedLogs,
-    }
+    };
 }
 
 // ── AJOUT ─────────────────────────────────────────────────────────
 async function addPersonnel({
-    nom, prenoms, im, date_naissance,
-    id_grade_actuel, date_effet,
-    specialite, telephone, email,
-    service_id, fonction_id, statut, photo_profil,
+    nom,
+    prenoms,
+    im,
+    date_naissance,
+    id_grade_actuel,
+    date_effet,
+    specialite,
+    telephone,
+    email,
+    service_id,
+    fonction_id,
+    statut,
+    photo_profil,
     diplomes = [],
     num_arrete = null,
-    donner_acces = false, username, password_hash, role = 'user',
-    adminId, date_entree_admin,
+    donner_acces = false,
+    username,
+    password_hash,
+    role = "user",
+    adminId,
+    date_entree_admin,
 }) {
-
     const grade = await prisma.grade.findUnique({
         where: { id_grade: parseInt(id_grade_actuel, 10) },
         select: { duree_mois: true, classe: true },
     });
 
-    if (!grade) throw new Error(`Grade introuvable : id_grade_actuel = ${id_grade_actuel}`);
+    if (!grade)
+        throw new Error(
+            `Grade introuvable : id_grade_actuel = ${id_grade_actuel}`,
+        );
 
     const dateAujourdhui = new Date();
-    const dateEntreeAdmin = date_entree_admin ? new Date(date_entree_admin) : dateAujourdhui;
+    const dateEntreeAdmin = date_entree_admin
+        ? new Date(date_entree_admin)
+        : dateAujourdhui;
     const dateEffetVal = new Date(date_effet);
     const dateProchain = new Date(dateEffetVal);
     dateProchain.setMonth(dateProchain.getMonth() + grade.duree_mois);
 
     let type_mouvement;
-    if (grade.classe === 'STAGIAIRE') {
-        type_mouvement = 'NOMINATION';
+    if (grade.classe === "STAGIAIRE") {
+        type_mouvement = "NOMINATION";
     } else {
-        type_mouvement = 'INITIALISATION';
+        type_mouvement = "INITIALISATION";
     }
-    
-    return await prisma.$transaction(async (tx) => {
 
+    return await prisma.$transaction(async (tx) => {
         // INSERT chu.personnel
         const personnel = await tx.personnel.create({
             data: {
-                nom, 
+                nom,
                 prenoms,
                 im,
                 date_naissance: new Date(date_naissance),
@@ -433,7 +482,7 @@ async function addPersonnel({
             data: {
                 id_personnel: personnelId,
                 id_grade_obtenu: parseInt(id_grade_actuel, 10),
-                num_arrete: num_arrete || '', // facultatif
+                num_arrete: num_arrete || "", // facultatif
                 date_signature: dateAujourdhui,
                 date_effet: dateEffetVal,
                 date_prochain_avancement: dateProchain,
@@ -444,7 +493,7 @@ async function addPersonnel({
         // INSERT ref.diplome
         if (diplomes.length > 0) {
             await tx.diplome.createMany({
-                data: diplomes.map(d => ({
+                data: diplomes.map((d) => ({
                     libelle: d.libelle,
                     etablissement: d.etablissement || null,
                     annee_obtention: d.annee_obtention ?? null,
@@ -470,11 +519,13 @@ async function addPersonnel({
         const dateArrivee = formaterDate(dateEntreeAdmin);
         await tx.ref_audit_log.create({
             data: {
-                action: 'AJOUT_PERSONNEL',
-                cible_type: 'personnel',
+                action: "AJOUT_PERSONNEL",
+                cible_type: "personnel",
                 cible_id: personnelId,
                 fait_par_id: adminId ? BigInt(adminId) : null,
-                details: { description: `Nouveau personnel ${nom} ${prenoms} arrive le ${dateArrivee}` },
+                details: {
+                    description: `Nouveau personnel ${nom} ${prenoms} arrive le ${dateArrivee}`,
+                },
             },
         });
 
@@ -485,15 +536,25 @@ async function addPersonnel({
 // ── UPDATE ────────────────────────────────────────────────────────
 async function updatePersonnel({
     id,
-    nom, prenoms, date_naissance,
-    categorie, classe, echelon, id_grade_actuel,
-    specialite, telephone, email,
-    service_id, fonction_id, statut,
+    nom,
+    prenoms,
+    date_naissance,
+    categorie,
+    classe,
+    echelon,
+    id_grade_actuel,
+    specialite,
+    telephone,
+    email,
+    service_id,
+    fonction_id,
+    statut,
     photo_profil,
     anciennePhoto,
     diplomes = [],
     donner_acces,
-    username, password_hash,
+    username,
+    password_hash,
     adminId,
 }) {
     await prisma.$transaction(async (tx) => {
@@ -502,18 +563,22 @@ async function updatePersonnel({
         // ajout des champs non undefined
         if (nom !== undefined) dataToUpdate.nom = nom;
         if (prenoms !== undefined) dataToUpdate.prenoms = prenoms;
-        if (date_naissance !== undefined) dataToUpdate.date_naissance = new Date(date_naissance);
+        if (date_naissance !== undefined)
+            dataToUpdate.date_naissance = new Date(date_naissance);
         if (categorie !== undefined) dataToUpdate.categorie = categorie;
         if (classe !== undefined) dataToUpdate.classe = classe;
         if (echelon !== undefined) dataToUpdate.echelon = echelon;
-        if (id_grade_actuel !== undefined) dataToUpdate.id_grade_actuel = id_grade_actuel;
+        if (id_grade_actuel !== undefined)
+            dataToUpdate.id_grade_actuel = id_grade_actuel;
         if (specialite !== undefined) dataToUpdate.specialite = specialite;
         if (telephone !== undefined) dataToUpdate.telephone = telephone;
         if (email !== undefined) dataToUpdate.email = email;
-        if (service_id !== undefined) dataToUpdate.service_id = BigInt(service_id);
+        if (service_id !== undefined)
+            dataToUpdate.service_id = BigInt(service_id);
         if (fonction_id !== undefined) dataToUpdate.fonction_id = fonction_id;
         if (statut !== undefined) dataToUpdate.statut = statut;
-        if (photo_profil !== undefined) dataToUpdate.photo_profil = photo_profil;
+        if (photo_profil !== undefined)
+            dataToUpdate.photo_profil = photo_profil;
 
         // UPDATE only si un cham a ete modifie
         if (Object.keys(dataToUpdate).length > 0) {
@@ -527,26 +592,30 @@ async function updatePersonnel({
         if (id_grade_actuel !== undefined) {
             const newGrade = await tx.grade.findUnique({
                 where: { id_grade: id_grade_actuel },
-                select: { duree_mois: true }
+                select: { duree_mois: true },
             });
-            
+
             if (newGrade) {
                 const latestAvancement = await tx.avancements.findFirst({
                     where: { id_personnel: BigInt(id) },
-                    orderBy: { date_effet: 'desc' },
+                    orderBy: { date_effet: "desc" },
                 });
 
                 if (latestAvancement) {
                     const dateEffet = new Date(latestAvancement.date_effet);
                     const dateProchain = new Date(dateEffet);
-                    dateProchain.setMonth(dateProchain.getMonth() + newGrade.duree_mois);
+                    dateProchain.setMonth(
+                        dateProchain.getMonth() + newGrade.duree_mois,
+                    );
 
                     await tx.avancements.update({
-                        where: { id_avancement: latestAvancement.id_avancement },
+                        where: {
+                            id_avancement: latestAvancement.id_avancement,
+                        },
                         data: {
                             id_grade_obtenu: id_grade_actuel,
-                            date_prochain_avancement: dateProchain
-                        }
+                            date_prochain_avancement: dateProchain,
+                        },
                     });
                 }
             }
@@ -592,7 +661,7 @@ async function updatePersonnel({
                         // si pas de compte -> creer
                         username,
                         password_hash,
-                        role: 'user',
+                        role: "user",
                         id_personnel: BigInt(id),
                     },
                     update: {
@@ -601,21 +670,20 @@ async function updatePersonnel({
                         password_hash,
                     },
                 });
-            }
-            else {
+            } else {
                 // upsert username si pas de nouveau password
                 await tx.auth_user.upsert({
                     where: { id_personnel: BigInt(id) },
                     create: {
                         username,
-                        password_hash: '',
-                        role: 'user',
+                        password_hash: "",
+                        role: "user",
                         id_personnel: BigInt(id),
                     },
                     update: {
                         username,
-                    }
-                })
+                    },
+                });
             }
         }
 
@@ -626,25 +694,27 @@ async function updatePersonnel({
             select: { nom: true, prenoms: true },
         });
         const nomComplet = personnelPourLog
-            ? `${personnelPourLog.nom}${personnelPourLog.prenoms ? ' ' + personnelPourLog.prenoms : ''}`
+            ? `${personnelPourLog.nom}${personnelPourLog.prenoms ? " " + personnelPourLog.prenoms : ""}`
             : `ID ${id}`;
 
         // Liste des champs effectivement modifiés
-        const champsModifies = Object.keys(dataToUpdate)
-            .filter(c => c !== 'photo_profil'); // la photo n'est pas informative à logguer
-        if (diplomes.length > 0) champsModifies.push('diplomes');
-        if (donner_acces && username) champsModifies.push('acces_sih');
+        const champsModifies = Object.keys(dataToUpdate).filter(
+            (c) => c !== "photo_profil",
+        ); // la photo n'est pas informative à logguer
+        if (diplomes.length > 0) champsModifies.push("diplomes");
+        if (donner_acces && username) champsModifies.push("acces_sih");
 
         const maintenant = new Date();
-        const dateFormatee = maintenant.toLocaleDateString('fr-FR', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit',
+        const dateFormatee = maintenant.toLocaleDateString("fr-FR", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
         });
 
         await tx.ref_audit_log.create({
             data: {
-                action: 'MODIFICATION_PERSONNEL',
-                cible_type: 'personnel',
+                action: "MODIFICATION_PERSONNEL",
+                cible_type: "personnel",
                 cible_id: BigInt(id),
                 fait_par_id: adminId ? BigInt(adminId) : null,
                 details: {
@@ -660,12 +730,24 @@ async function updatePersonnel({
 
 // Fonction auxiliaire : supprime l'ancienne photo du serveur
 function supprimerAnciennePhoto(photo_profil, anciennePhoto) {
-    if (photo_profil && anciennePhoto && anciennePhoto !== 'default-avatar.png') {
-        const cheminAncien = path.join(__dirname, '..', '..', 'uploads', anciennePhoto);
+    if (
+        photo_profil &&
+        anciennePhoto &&
+        anciennePhoto !== "default-avatar.png"
+    ) {
+        const cheminAncien = path.join(
+            __dirname,
+            "..",
+            "..",
+            "uploads",
+            anciennePhoto,
+        );
         try {
             if (fs.existsSync(cheminAncien)) fs.unlinkSync(cheminAncien);
         } catch {
-            console.warn(`[supprimerAnciennePhoto] Impossible de supprimer : ${anciennePhoto}`);
+            console.warn(
+                `[supprimerAnciennePhoto] Impossible de supprimer : ${anciennePhoto}`,
+            );
         }
     }
 }
@@ -679,17 +761,17 @@ async function archiverPersonnel(id, adminId) {
 
     if (!personnel) return { found: false };
 
-    if (personnel.statut === 'Sortie') {
+    if (personnel.statut === "Sortie") {
         return { found: true, dejaArchive: true };
     }
-    
+
     await prisma.$transaction(async (tx) => {
         const dateSortie = new Date();
         // update changer statut et date_sortie
         await tx.personnel.update({
             where: { id: BigInt(id) },
             data: {
-                statut: 'Sortie',
+                statut: "Sortie",
                 date_sortie: dateSortie,
             },
         });
@@ -697,18 +779,20 @@ async function archiverPersonnel(id, adminId) {
         // Mettre inactif les comptes SIH
         await tx.auth_user.updateMany({
             where: { id_personnel: BigInt(id) },
-            data:  { actif: false },
+            data: { actif: false },
         });
 
         const dateSortieFormatee = formaterDate(dateSortie);
-        const nomComplet = `${personnel.nom}${personnel.prenoms ? ' ' + personnel.prenoms : ''}`;
+        const nomComplet = `${personnel.nom}${personnel.prenoms ? " " + personnel.prenoms : ""}`;
         await tx.ref_audit_log.create({
             data: {
-                action: 'ARCHIVAGE_PERSONNEL',
-                cible_type: 'personnel',
+                action: "ARCHIVAGE_PERSONNEL",
+                cible_type: "personnel",
                 cible_id: BigInt(id),
                 fait_par_id: adminId ? BigInt(adminId) : null,
-                details: { description: `${nomComplet} a été archivé le ${dateSortieFormatee}` },
+                details: {
+                    description: `${nomComplet} a été archivé le ${dateSortieFormatee}`,
+                },
             },
         });
     });
@@ -722,7 +806,7 @@ async function trouverGrade({ categorie, classe, echelon }) {
     const where = { categorie, classe };
 
     // N'ajouter le filtre echelon que s'il est fourni (pas pour les STAGIAIRES)
-    if (echelon !== null && echelon !== undefined && echelon !== '') {
+    if (echelon !== null && echelon !== undefined && echelon !== "") {
         where.echelon = parseInt(echelon, 10);
     }
 
