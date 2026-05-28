@@ -1035,9 +1035,21 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
                                                     dark: "bg-rose-500/15 text-rose-400 border-rose-500/25",
                                                     light: "bg-rose-50 text-rose-700 border-rose-200",
                                                 },
-                                                MODIFICATION: {
+                                                MODIFICATION_PERSONNEL: {
                                                     dark: "bg-amber-500/15 text-amber-400 border-amber-500/25",
                                                     light: "bg-amber-50 text-amber-700 border-amber-200",
+                                                },
+                                                RESET_MDP: {
+                                                    dark: "bg-orange-500/15 text-orange-400 border-orange-500/25",
+                                                    light: "bg-orange-50 text-orange-700 border-orange-200",
+                                                },
+                                                ACTIVATION: {
+                                                    dark: "bg-lime-500/15 text-lime-400 border-lime-500/25",
+                                                    light: "bg-lime-50 text-lime-700 border-lime-200",
+                                                },
+                                                DESACTIVATION: {
+                                                    dark: "bg-slate-500/15 text-slate-400 border-slate-500/25",
+                                                    light: "bg-slate-100 text-slate-600 border-slate-300",
                                                 },
                                             };
                                             const colors = actionColors[
@@ -1058,7 +1070,13 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
                                                 PROMOTION_CLASSE: "Promotion",
                                                 ARCHIVAGE_PERSONNEL:
                                                     "Archivage",
-                                                MODIFICATION: "Modification",
+                                                MODIFICATION_PERSONNEL:
+                                                    "Modification",
+                                                RESET_MDP:
+                                                    "Réinitialisation mot de passe",
+                                                ACTIVATION: "Activation Compte",
+                                                DESACTIVATION:
+                                                    "Désactivation Compte",
                                             };
                                             const label =
                                                 actionLabels[log.action] ||
