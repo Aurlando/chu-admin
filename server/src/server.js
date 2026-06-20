@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-BigInt.prototype.toJSON = function() {
+BigInt.prototype.toJSON = function () {
     return this.toString();
 };
 
@@ -17,6 +17,7 @@ const structureRoutes = require('./routes/structureRoutes');
 const avancementsRoutes = require('./routes/avancementsRoutes');
 const securityRoutes = require('./routes/securityRoutes');
 const auditRoutes = require('./routes/auditRoutes');
+const documentRoutes = require('./routes/documentRoutes');
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use('/staff', staffRoutes);
 app.use('/structure', structureRoutes);
 app.use('/avancements', avancementsRoutes);
 app.use('/security', securityRoutes);
+app.use('/documents', documentRoutes);
 
 app.listen(process.env.PORT, () => {
     console.log(`Server is running at PORT ${process.env.PORT}`);

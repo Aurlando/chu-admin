@@ -22,7 +22,7 @@ model allergie {
   @@schema("chu")
 }
 
-model audit_log {
+model chu_audit_log {
   id          BigInt       @id @default(autoincrement())
   table_name  String
   record_id   BigInt
@@ -32,6 +32,7 @@ model audit_log {
   diff        Json?
   utilisateur utilisateur? @relation(fields: [auteur_id], references: [id])
 
+  @@map("audit_log")
   @@schema("chu")
 }
 
@@ -397,8 +398,10 @@ model personnel {
   photo_profil       String?           @default("default-avatar.png") @db.VarChar(255)
   date_sortie        DateTime?         @db.Date
   id_grade_actuel    Int?
+  genre_id           BigInt?
   consultation       consultation[]
   hospitalisation    hospitalisation[]
+  genre              genre?            @relation(fields: [genre_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_personnel_genre")
   fonction           fonction?         @relation(fields: [fonction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   grade              grade?            @relation(fields: [id_grade_actuel], references: [id_grade], onUpdate: NoAction)
   service            service?          @relation(fields: [service_id], references: [id])
@@ -469,7 +472,7 @@ model utilisateur {
   email                 String?                 @unique
   role_id               Int?                    @db.SmallInt
   actif                 Boolean                 @default(true)
-  audit_log             audit_log[]
+  audit_log             chu_audit_log[]
   consultation          consultation[]
   evolution_journaliere evolution_journaliere[]
   ordonnance            ordonnance[]
@@ -505,6 +508,22 @@ model vital_sign {
   @@schema("chu")
 }
 
+model ref_audit_log {
+  id          Int       @id @default(autoincrement())
+  action      String
+  cible_type  String
+  cible_id    BigInt
+  fait_par_id BigInt
+  details     Json?
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+  auth_user   auth_user @relation(fields: [fait_par_id], references: [id], onUpdate: NoAction)
+
+  @@index([created_at(sort: Desc)], map: "idx_audit_log_created_at")
+  @@index([fait_par_id], map: "idx_audit_log_fait_par")
+  @@map("audit_log")
+  @@schema("ref")
+}
+
 model auth_user {
   id              BigInt            @id @default(autoincrement())
   username        String            @unique
@@ -516,6 +535,21 @@ model auth_user {
   histoire_malade histoire_malade[]
   audit_log       ref_audit_log[]
   personnel       personnel?        @relation(fields: [id_personnel], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@schema("ref")
+}
+
+model avancements {
+  id_avancement            Int       @id @default(autoincrement())
+  id_personnel             BigInt
+  id_grade_obtenu          Int
+  num_arrete               String
+  date_signature           DateTime  @db.Date
+  date_effet               DateTime  @db.Date
+  type_mouvement           String
+  date_prochain_avancement DateTime? @db.Date
+  grade                    grade     @relation(fields: [id_grade_obtenu], references: [id_grade], onUpdate: NoAction)
+  personnel                personnel @relation(fields: [id_personnel], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@schema("ref")
 }
@@ -600,7 +634,24 @@ model genre {
   id         BigInt       @id @default(autoincrement())
   libelle    String       @unique @db.Char(1)
   patient    patient[]
+  personnel  personnel[]
   saisie_rma saisie_rma[]
+
+  @@schema("ref")
+}
+
+model grade {
+  id_grade         Int           @id @default(autoincrement())
+  categorie        String
+  classe           String
+  echelon          Int
+  id_grade_suivant Int?
+  duree_mois       Int           @default(24)
+  indice           Int?
+  personnel        personnel[]
+  avancements      avancements[]
+  grade            grade?        @relation("gradeTograde", fields: [id_grade_suivant], references: [id_grade], onUpdate: NoAction)
+  other_grade      grade[]       @relation("gradeTograde")
 
   @@schema("ref")
 }
@@ -880,53 +931,6 @@ model types_prestations {
   prestations            prestations[]
   sous_types_prestations sous_types_prestations[]
 
-  @@schema("ref")
-}
-
-model avancements {
-  id_avancement            Int       @id @default(autoincrement())
-  id_personnel             BigInt
-  id_grade_obtenu          Int
-  num_arrete               String
-  date_signature           DateTime  @db.Date
-  date_effet               DateTime  @db.Date
-  type_mouvement           String
-  date_prochain_avancement DateTime? @db.Date
-  grade                    grade     @relation(fields: [id_grade_obtenu], references: [id_grade], onUpdate: NoAction)
-  personnel                personnel @relation(fields: [id_personnel], references: [id], onDelete: Cascade, onUpdate: NoAction)
-
-  @@schema("ref")
-}
-
-model grade {
-  id_grade         Int           @id @default(autoincrement())
-  categorie        String
-  classe           String
-  echelon          Int
-  id_grade_suivant Int?
-  duree_mois       Int           @default(24)
-  indice           Int?
-  personnel        personnel[]
-  avancements      avancements[]
-  grade            grade?        @relation("gradeTograde", fields: [id_grade_suivant], references: [id_grade], onUpdate: NoAction)
-  other_grade      grade[]       @relation("gradeTograde")
-
-  @@schema("ref")
-}
-
-model ref_audit_log {
-  id          Int       @id @default(autoincrement())
-  action      String
-  cible_type  String
-  cible_id    BigInt
-  fait_par_id BigInt
-  details     Json?
-  created_at  DateTime  @default(now()) @db.Timestamptz(6)
-  auth_user   auth_user @relation(fields: [fait_par_id], references: [id], onUpdate: NoAction)
-
-  @@index([created_at(sort: Desc)], map: "idx_audit_log_created_at")
-  @@index([fait_par_id], map: "idx_audit_log_fait_par")
-  @@map("audit_log")
   @@schema("ref")
 }
 
