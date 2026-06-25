@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import StaffProfile from "./StaffProfile";
 import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
+import GenerateDocModal from "./GenerateDocModal"; // [NOUVEAU] modale de génération de docs
+import CertificatAdminForm from "./CertificatAdminForm"; // [NOUVEAU] formulaire certificat
 import SearchInput from "./SearchInput";
 import "../App.css";
 
@@ -90,8 +92,80 @@ function EditIcon() {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// DocsDropdown — bouton "Docs ▾" avec menu déroulant
+// ════════════════════════════════════════════════════════════════════
+function DocsDropdown({ dark, onCertificat }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+
+    // Fermer si clic en dehors
+    useEffect(() => {
+        const handler = (e) => {
+            if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+        };
+        document.addEventListener("mousedown", handler);
+        return () => document.removeEventListener("mousedown", handler);
+    }, []);
+
+    const triggerCls = dark
+        ? "flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-violet-500/25 text-violet-400 hover:bg-violet-500/10 transition-all cursor-pointer"
+        : "flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-violet-200 text-violet-600 hover:bg-violet-50 transition-all cursor-pointer";
+    const menuCls = dark
+        ? "absolute right-0 top-full mt-1 w-52 rounded-xl border border-white/10 bg-[#0d1526] shadow-2xl z-30 py-1"
+        : "absolute right-0 top-full mt-1 w-52 rounded-xl border border-slate-200 bg-white shadow-2xl z-30 py-1";
+    const itemCls = dark
+        ? "w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-slate-300 hover:bg-white/5 hover:text-white transition-colors cursor-pointer text-left"
+        : "w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-slate-600 hover:bg-violet-50 hover:text-violet-700 transition-colors cursor-pointer text-left";
+
+    return (
+        <div className="relative" ref={ref}>
+            <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+                className={triggerCls}
+                title="Générer un document"
+            >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span className="hidden sm:inline">Docs</span>
+                <svg className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+
+            {open && (
+                <div className={menuCls}>
+                    <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${dark ? "text-slate-600" : "text-slate-400"}`}>
+                        Documents disponibles
+                    </div>
+                    <button
+                        type="button"
+                        className={itemCls}
+                        onClick={(e) => { setOpen(false); onCertificat(e); }}
+                    >
+                        <svg className="w-3.5 h-3.5 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Certificat Administratif
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ════════════════════════════════════════════════════════════════════
 // Composant principal
 // ════════════════════════════════════════════════════════════════════
+// ── Valeurs initiales du formulaire certificat
+const CERT_DEFAULTS = () => ({
+    numero: "",
+    motif: "",
+    date_delivrance: new Date().toISOString().split("T")[0],
+    signataire: "Directeur",
+});
+
 export default function PersonnelDirectory({ dark, onNavigate }) {
     // selectedId : null = liste, valeur = vue profil détail
     const [selectedId, setSelectedId] = useState(null);
@@ -102,6 +176,12 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
     const [toast, setToast] = useState({ show: false, msg: "", type: "success" });
     const toastTimer = useRef(null);
 
+    // [NOUVEAU] État pour la modale de génération de documents
+    const [docModal, setDocModal] = useState(null); // { agentId, agentName } ou null
+    const [certFields, setCertFields] = useState(CERT_DEFAULTS());
+    const [docLoading, setDocLoading] = useState(false);
+    const [docError, setDocError] = useState(null);
+
     const showToast = (msg, type = "success") => {
         if (toastTimer.current) clearTimeout(toastTimer.current);
         setToast({ show: true, msg, type });
@@ -109,6 +189,51 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
             setToast(prev => ({ ...prev, show: false })), 
             2000
         );
+    };
+
+    // [NOUVEAU] Ouvre la modale pour un agent donné
+    const openDocModal = (agentId, agentName) => {
+        setCertFields(CERT_DEFAULTS());
+        setDocError(null);
+        setDocModal({ agentId, agentName });
+    };
+
+    // [NOUVEAU] Génère le certificat et déclenche le téléchargement
+    const handleGenerate = async () => {
+        if (!docModal) return;
+        const token = localStorage.getItem("token");
+        setDocLoading(true);
+        setDocError(null);
+        try {
+            const res = await fetch(
+                `${API_BASE}/documents/certificat-administratif/${docModal.agentId}`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify(certFields),
+                }
+            );
+            if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                throw new Error(json.message || `Erreur ${res.status}`);
+            }
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `certificat_${docModal.agentId}.docx`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            setDocModal(null); // Ferme la modale après succès
+            showToast("Document généré avec succès !");
+        } catch (err) {
+            setDocError(err.message);
+        } finally {
+            setDocLoading(false);
+        }
     };
 
     // Vue profil — remplace toute la page
@@ -123,7 +248,7 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
         );
     }
 
-    // Vue liste — avec le modal superposé si selectedIdUpdate != null
+    // Vue liste — avec les modaux superposés si nécessaire
     return (
         <>
             {selectedIdUpdate !== null && (
@@ -142,11 +267,33 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
                     }}
                 />
             )}
+
+            {/* [NOUVEAU] Modale de génération de documents */}
+            {docModal && (
+                <GenerateDocModal
+                    title="Certificat Administratif"
+                    dark={dark}
+                    loading={docLoading}
+                    error={docError}
+                    onClose={() => !docLoading && setDocModal(null)}
+                    onSubmit={handleGenerate}
+                >
+                    <CertificatAdminForm
+                        fields={certFields}
+                        onChange={(key, val) =>
+                            setCertFields((prev) => ({ ...prev, [key]: val }))
+                        }
+                        dark={dark}
+                    />
+                </GenerateDocModal>
+            )}
+
             <PersonnelList
                 key={refreshKey}
                 dark={dark}
                 onSelectId={setSelectedId}
                 onSelectIdUpdate={setSelectedIdUpdate}
+                onOpenDocModal={openDocModal}
                 onNavigate={onNavigate}
             />
 
@@ -163,7 +310,7 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
     );
 }
 
-function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
+function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onOpenDocModal, onNavigate }) {
     // ── États des données
     const [personnel, setPersonnel] = useState([]);
     const [pagination, setPagination] = useState({
@@ -494,13 +641,13 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
 
             {/* ── Tableau ── */}
             {!loading && !error && (
-                <div className={`rounded-2xl border overflow-hidden ${T.card}`}>
+                <div className={`rounded-2xl border overflow-visible ${T.card}`}>
                     <table className="w-full text-sm">
                         <thead>
                             <tr
                                 className={`border-b text-left text-[11px] font-bold uppercase tracking-wider ${T.thHead}`}
                             >
-                                <th className="px-5 py-3.5">Nom</th>
+                                <th className="px-5 py-3.5 first:rounded-tl-2xl">Nom</th>
                                 <th className="px-5 py-3.5">Imatricule</th>
                                 <th className="px-5 py-3.5 hidden md:table-cell">
                                     Département
@@ -509,7 +656,7 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
                                     Service
                                 </th>
                                 <th className="px-5 py-3.5">Statut</th>
-                                <th className="px-5 py-3.5 text-right">
+                                <th className="px-5 py-3.5 text-right last:rounded-tr-2xl">
                                     Action
                                 </th>
                             </tr>
@@ -604,14 +751,9 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
                                         {/* Actions */}
                                         <td className="px-5 py-3.5">
                                             <div className="flex items-center justify-end gap-2">
-                                                {/* Bouton "Voir" — fonctionnel
-                            onClick → onSelectId(p.id)
-                            → setSelectedId(p.id) dans le parent
-                            → PersonnelDirectory affiche <StaffProfile>
-                            → StaffProfile appelle GET /staff/profile/:id */}
                                                 <button
                                                     onClick={(e) => {
-                                                        e.stopPropagation(); // évite de propager le clic à la <tr>
+                                                        e.stopPropagation();
                                                         onSelectId(p.id);
                                                     }}
                                                     className={`${T.actionView} cursor-pointer`}
@@ -623,7 +765,6 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
                                                     </span>
                                                 </button>
 
-                                                {/* Bouton "Mis à jour" — ouvre UpdateModal avec l'id du membre */}
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -637,6 +778,18 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onNavigate }) {
                                                         Mis à jour
                                                     </span>
                                                 </button>
+
+                                                {/* [NOUVEAU] Bouton "Docs ▾" — menu de génération de documents */}
+                                                <DocsDropdown
+                                                    dark={dark}
+                                                    onCertificat={(e) => {
+                                                        e.stopPropagation();
+                                                        onOpenDocModal(
+                                                            p.id,
+                                                            `${p.nom} ${p.prenoms}`
+                                                        );
+                                                    }}
+                                                />
                                             </div>
                                         </td>
                                     </tr>
