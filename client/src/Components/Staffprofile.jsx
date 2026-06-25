@@ -941,6 +941,15 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
                                 />
                                 <InfoRow
                                     dark={dark}
+                                    label="Sexe"
+                                    value={
+                                        profile.genre === "M" ? "Masculin" :
+                                        profile.genre === "F" ? "Féminin" :
+                                        profile.genre || null
+                                    }
+                                />
+                                <InfoRow
+                                    dark={dark}
                                     label="Téléphone"
                                     value={profile.telephone}
                                 />

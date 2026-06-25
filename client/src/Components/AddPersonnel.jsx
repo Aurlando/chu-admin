@@ -166,7 +166,7 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
   // ── Données du formulaire
   const [form, setForm] = useState(() => {
     return getValidDraft("add_personnel_form", {
-      nom: "", prenoms: "", im: "", date_naissance: "",
+      nom: "", prenoms: "", im: "", date_naissance: "", genre_id: "",
       date_entree_admin: "", // [NOUVEAU] Date d'arrivée réelle à l'administration
       categorie: "", classe: "", echelon: "", specialite: "",
       telephone: "", email: "", date_effet: "", num_arrete: "",
@@ -288,6 +288,7 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
       else if (!noSpecialCharsRegex.test(form.prenoms)) e.prenoms    = "Pas de chiffres ou caractères spéciaux";
       if (!form.im.trim())                           e.im            = "Requis";
       else if (!/^\d+$/.test(form.im.trim()))        e.im            = "Le matricule doit contenir uniquement des chiffres";
+      if (!form.genre_id)                            e.genre_id      = "Requis";
       if (!form.date_naissance)                      e.date_naissance= "Requis";
       else {
         const birthDate = new Date(form.date_naissance);
@@ -424,6 +425,7 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
       fd.append("prenoms",        form.prenoms.trim());
       fd.append("im",             form.im.trim());
       fd.append("date_naissance", form.date_naissance);
+      fd.append("genre_id",       form.genre_id);
       fd.append("categorie",      form.categorie);
       fd.append("classe",         form.classe);
       fd.append("echelon",        form.echelon);
@@ -463,7 +465,7 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
       setSuccess(true);
       clearSavedData();
       // Reset complet
-      setForm({ nom:"", prenoms:"", im:"", date_naissance:"", date_entree_admin:"",
+      setForm({ nom:"", prenoms:"", im:"", date_naissance:"", genre_id:"", date_entree_admin:"",
         categorie:"", classe:"", echelon:"", specialite:"", telephone:"", email:"",
         service_id:"", fonction_id:"", statut:"En activité",
         username:"", password:"", role: "user", date_effet:"", num_arrete:"" });
@@ -759,6 +761,14 @@ export function AddPersonnelInner({ dark, onAnnuler }) {
                 <Field label="Date de naissance" required dark={dark} error={errors.date_naissance}>
                   <input type="date" value={form.date_naissance}
                     onChange={e => handleChange("date_naissance", e.target.value)} className={inp("date_naissance")} />
+                </Field>
+                <Field label="Sexe" required dark={dark} error={errors.genre_id}>
+                  <select value={form.genre_id} onChange={e => handleChange("genre_id", e.target.value)}
+                    className={sel("genre_id")}>
+                    <option value="">Sélectionner</option>
+                    <option value="1">Masculin</option>
+                    <option value="2">Féminin</option>
+                  </select>
                 </Field>
                 {/* [NOUVEAU] Date d'entrée dans l'administration (utilisée pour le log AJOUT_PERSONNEL) */}
                 <Field label="Date d'entrée dans l'administration" dark={dark} error={errors.date_entree_admin}>

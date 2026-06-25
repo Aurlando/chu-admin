@@ -169,6 +169,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
         prenoms: "",
         im: "",
         date_naissance: "",
+        genre_id: "",
         categorie: "",
         classe: "",
         echelon: "",
@@ -246,6 +247,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                     prenoms: p.prenoms || "",
                     im: (p.matricule || "").replace(/\s/g, ""), // la BDD renvoie "matricule" en lecture
                     date_naissance: dateFormatted,
+                    genre_id: p.genre_id || "",
                     categorie: p.grade_actuel ? p.grade_actuel.categorie : "",
                     classe: p.grade_actuel ? p.grade_actuel.classe : "",
                     echelon: p.grade_actuel ? p.grade_actuel.echelon : "",
@@ -374,6 +376,10 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             e.im = "Le matricule doit contenir uniquement des chiffres";
         }
 
+        if (!form.genre_id) {
+            e.genre_id = "Le sexe est requis";
+        }
+
         // [AJOUT] Validation de l'âge (minimum 16 ans)
         if (form.date_naissance) {
             const birthDate = new Date(form.date_naissance);
@@ -460,6 +466,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             fd.append("prenoms", form.prenoms.trim());
             fd.append("im", form.im.trim());
             fd.append("date_naissance", form.date_naissance);
+            fd.append("genre_id", form.genre_id);
             fd.append("categorie", form.categorie);
             if (form.classe) fd.append("classe", form.classe);
             if (form.echelon) fd.append("echelon", form.echelon);
@@ -870,6 +877,27 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     }
                                                     className={inputCls}
                                                 />
+                                            </Field>
+                                            <Field
+                                                label="Sexe"
+                                                required
+                                                dark={dark}
+                                                error={errors.genre_id}
+                                            >
+                                                <select
+                                                    value={form.genre_id}
+                                                    onChange={(e) =>
+                                                        handleChange(
+                                                            "genre_id",
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    className={sel("genre_id")}
+                                                >
+                                                    <option value="">Sélectionner</option>
+                                                    <option value="1">Masculin</option>
+                                                    <option value="2">Féminin</option>
+                                                </select>
                                             </Field>
                                         </div>
                                     </div>
