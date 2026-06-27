@@ -9,13 +9,13 @@ const ACTION_STYLE = {
     AJOUT_PERSONNEL: {
         dark: "bg-emerald-500/15 text-emerald-400 border-emerald-500/25",
         light: "bg-emerald-50 text-emerald-700 border-emerald-200",
-        label: "Ajout personnel",
+        label: "Ajout d'employé",
         dot: "bg-emerald-500",
     },
     ARCHIVAGE_PERSONNEL: {
         dark: "bg-rose-500/15 text-rose-400 border-rose-500/25",
         light: "bg-rose-50 text-rose-700 border-rose-200",
-        label: "Archivage",
+        label: "Archivage d'employé",
         dot: "bg-rose-500",
     },
     AVANCEMENT_ECHELON: {
@@ -30,11 +30,35 @@ const ACTION_STYLE = {
         label: "Promotion classe",
         dot: "bg-violet-500",
     },
-    MODIFICATION: {
+    MODIFICATION_PERSONNEL: {
         dark: "bg-amber-500/15 text-amber-400 border-amber-500/25",
         light: "bg-amber-50 text-amber-700 border-amber-200",
-        label: "Modification",
+        label: "Modification d'employé",
         dot: "bg-amber-500",
+    },
+    GENERATION_DOCUMENT: {
+        dark: "bg-cyan-500/15 text-cyan-400 border-cyan-500/25",
+        light: "bg-cyan-50 text-cyan-700 border-cyan-200",
+        label: "Génération de document",
+        dot: "bg-cyan-500",
+    },
+    RESET_MDP: {
+        dark: "bg-orange-500/15 text-orange-400 border-orange-500/25",
+        light: "bg-orange-50 text-orange-700 border-orange-200",
+        label: "Réinitialisation mot de passe",
+        dot: "bg-orange-500",
+    },
+    ACTIVATION: {
+        dark: "bg-lime-500/15 text-lime-400 border-lime-500/25",
+        light: "bg-lime-50 text-lime-700 border-lime-200",
+        label: "Activation compte",
+        dot: "bg-lime-500",
+    },
+    DESACTIVATION: {
+        dark: "bg-slate-500/15 text-slate-400 border-slate-500/25",
+        light: "bg-slate-100 text-slate-600 border-slate-300",
+        label: "Désactivation compte",
+        dot: "bg-slate-400",
     },
 };
 const ACTION_DEFAULT = {
@@ -50,7 +74,11 @@ const ACTION_FILTERS = [
     { value: "ARCHIVAGE_PERSONNEL", label: "Archivage" },
     { value: "AVANCEMENT_ECHELON", label: "Avancement échelon" },
     { value: "PROMOTION_CLASSE", label: "Promotion classe" },
-    { value: "MODIFICATION", label: "Modification" },
+    { value: "MODIFICATION_PERSONNEL", label: "Modification" },
+    { value: "GENERATION_DOCUMENT", label: "Génération de document" },
+    { value: "RESET_MDP", label: "Réinitialisation mot de passe" },
+    { value: "ACTIVATION", label: "Activation compte" },
+    { value: "DESACTIVATION", label: "Désactivation compte" },
 ];
 
 function auditIcon(action, cls = "w-4 h-4") {
@@ -105,7 +133,7 @@ function auditIcon(action, cls = "w-4 h-4") {
                 />
             </svg>
         );
-    if (action === "MODIFICATION")
+    if (action === "MODIFICATION" || action === "MODIFICATION_PERSONNEL")
         return (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -119,6 +147,74 @@ function auditIcon(action, cls = "w-4 h-4") {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
+            </svg>
+        );
+    if (action === "GENERATION_DOCUMENT")
+        return (
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={cls}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+            </svg>
+        );
+    if (action === "RESET_MDP")
+        return (
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={cls}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                />
+            </svg>
+        );
+    if (action === "ACTIVATION")
+        return (
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={cls}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+            </svg>
+        );
+    if (action === "DESACTIVATION")
+        return (
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={cls}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
             </svg>
         );
@@ -148,7 +244,7 @@ function StatCard({ icon, value, label, colorClass, bgClass, dark }) {
             ${dark ? "bg-[#0d1526] border-white/6" : "bg-white border-slate-200 shadow-sm"}`}
         >
             <div
-                className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${bgClass}`}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${bgClass}`}
             >
                 {icon}
             </div>
@@ -199,70 +295,66 @@ export default function AuditLogsPage({ dark }) {
     const thCls = dark
         ? "px-5 py-3 text-[10.5px] font-bold uppercase tracking-widest text-slate-600 bg-white/2 border-b border-white/5 whitespace-nowrap text-left"
         : "px-5 py-3 text-[10.5px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50 border-b border-slate-100 whitespace-nowrap text-left";
-    const inputCls = dark
-        ? "px-3.5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white text-sm placeholder:text-slate-600 outline-none focus:border-blue-500/60 transition-all"
-        : "px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-800 text-sm placeholder:text-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/10 transition-all";
+
     const selectCls = dark
         ? "px-3.5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-slate-200 text-sm outline-none focus:border-blue-500/60 cursor-pointer transition-all [&_option]:text-black [&_option]:bg-white"
         : "px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm outline-none focus:border-blue-400 cursor-pointer transition-all";
 
-    // ── GET /audit-logs
-    const fetchLogs = useCallback(() => {
-        setLoading(true);
-        setError(null);
-        const params = new URLSearchParams({ page: currentPage, limit: 20 });
-        fetch(`${API_BASE}/audit-logs?${params}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then((res) => {
-                if (!res.ok) throw new Error(`Erreur ${res.status}`);
-                return res.json();
+    // ── GET /audit-logs — search, filtre et stats gérés côté backend
+    const requestLogs = useCallback(
+        (page = currentPage) => {
+            setLoading(true);
+            setError(null);
+            const params = new URLSearchParams({ page, limit: 20 });
+            if (searchText) params.set("search", searchText);
+            if (filterAction) params.set("type_action", filterAction);
+
+            return fetch(`${API_BASE}/audit-logs?${params}`, {
+                headers: { Authorization: `Bearer ${token}` },
             })
-            .then((json) => {
-                const data = json.data || [];
-                setLogs(data);
-                setPagination(
-                    json.pagination || {
-                        total: 0,
-                        page: 1,
-                        limit: 20,
-                        totalPages: 1,
-                    },
-                );
-                // Calcul comptages pour stat cards
-                const c = {};
-                data.forEach((l) => {
-                    c[l.action] = (c[l.action] || 0) + 1;
-                });
-                setCounts(c);
-            })
-            .catch((err) => setError(err.message))
-            .finally(() => setLoading(false));
-    }, [currentPage, token]);
+                .then((res) => {
+                    if (!res.ok) throw new Error(`Erreur ${res.status}`);
+                    return res.json();
+                })
+                .then((json) => {
+                    setLogs(json.data || []);
+                    setPagination(
+                        json.pagination || {
+                            total: 0,
+                            page: 1,
+                            limit: 20,
+                            totalPages: 1,
+                        },
+                    );
+                    // Stats reçues du backend (totaux réels, pas seulement la page)
+                    setCounts(json.stats || {});
+                })
+                .catch((err) => setError(err.message))
+                .finally(() => setLoading(false));
+        },
+        [currentPage, searchText, filterAction, token],
+    );
 
     useEffect(() => {
-        fetchLogs();
-    }, [fetchLogs]);
+        const timeoutId = window.setTimeout(() => {
+            void requestLogs(currentPage);
+        }, 0);
 
-    // ── Filtrage côté client
-    const logsFiltres = logs.filter((log) => {
-        const matchAction = !filterAction || log.action === filterAction;
-        const desc = (
-            log.details?.description ||
-            log.details?.nouveau_grade ||
-            ""
-        ).toLowerCase();
-        const auteur = (
-            log.utilisateur?.nom_complet ||
-            log.utilisateur?.username ||
-            ""
-        ).toLowerCase();
-        const matchSearch =
-            !searchText ||
-            desc.includes(searchText.toLowerCase()) ||
-            auteur.includes(searchText.toLowerCase());
-        return matchAction && matchSearch;
-    });
+        return () => window.clearTimeout(timeoutId);
+    }, [requestLogs, currentPage]);
+
+    const handleSearchChange = (value) => {
+        setSearchText(value);
+        setCurrentPage(1);
+    };
+
+    const handleFilterChange = (e) => {
+        setFilterAction(e.target.value);
+        setCurrentPage(1);
+    };
+
+    // Plus de filtrage côté client : le backend gère search + type_action
+    const logsFiltres = logs;
 
     const goToPage = (p) => {
         if (p >= 1 && p <= pagination.totalPages) setCurrentPage(p);
@@ -306,7 +398,7 @@ export default function AuditLogsPage({ dark }) {
                 {/* ── TITRE */}
                 <div className="flex items-start gap-4">
                     <div
-                        className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg
+                        className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg
                         ${dark ? "bg-violet-500/20" : "bg-violet-600"}`}
                     >
                         <svg
@@ -338,108 +430,189 @@ export default function AuditLogsPage({ dark }) {
 
                 {/* ── STAT CARDS */}
                 {!loading && !error && (
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                        <StatCard
-                            dark={dark}
-                            value={counts["AJOUT_PERSONNEL"] ?? 0}
-                            label="Ajouts (page)"
-                            colorClass={
-                                dark ? "text-emerald-400" : "text-emerald-600"
-                            }
-                            bgClass={
-                                dark ? "bg-emerald-500/15" : "bg-emerald-50"
-                            }
-                            icon={
-                                <svg
-                                    className={`w-5 h-5 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={1.8}
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                                    />
-                                </svg>
-                            }
-                        />
-                        <StatCard
-                            dark={dark}
-                            value={counts["ARCHIVAGE_PERSONNEL"] ?? 0}
-                            label="Archivages (page)"
-                            colorClass={
-                                dark ? "text-rose-400" : "text-rose-600"
-                            }
-                            bgClass={dark ? "bg-rose-500/15" : "bg-rose-50"}
-                            icon={
-                                <svg
-                                    className={`w-5 h-5 ${dark ? "text-rose-400" : "text-rose-600"}`}
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={1.8}
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-                                    />
-                                </svg>
-                            }
-                        />
-                        <StatCard
-                            dark={dark}
-                            value={
-                                (counts["AVANCEMENT_ECHELON"] ?? 0) +
-                                (counts["PROMOTION_CLASSE"] ?? 0)
-                            }
-                            label="Avancements (page)"
-                            colorClass={
-                                dark ? "text-blue-400" : "text-blue-600"
-                            }
-                            bgClass={dark ? "bg-blue-500/15" : "bg-blue-50"}
-                            icon={
-                                <svg
-                                    className={`w-5 h-5 ${dark ? "text-blue-400" : "text-blue-600"}`}
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={1.8}
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                                    />
-                                </svg>
-                            }
-                        />
-                        <StatCard
-                            dark={dark}
-                            value={counts["MODIFICATION"] ?? 0}
-                            label="Modifications (page)"
-                            colorClass={
-                                dark ? "text-amber-400" : "text-amber-600"
-                            }
-                            bgClass={dark ? "bg-amber-500/15" : "bg-amber-50"}
-                            icon={
-                                <svg
-                                    className={`w-5 h-5 ${dark ? "text-amber-400" : "text-amber-600"}`}
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={1.8}
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                    />
-                                </svg>
-                            }
-                        />
+                    <div className="space-y-3">
+                        {/* Ligne 1 — 4 cards existantes */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                            <StatCard
+                                dark={dark}
+                                value={counts["ajouts"] ?? 0}
+                                label="Ajouts d'employés (total)"
+                                colorClass={
+                                    dark
+                                        ? "text-emerald-400"
+                                        : "text-emerald-600"
+                                }
+                                bgClass={
+                                    dark ? "bg-emerald-500/15" : "bg-emerald-50"
+                                }
+                                icon={
+                                    <svg
+                                        className={`w-5 h-5 ${dark ? "text-emerald-400" : "text-emerald-600"}`}
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={1.8}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                                        />
+                                    </svg>
+                                }
+                            />
+                            <StatCard
+                                dark={dark}
+                                value={counts["archivages"] ?? 0}
+                                label="Archivages de profils (total)"
+                                colorClass={
+                                    dark ? "text-rose-400" : "text-rose-600"
+                                }
+                                bgClass={dark ? "bg-rose-500/15" : "bg-rose-50"}
+                                icon={
+                                    <svg
+                                        className={`w-5 h-5 ${dark ? "text-rose-400" : "text-rose-600"}`}
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={1.8}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                                        />
+                                    </svg>
+                                }
+                            />
+                            <StatCard
+                                dark={dark}
+                                value={counts["avancements"] ?? 0}
+                                label="Avancements (total)"
+                                colorClass={
+                                    dark ? "text-blue-400" : "text-blue-600"
+                                }
+                                bgClass={dark ? "bg-blue-500/15" : "bg-blue-50"}
+                                icon={
+                                    <svg
+                                        className={`w-5 h-5 ${dark ? "text-blue-400" : "text-blue-600"}`}
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={1.8}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                                        />
+                                    </svg>
+                                }
+                            />
+                            <StatCard
+                                dark={dark}
+                                value={counts["modifications"] ?? 0}
+                                label="Modifications de profils (total)"
+                                colorClass={
+                                    dark ? "text-amber-400" : "text-amber-600"
+                                }
+                                bgClass={
+                                    dark ? "bg-amber-500/15" : "bg-amber-50"
+                                }
+                                icon={
+                                    <svg
+                                        className={`w-5 h-5 ${dark ? "text-amber-400" : "text-amber-600"}`}
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={1.8}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                        />
+                                    </svg>
+                                }
+                            />
+                        </div>
+                        {/* Ligne 2 — 3 nouvelles cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <StatCard
+                                dark={dark}
+                                value={counts["documents"] ?? 0}
+                                label="Documents générés (total)"
+                                colorClass={
+                                    dark ? "text-cyan-400" : "text-cyan-600"
+                                }
+                                bgClass={dark ? "bg-cyan-500/15" : "bg-cyan-50"}
+                                icon={
+                                    <svg
+                                        className={`w-5 h-5 ${dark ? "text-cyan-400" : "text-cyan-600"}`}
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={1.8}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                        />
+                                    </svg>
+                                }
+                            />
+                            <StatCard
+                                dark={dark}
+                                value={counts["comptes"] ?? 0}
+                                label="Activations/désactivations de comptes (total)"
+                                colorClass={
+                                    dark ? "text-lime-400" : "text-lime-600"
+                                }
+                                bgClass={dark ? "bg-lime-500/15" : "bg-lime-50"}
+                                icon={
+                                    <svg
+                                        className={`w-5 h-5 ${dark ? "text-lime-400" : "text-lime-600"}`}
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={1.8}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                                        />
+                                    </svg>
+                                }
+                            />
+                            <StatCard
+                                dark={dark}
+                                value={counts["reinitialisations_mdp"] ?? 0}
+                                label="Réinitialisations de mots de passe (total)"
+                                colorClass={
+                                    dark ? "text-orange-400" : "text-orange-600"
+                                }
+                                bgClass={
+                                    dark ? "bg-orange-500/15" : "bg-orange-50"
+                                }
+                                icon={
+                                    <svg
+                                        className={`w-5 h-5 ${dark ? "text-orange-400" : "text-orange-600"}`}
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={1.8}
+                                    >
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                                        />
+                                    </svg>
+                                }
+                            />
+                        </div>
                     </div>
                 )}
 
@@ -447,16 +620,16 @@ export default function AuditLogsPage({ dark }) {
                 <div
                     className={`rounded-2xl border p-4 flex flex-col sm:flex-row gap-3 ${card}`}
                 >
-                <SearchInput 
-                    value={searchText} 
-                    onChange={setSearchText} 
-                    dark={dark} 
-                    placeholder="Rechercher par description ou auteur…" 
-                    className="flex-1"
-                />
+                    <SearchInput
+                        value={searchText}
+                        onChange={handleSearchChange}
+                        dark={dark}
+                        placeholder="Rechercher par description ou auteur…"
+                        className="flex-1"
+                    />
                     <select
                         value={filterAction}
-                        onChange={(e) => setFilterAction(e.target.value)}
+                        onChange={handleFilterChange}
                         className={selectCls}
                     >
                         {ACTION_FILTERS.map((f) => (
@@ -469,7 +642,7 @@ export default function AuditLogsPage({ dark }) {
                         ))}
                     </select>
                     <button
-                        onClick={fetchLogs}
+                        onClick={() => requestLogs(currentPage)}
                         title="Rafraîchir"
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all cursor-pointer
                             ${dark ? "border-white/10 text-slate-300 hover:bg-white/8" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}
@@ -562,7 +735,7 @@ export default function AuditLogsPage({ dark }) {
                                     {error}
                                 </p>
                                 <button
-                                    onClick={fetchLogs}
+                                    onClick={() => requestLogs(currentPage)}
                                     className="underline text-xs mt-1 cursor-pointer"
                                 >
                                     Réessayer
@@ -680,7 +853,7 @@ export default function AuditLogsPage({ dark }) {
                                                                 className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs font-bold border ${colorCls}`}
                                                             >
                                                                 <span
-                                                                    className={`w-1.5 h-1.5 rounded-full ${dotCls} flex-shrink-0`}
+                                                                    className={`w-1.5 h-1.5 rounded-full ${dotCls} shrink-0`}
                                                                 />
                                                                 {auditIcon(
                                                                     log.action,

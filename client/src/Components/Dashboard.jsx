@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "./SideBar";
 import PersonnelDirectory from "./PersonnelDirectory";
 import AddPersonnel from "./AddPersonnel";
@@ -167,27 +167,47 @@ const ACTION_STYLE = {
     AJOUT_PERSONNEL: {
         dark: "bg-emerald-400/10 text-emerald-400",
         light: "bg-emerald-50 text-emerald-600",
-        label: "Ajout personnel",
+        label: "Ajout d'employé",
     },
     ARCHIVAGE_PERSONNEL: {
         dark: "bg-rose-400/10 text-rose-400",
         light: "bg-rose-50 text-rose-600",
-        label: "Archivage",
+        label: "Archivage d'employé",
     },
     AVANCEMENT_ECHELON: {
         dark: "bg-blue-400/10 text-blue-400",
         light: "bg-blue-50 text-blue-600",
-        label: "Avancement",
+        label: "Avancement d'échelon",
     },
     PROMOTION_CLASSE: {
         dark: "bg-violet-400/10 text-violet-400",
         light: "bg-violet-50 text-violet-600",
-        label: "Promotion",
+        label: "Promotion d'employé",
     },
-    MODIFICATION: {
+    MODIFICATION_PERSONNEL: {
         dark: "bg-amber-400/10 text-amber-400",
         light: "bg-amber-50 text-amber-600",
-        label: "Modification",
+        label: "Modification d'employé",
+    },
+    GENERATION_DOCUMENT: {
+        dark: "bg-cyan-400/10 text-cyan-400",
+        light: "bg-cyan-50 text-cyan-600",
+        label: "Génération de document",
+    },
+    RESET_MDP: {
+        dark: "bg-orange-400/10 text-orange-400",
+        light: "bg-orange-50 text-orange-600",
+        label: "Réinitialisation mot de passe",
+    },
+    ACTIVATION: {
+        dark: "bg-lime-400/10 text-lime-400",
+        light: "bg-lime-50 text-lime-600",
+        label: "Activation compte",
+    },
+    DESACTIVATION: {
+        dark: "bg-slate-400/10 text-slate-400",
+        light: "bg-slate-100 text-slate-500",
+        label: "Désactivation compte",
     },
 };
 const ACTION_DEFAULT = {
@@ -248,7 +268,7 @@ function auditIcon(action) {
                 />
             </svg>
         );
-    if (action === "MODIFICATION")
+    if (action === "MODIFICATION" || action === "MODIFICATION_PERSONNEL")
         return (
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -262,6 +282,77 @@ function auditIcon(action) {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                />
+            </svg>
+        );
+    if (action === "GENERATION_DOCUMENT")
+        return (
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+            </svg>
+        );
+
+    if (action === "RESET_MDP")
+        return (
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                />
+            </svg>
+        );
+
+    if (action === "ACTIVATION")
+        return (
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+            </svg>
+        );
+
+    if (action === "DESACTIVATION")
+        return (
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
             </svg>
         );
@@ -546,7 +637,9 @@ function AuditLogPanel({ dark, T, onNavigate, onLogout }) {
                 setLoadError(err.message);
                 setLoadingLogs(false);
             });
-    }, []);
+
+
+        }, [onLogout]);
 
     return (
         <div
@@ -699,7 +792,7 @@ function DashboardHome({ dark, T, onNavigate, onLogout }) {
                 setError(err.message);
                 setLoading(false);
             });
-    }, []);
+    }, [onLogout]);
 
     const hour = new Date().getHours();
     const greeting =
@@ -1118,15 +1211,15 @@ export default function Dashboard({ onLogout }) {
                             onToggle={() => setDark((d) => !d)}
                         />
 
-                        <NotificationMenu 
-                            dark={dark} 
-                            onNavigate={setActiveNav} 
+                        <NotificationMenu
+                            dark={dark}
+                            onNavigate={setActiveNav}
                         />
 
-                        <SettingsMenu 
-                            dark={dark} 
-                            onNavigate={setActiveNav} 
-                            onLogout={onLogout} 
+                        <SettingsMenu
+                            dark={dark}
+                            onNavigate={setActiveNav}
+                            onLogout={onLogout}
                         />
                     </div>
                 </header>

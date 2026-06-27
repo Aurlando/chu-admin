@@ -63,7 +63,7 @@ function StatutBadge({ statut = "En activité", dark }) {
 
     return (
         <span
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wide flex-shrink-0 whitespace-nowrap ${styles[normalized] || styles["Actif"]}`}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border uppercase tracking-wide shrink-0 whitespace-nowrap ${styles[normalized] || styles["Actif"]}`}
         >
             <span className="w-1.5 translate-y- h-1.5 rounded-full bg-current whitespace-nowrap" />
             {statut}
@@ -166,34 +166,72 @@ function ProfileDocsDropdown({ dark, onCertificat }) {
         : "w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 hover:bg-violet-50 hover:text-violet-700 transition-colors cursor-pointer text-left";
 
     return (
-        <div className="relative" ref={ref}>
+        <div
+            className="relative"
+            ref={ref}
+        >
             <button
                 type="button"
                 onClick={() => setOpen((o) => !o)}
                 className={triggerCls}
                 title="Générer un document"
             >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
                 </svg>
                 Docs
-                <svg className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                <svg
+                    className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M19 9l-7 7-7-7"
+                    />
                 </svg>
             </button>
 
             {open && (
                 <div className={menuCls}>
-                    <div className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest ${dark ? "text-slate-600" : "text-slate-400"}`}>
+                    <div
+                        className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest ${dark ? "text-slate-600" : "text-slate-400"}`}
+                    >
                         Documents disponibles
                     </div>
                     <button
                         type="button"
                         className={itemCls}
-                        onClick={() => { setOpen(false); onCertificat(); }}
+                        onClick={() => {
+                            setOpen(false);
+                            onCertificat();
+                        }}
                     >
-                        <svg className="w-4 h-4 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <svg
+                            className="w-4 h-4 text-violet-400 shrink-0"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
                         </svg>
                         Certificat Administratif
                     </button>
@@ -261,7 +299,7 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
                         Authorization: `Bearer ${token}`,
                     },
                     body: JSON.stringify(certFields),
-                }
+                },
             );
             if (!res.ok) {
                 const json = await res.json().catch(() => ({}));
@@ -342,7 +380,7 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
                 setError(err.message);
                 setLoading(false);
             });
-    }, [id, refreshTrigger]); // [MODIFIÉ] refreshTrigger ajouté aux dépendances
+    }, [id, refreshTrigger, token]);
 
     // ── Tokens thème
     const bg = dark ? "bg-[#0a0f1e]" : "bg-slate-50";
@@ -696,7 +734,9 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
                                         setCertFields({
                                             numero: "",
                                             motif: "",
-                                            date_delivrance: new Date().toISOString().split("T")[0],
+                                            date_delivrance: new Date()
+                                                .toISOString()
+                                                .split("T")[0],
                                             signataire: "Directeur",
                                         });
                                         setDocError(null);
@@ -943,9 +983,11 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
                                     dark={dark}
                                     label="Sexe"
                                     value={
-                                        profile.genre === "M" ? "Masculin" :
-                                        profile.genre === "F" ? "Féminin" :
-                                        profile.genre || null
+                                        profile.genre === "M"
+                                            ? "Masculin"
+                                            : profile.genre === "F"
+                                              ? "Féminin"
+                                              : profile.genre || null
                                     }
                                 />
                                 <InfoRow
@@ -1196,6 +1238,10 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
                                                     dark: "bg-amber-500/15 text-amber-400 border-amber-500/25",
                                                     light: "bg-amber-50 text-amber-700 border-amber-200",
                                                 },
+                                                GENERATION_DOCUMENT: {
+                                                    dark: "bg-cyan-500/15 text-cyan-400 border-cyan-500/25",
+                                                    light: "bg-cyan-50 text-cyan-700 border-cyan-200",
+                                                },
                                                 RESET_MDP: {
                                                     dark: "bg-orange-500/15 text-orange-400 border-orange-500/25",
                                                     light: "bg-orange-50 text-orange-700 border-orange-200",
@@ -1221,19 +1267,24 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
 
                                             // Libellé lisible
                                             const actionLabels = {
-                                                AJOUT_PERSONNEL: "Ajout",
+                                                AJOUT_PERSONNEL:
+                                                    "Ajout de l'employé",
                                                 AVANCEMENT_ECHELON:
-                                                    "Avancement",
-                                                PROMOTION_CLASSE: "Promotion",
+                                                    "Avancement d'échelon",
+                                                PROMOTION_CLASSE:
+                                                    "Promotion de classe",
                                                 ARCHIVAGE_PERSONNEL:
-                                                    "Archivage",
+                                                    "Archivage de l'employé",
                                                 MODIFICATION_PERSONNEL:
-                                                    "Modification",
+                                                    "Modification du dossier",
+                                                GENERATION_DOCUMENT:
+                                                    "Génération de document",
                                                 RESET_MDP:
-                                                    "Réinitialisation mot de passe",
-                                                ACTIVATION: "Activation Compte",
+                                                    "Réinitialisation du mot de passe",
+                                                ACTIVATION:
+                                                    "Activation du compte",
                                                 DESACTIVATION:
-                                                    "Désactivation Compte",
+                                                    "Désactivation du compte",
                                             };
                                             const label =
                                                 actionLabels[log.action] ||
