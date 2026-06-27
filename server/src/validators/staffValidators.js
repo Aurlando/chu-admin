@@ -112,6 +112,21 @@ function formatIM(im) {
 }
 
 // ------------------------------------------------------------------
+//  vérifier que genre_id existe dans ref.genre
+// ------------------------------------------------------------------
+async function validerGenreId(genre_id) {
+    if (genre_id === undefined || genre_id === null) return null; // optionnel
+
+    const id = parseInt(genre_id, 10);
+    if (isNaN(id) || id <= 0) return "genre_id invalide.";
+
+    const genre = await prisma.genre.findUnique({ where: { id: BigInt(id) } });
+    if (!genre) return "Le genre sélectionné n'existe pas.";
+
+    return null;
+}
+
+// ------------------------------------------------------------------
 //  verification des diplomes et normalisation de format
 // ------------------------------------------------------------------
 const STATUTS_ENUM_MAP = {
@@ -249,6 +264,7 @@ module.exports = {
     validerTelephone,
     validerIM,
     formatIM,
+    validerGenreId,
     normaliserDiplomes,
     normaliserStatut,
     formatStatutPourClient,

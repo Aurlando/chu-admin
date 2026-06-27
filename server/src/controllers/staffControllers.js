@@ -74,6 +74,19 @@ async function getFonctions(req, res) {
     }
 }
 
+// ------------------------------------------------------------------
+//   Genres
+// ------------------------------------------------------------------
+async function getGenres(req, res) {
+    try {
+        const genres = await staffModels.getDistinctGenres();
+        res.status(200).json({ data: genres });
+    } catch (error) {
+        console.error("[getGenres] Erreur :", error);
+        res.status(500).json({ message: "Erreur interne du serveur" });
+    }
+}
+
 // ── PROFIL ────────────────────────────────────────────────────────
 async function getStaffProfile(req, res) {
     const id = parseInt(req.params.id, 10);
@@ -125,6 +138,7 @@ async function addStaff(req, res) {
         email,
         service_id,
         fonction_id,
+        genre_id,
         statut,
         donner_access,
         donner_acces,
@@ -226,6 +240,10 @@ async function addStaff(req, res) {
     const erreurEmail = validators.validerEmail(email);
     if (erreurEmail) return erreur400(erreurEmail);
 
+    // ── genre_id ──────────────────────────────────────────────────
+    const erreurGenre = await validators.validerGenreId(genre_id);
+    if (erreurGenre) return erreur400(erreurGenre);
+
     // ── 3. Accès SIH ──────────────────────────────────────────────
     const accesBoolean = (donner_access ?? donner_acces) === "true";
     const erreurSIH = validators.validerAccesSIH({
@@ -282,6 +300,7 @@ async function addStaff(req, res) {
             email: email?.trim() || null,
             service_id: serviceId,
             fonction_id: fonctionId,
+            genre_id: genre_id ? parseInt(genre_id, 10) : null,
             statut: statutNormalise,
             photo_profil: req.file
                 ? `photo-profil-${imNormalise.replaceAll(" ", "")}.png`
@@ -400,6 +419,7 @@ async function updateStaff(req, res) {
     const email = ouString(body.email);
     const service_id = ouInt(body.service_id);
     const fonction_id = ouInt(body.fonction_id);
+    const genre_id = ouInt(body.genre_id);
     const statut = ouString(body.statut);
 
     //Helper update : reutilise erreur400 avec nettoyage fichier
@@ -447,6 +467,11 @@ async function updateStaff(req, res) {
     if (email !== undefined) {
         const erreurEmail = validators.validerEmail(email);
         if (erreurEmail) return erreur400(erreurEmail);
+    }
+
+    if (genre_id !== undefined) {
+        const erreurGenre = await validators.validerGenreId(genre_id);
+        if (erreurGenre) return erreur400(erreurGenre);
     }
 
     // ── 5. Unicité BDD — en excluant le personnel actuel ─────────
@@ -543,6 +568,7 @@ async function updateStaff(req, res) {
             email,
             service_id,
             fonction_id,
+            genre_id,
             statut:
                 statut !== undefined
                     ? validators.normaliserStatut(statut)
@@ -671,6 +697,7 @@ module.exports = {
     getArchivedProfile,
     getDepartments,
     getFonctions,
+    getGenres,
     getStaffProfile,
     addStaff,
     updateStaff,

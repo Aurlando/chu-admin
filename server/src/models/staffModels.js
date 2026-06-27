@@ -248,6 +248,19 @@ async function getDistinctFonctions() {
     }));
 }
 
+// Dropdown Genre
+async function getDistinctGenres() {
+    const genres = await prisma.genre.findMany({
+        select: { id: true, libelle: true },
+        orderBy: { libelle: "asc" },
+    });
+
+    return genres.map((g) => ({
+        id: Number(g.id),
+        libelle: g.libelle,
+    }));
+}
+
 // ── PROFIL ────────────────────────────────────────────────────────
 async function getStaffById(id) {
     const personnel = await prisma.personnel.findUnique({
@@ -258,6 +271,9 @@ async function getStaffById(id) {
                 select: { id: true, libelle: true },
             },
             fonction: {
+                select: { id: true, libelle: true },
+            },
+            genre: {
                 select: { id: true, libelle: true },
             },
             diplome: {
@@ -397,6 +413,8 @@ async function getStaffById(id) {
         email: personnel.email,
         departement: toInitCap(personnel.service?.libelle),
         service_id: personnel.service_id,
+        genre_id: personnel.genre_id ? Number(personnel.genre_id) : null,
+        genre: personnel.genre?.libelle ?? null,
         statut: validators.formatStatutPourClient(personnel.statut),
         a_acces_sih: Boolean(personnel.auth_user),
         username_sih: personnel.auth_user?.username ?? null,
@@ -418,6 +436,7 @@ async function addPersonnel({
     email,
     service_id,
     fonction_id,
+    genre_id,
     statut,
     photo_profil,
     diplomes = [],
@@ -469,6 +488,7 @@ async function addPersonnel({
                 email,
                 service_id: BigInt(service_id),
                 fonction_id: fonction_id !== undefined ? fonction_id : null,
+                genre_id: genre_id !== undefined && genre_id !== null ? BigInt(genre_id) : null,
                 statut,
                 photo_profil,
             },
@@ -548,6 +568,7 @@ async function updatePersonnel({
     email,
     service_id,
     fonction_id,
+    genre_id,
     statut,
     photo_profil,
     anciennePhoto,
@@ -576,6 +597,8 @@ async function updatePersonnel({
         if (service_id !== undefined)
             dataToUpdate.service_id = BigInt(service_id);
         if (fonction_id !== undefined) dataToUpdate.fonction_id = fonction_id;
+        if (genre_id !== undefined)
+            dataToUpdate.genre_id = genre_id !== null ? BigInt(genre_id) : null;
         if (statut !== undefined) dataToUpdate.statut = statut;
         if (photo_profil !== undefined)
             dataToUpdate.photo_profil = photo_profil;
@@ -821,6 +844,7 @@ module.exports = {
     getArchivedStaff,
     getDistinctDepartments,
     getDistinctFonctions,
+    getDistinctGenres,
     getStaffById,
     addPersonnel,
     updatePersonnel,
