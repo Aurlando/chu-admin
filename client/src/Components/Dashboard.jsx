@@ -1,17 +1,17 @@
-import { useState, useEffect } from "react";
-import Sidebar from "./SideBar";
-import PersonnelDirectory from "./PersonnelDirectory";
-import AddPersonnel from "./AddPersonnel";
+import { useEffect, useState } from "react";
 import "../App.css";
-import StructureHospitaliere from "./StructureHospitaliere";
+import AddPersonnel from "./AddPersonnel";
+import PersonnelDirectory from "./PersonnelDirectory";
 import SecurityCredentials from "./SecurityCredentials";
+import Sidebar from "./SideBar";
+import StructureHospitaliere from "./StructureHospitaliere";
 // [AJOUTÉ] Page archives du personnel
 import ArchivePage from "./ArchivePage";
-import Avancements from "./Avancements";
 import AuditLogsPage from "./AuditLogsPage";
-import ToggleMode from "./ToggleMode";
+import Avancements from "./Avancements";
 import NotificationMenu from "./NotificationMenu";
 import SettingsMenu from "./SettingsMenu";
+import ToggleMode from "./ToggleMode";
 
 const API_URL = "http://localhost:3000/dashboard";
 
@@ -589,10 +589,7 @@ function ChartLegend({ dark }) {
             ${dark ? "border-white/8" : "border-slate-100"}`}
         >
             {GROUPES.map((g) => (
-                <div
-                    key={g}
-                    className="flex items-center gap-1.5"
-                >
+                <div key={g} className="flex items-center gap-1.5">
                     <div
                         className="w-2.5 h-2.5 rounded-sm shrink-0"
                         style={{ backgroundColor: PALETTE_API[g] }}
@@ -637,9 +634,7 @@ function AuditLogPanel({ dark, T, onNavigate, onLogout }) {
                 setLoadError(err.message);
                 setLoadingLogs(false);
             });
-
-
-        }, [onLogout]);
+    }, [onLogout]);
 
     return (
         <div
@@ -1076,6 +1071,9 @@ export default function Dashboard({ onLogout }) {
             window.matchMedia &&
             window.matchMedia("(prefers-color-scheme: dark)").matches,
     );
+    const [notifRefresh, setNotifRefresh] = useState(0);
+    const refreshNotifications = () => setNotifRefresh((prev) => prev + 1);
+
     // [AJOUTÉ] Écouteur pour les changements de thème du système
     useEffect(() => {
         if (!window.matchMedia) return;
@@ -1115,6 +1113,7 @@ export default function Dashboard({ onLogout }) {
                     <PersonnelDirectory
                         dark={dark}
                         onNavigate={setActiveNav}
+                        refreshNotifications={refreshNotifications}
                     />
                 );
             case "Ajouter un personnel":
@@ -1124,6 +1123,7 @@ export default function Dashboard({ onLogout }) {
                         onAnnuler={() =>
                             setActiveNav("Répertoire du personnel")
                         }
+                        refreshNotifications={refreshNotifications}
                     />
                 );
             // ── [AJOUTÉ] Liaison avec StructureHospitaliere (déjà importé ligne 6)
@@ -1141,7 +1141,12 @@ export default function Dashboard({ onLogout }) {
             case "Archives":
                 return <ArchivePage dark={dark} />;
             case "Avancements":
-                return <Avancements dark={dark} />;
+                return (
+                    <Avancements
+                        dark={dark}
+                        refreshNotifications={refreshNotifications}
+                    />
+                );
             case "Audit Logs":
                 return <AuditLogsPage dark={dark} />;
             case "Dashboard":
@@ -1214,6 +1219,7 @@ export default function Dashboard({ onLogout }) {
                         <NotificationMenu
                             dark={dark}
                             onNavigate={setActiveNav}
+                            refreshKey={notifRefresh}
                         />
 
                         <SettingsMenu
