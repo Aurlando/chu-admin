@@ -99,16 +99,11 @@ function validerIM(im) {
 }
 
 // ------------------------------------------------------------------
-//  tranformer l'Im 123456 en 123 456
+//  normaliser l'IM pour stockage/validation (retire espaces/tirets)
 // ------------------------------------------------------------------
 function formatIM(im) {
-    const chiffres = im.toString().trim().replace(/\s+/g, "");
-
-    if (chiffres.length >= 6) {
-        return `${chiffres.slice(0, 3)} ${chiffres.slice(3)}`;
-    }
-
-    return chiffres;
+    if (!im) return "";
+    return im.toString().trim().replace(/\D/g, "");
 }
 
 // ------------------------------------------------------------------

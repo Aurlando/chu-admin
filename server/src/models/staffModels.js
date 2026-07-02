@@ -405,8 +405,12 @@ async function getStaffById(id) {
               }
             : null,
         date_entree_admin: dateEntreeAdminFormatee,
+        date_sortie: personnel.date_sortie
+            ? formaterDate(personnel.date_sortie)
+            : null,
         annees_exercice: anneesExercice,
         specialite: personnel.specialite,
+        corps: personnel.corps,
         service: toInitCap(personnel.fonction?.libelle),
         fonction_id: personnel.fonction_id,
         telephone: personnel.telephone,
@@ -432,6 +436,7 @@ async function addPersonnel({
     id_grade_actuel,
     date_effet,
     specialite,
+    corps,
     telephone,
     email,
     service_id,
@@ -484,11 +489,15 @@ async function addPersonnel({
                 id_grade_actuel: parseInt(id_grade_actuel, 10),
                 date_entree_admin: dateEntreeAdmin,
                 specialite,
+                corps,
                 telephone,
                 email,
                 service_id: BigInt(service_id),
                 fonction_id: fonction_id !== undefined ? fonction_id : null,
-                genre_id: genre_id !== undefined && genre_id !== null ? BigInt(genre_id) : null,
+                genre_id:
+                    genre_id !== undefined && genre_id !== null
+                        ? BigInt(genre_id)
+                        : null,
                 statut,
                 photo_profil,
             },
@@ -564,6 +573,7 @@ async function updatePersonnel({
     echelon,
     id_grade_actuel,
     specialite,
+    corps,
     telephone,
     email,
     service_id,
@@ -592,6 +602,7 @@ async function updatePersonnel({
         if (id_grade_actuel !== undefined)
             dataToUpdate.id_grade_actuel = id_grade_actuel;
         if (specialite !== undefined) dataToUpdate.specialite = specialite;
+        if (corps !== undefined) dataToUpdate.corps = corps;
         if (telephone !== undefined) dataToUpdate.telephone = telephone;
         if (email !== undefined) dataToUpdate.email = email;
         if (service_id !== undefined)
@@ -748,7 +759,9 @@ async function updatePersonnel({
         });
     });
 
-    return { success: true };
+    // Retourner le profil mis à jour pour que le contrôleur puisse le renvoyer au client
+    const profile = await getStaffById(id);
+    return { success: true, data: profile };
 }
 
 // Fonction auxiliaire : supprime l'ancienne photo du serveur

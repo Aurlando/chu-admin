@@ -146,13 +146,14 @@ async function addStaff(req, res) {
         password,
         role,
         date_entree_admin,
+        corps,
         diplomes: diplomesRaw,
     } = req.body;
 
     // ── Résolution du grade : id_grade_actuel (si fourni) OU
     //    lookup BDD depuis categorie + classe + echelon
     //    Pour la classe STAGIAIRE, l'échelon est optionnel
-    const estStagiaire = classe?.toString().toUpperCase() === 'STAGIAIRE';
+    const estStagiaire = classe?.toString().toUpperCase() === "STAGIAIRE";
     let gradeIdResolu = id_grade_actuel;
     if (!gradeIdResolu && categorie && classe && (echelon || estStagiaire)) {
         const gradeFound = await staffModels.trouverGrade({
@@ -296,6 +297,7 @@ async function addStaff(req, res) {
             num_arrete: num_arrete || req.body.arrete || null,
             date_effet,
             specialite: specialite?.trim() || null,
+            corps: corps?.trim() || null,
             telephone: telephone.trim(),
             email: email?.trim() || null,
             service_id: serviceId,
@@ -394,7 +396,7 @@ async function updateStaff(req, res) {
     const echelon = ouString(body.echelon);
     let id_grade_actuel = ouInt(body.id_grade_actuel);
 
-    const estStagiaire = classe?.toUpperCase() === 'STAGIAIRE';
+    const estStagiaire = classe?.toUpperCase() === "STAGIAIRE";
     if (!id_grade_actuel && categorie && classe && (echelon || estStagiaire)) {
         const gradeFound = await staffModels.trouverGrade({
             categorie,
@@ -405,16 +407,15 @@ async function updateStaff(req, res) {
             id_grade_actuel = parseInt(gradeFound.id_grade, 10);
         } else {
             validators.supprimerFichierSiExiste(req.file?.path);
-            return res
-                .status(400)
-                .json({
-                    message: estStagiaire
-                        ? `Grade STAGIAIRE introuvable pour la catégorie ${categorie}. Veuillez vérifier la configuration des grades.`
-                        : `Combinaison de grade (catégorie, classe, échelon) invalide`,
-                });
+            return res.status(400).json({
+                message: estStagiaire
+                    ? `Grade STAGIAIRE introuvable pour la catégorie ${categorie}. Veuillez vérifier la configuration des grades.`
+                    : `Combinaison de grade (catégorie, classe, échelon) invalide`,
+            });
         }
     }
     const specialite = ouString(body.specialite);
+    const corps = ouString(body.corps);
     const telephone = ouString(body.telephone);
     const email = ouString(body.email);
     const service_id = ouInt(body.service_id);
@@ -545,7 +546,7 @@ async function updateStaff(req, res) {
 
     // ── 9. Transaction BDD ────────────────────────────────────────
     try {
-        await staffModels.updatePersonnel({
+        const result = await staffModels.updatePersonnel({
             id,
             nom: nom ? nom.toUpperCase() : undefined,
             prenoms: prenoms
@@ -564,6 +565,7 @@ async function updateStaff(req, res) {
             echelon,
             id_grade_actuel,
             specialite,
+            corps,
             telephone,
             email,
             service_id,
@@ -581,11 +583,15 @@ async function updateStaff(req, res) {
             password_hash,
             adminId: req.user?.id,
         });
-
         // Supprimer l'ancienne photo après la mise à jour en BDD
         staffModels.supprimerAnciennePhoto(photo_profil, anciennePhoto);
 
-        res.status(200).json({ message: "Personnel mis à jour avec succès" });
+        // Si le modèle renvoie le profil mis à jour, l'inclure dans la réponse
+        const data = result && result.data ? result.data : null;
+        res.status(200).json({
+            message: "Personnel mis à jour avec succès",
+            data,
+        });
     } catch (error) {
         if (req.file && photo_profil) {
             validators.supprimerFichierSiExiste(

@@ -22,8 +22,8 @@ const documentRoutes = require('./routes/documentRoutes');
 const app = express();
 
 app.use(cors({
-    origin: "http://localhost:5173",
-    allowedHeaders: ["content-Type", "Authorization"],
+    origin: "*",
+    allowedHeaders: ["Content-Type", "Authorization"],
     methods: ["GET", "POST", "PATCH"]
 }))
 app.use(express.json());
