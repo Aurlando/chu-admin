@@ -69,15 +69,37 @@ function civilite(libelleGenre) {
  * @returns {string}
  */
 function formaterGrade(classeRaw, echelonRaw) {
+    const classeValue = String(classeRaw ?? "").trim();
+    const echelonValue = echelonRaw;
+
+    if (!classeValue) return "";
+
+    const classeUpper = classeValue.toUpperCase();
+    if (classeUpper === "STAGIAIRE") {
+        return "stagiaire";
+    }
+
+    const classeNum = parseInt(classeValue, 10);
+    const echelonNum = Number(echelonValue);
+    const hasClasse = !Number.isNaN(classeNum);
+    const hasEchelon = !Number.isNaN(echelonNum) && echelonNum !== 0;
+
     function ordinal(n) {
         const num = parseInt(n, 10);
         if (num === 1) return "1er";
         return `${num}ème`;
     }
 
-    const classeOrd = ordinal(classeRaw);
-    const echelonOrd = ordinal(echelonRaw);
-    return `${classeOrd} classe ${echelonOrd} échelon`;
+    if (!hasClasse) {
+        return classeValue.toLowerCase();
+    }
+
+    const classeOrd = ordinal(classeNum);
+    if (hasEchelon) {
+        return `${classeOrd} classe ${ordinal(echelonNum)} échelon`;
+    }
+
+    return `${classeOrd} classe`;
 }
 
 // ------------------------------------------------------------------
