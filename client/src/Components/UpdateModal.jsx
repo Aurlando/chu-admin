@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 // [AJOUT] Import du modal de confirmation réutilisable
 import ConfirmModal from "./ConfirModal";
 
@@ -170,6 +170,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
         im: "",
         date_naissance: "",
         genre_id: "",
+        corps: "", // [NOUVEAU] Corps du personnel
         categorie: "",
         classe: "",
         echelon: "",
@@ -251,8 +252,9 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                     categorie: p.grade_actuel ? p.grade_actuel.categorie : "",
                     classe: p.grade_actuel ? p.grade_actuel.classe : "",
                     echelon: p.grade_actuel ? p.grade_actuel.echelon : "",
+                    corps: p.corps || "",
                     specialite: p.specialite || "",
-                    telephone: p.telephone || "",
+                    telephone: formatPhoneDisplay(p.telephone || ""),
                     email: p.email || "",
                     service_id: p.service_id || "", // si l'API renvoie l'id FK
                     fonction_id: p.fonction_id || "",
@@ -334,6 +336,43 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
         if (errors[name]) setErrors((prev) => ({ ...prev, [name]: null }));
     };
 
+    const formatPhoneDisplay = (value) => {
+        const raw = String(value ?? "").replace(/[^\d+]/g, "");
+        if (!raw) return "";
+
+        const hasPlus = raw.startsWith("+");
+        const digits = raw.replace(/\D/g, "");
+        if (!digits) return hasPlus ? "+" : "";
+
+        const limited = digits.slice(0, 10);
+        const parts = [];
+        if (limited.length <= 3) parts.push(limited);
+        else if (limited.length <= 5)
+            parts.push(limited.slice(0, 3), limited.slice(3));
+        else if (limited.length <= 8)
+            parts.push(
+                limited.slice(0, 3),
+                limited.slice(3, 5),
+                limited.slice(5),
+            );
+        else
+            parts.push(
+                limited.slice(0, 3),
+                limited.slice(3, 5),
+                limited.slice(5, 8),
+                limited.slice(8),
+            );
+
+        const formatted = parts.join(" ");
+        return hasPlus ? `+${formatted}` : formatted;
+    };
+
+    const normalizePhoneForBackend = (value) =>
+        String(value ?? "")
+            .replace(/[^\d+]/g, "")
+            .replace(/\s+/g, "")
+            .replace(/-/g, "");
+
     const handlePhoto = (file) => {
         if (!file) return;
         setPhotoFile(file);
@@ -354,20 +393,22 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
     const validate = () => {
         const e = {};
         // [AJOUT] Définition des expressions régulières pour des messages plus explicatifs
-        const noSpecialCharsRegex = /^[a-zA-ZÀ-ÿ\s]+$/;
-        const noSpecialCharsAlphanumRegex = /^[a-zA-Z0-9À-ÿ\s]+$/;
+        const noSpecialCharsRegex = /^[A-Za-zÀ-ÖØ-öø-ÿ\s'’-]+$/u;
+        const noSpecialCharsAlphanumRegex = /^[A-Za-zÀ-ÖØ-öø-ÿ0-9\s'’-]+$/u;
 
         if (!form.nom.trim()) {
             e.nom = "Le nom est requis";
         } else if (!noSpecialCharsRegex.test(form.nom)) {
             // [AJOUT] Message spécifique pour expliquer la nature de l'erreur
-            e.nom = "Pas de chiffres ou caractères spéciaux";
+            e.nom =
+                "Seules les lettres, espaces, accents, apostrophes et traits d'union sont autorisés";
         }
 
         if (!form.prenoms.trim()) {
             e.prenoms = "Le prénom est requis";
         } else if (!noSpecialCharsRegex.test(form.prenoms)) {
-            e.prenoms = "Pas de chiffres ou caractères spéciaux";
+            e.prenoms =
+                "Seules les lettres, espaces, accents, apostrophes et traits d'union sont autorisés";
         }
 
         if (!form.im.trim()) {
@@ -456,9 +497,6 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
         setSubmitting(true);
         setApiError(null);
 
-        onClose(); // Ferme le modal immédiatement pour la mise à jour optimiste
-        onSaved(true, "Mise à jour en cours..."); // Signale un succès optimiste au parent
-
         try {
             const fd = new FormData();
             if (photoFile) fd.append("photo_profil", photoFile);
@@ -471,7 +509,8 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             if (form.classe) fd.append("classe", form.classe);
             if (form.echelon) fd.append("echelon", form.echelon);
             fd.append("specialite", form.specialite.trim());
-            fd.append("telephone", form.telephone.trim());
+            fd.append("corps", form.corps?.trim() || "");
+            fd.append("telephone", normalizePhoneForBackend(form.telephone));
             fd.append("email", form.email.trim());
             fd.append("service_id", form.service_id);
             fd.append("fonction_id", form.fonction_id);
@@ -484,12 +523,37 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                 body: fd,
             });
 
+            const json = await res.json().catch(() => ({}));
             if (!res.ok) {
-                const json = await res.json().catch(() => ({}));
                 throw new Error(json.message || `Erreur ${res.status}`);
             }
+
+            // Mettre à jour le formulaire local avec les données renvoyées (notamment `corps`)
+            if (json.data) {
+                if (json.data.corps !== undefined)
+                    setForm((prev) => ({ ...prev, corps: json.data.corps }));
+                if (json.data.photo_profil)
+                    setPhotoPreview(json.data.photo_profil);
+            }
+
+            // Succès : fermer le modal et demander au parent de rafraîchir
+            if (typeof onClose === "function") onClose();
+            if (typeof onSaved === "function")
+                onSaved(true, "Profil mis à jour avec succès");
         } catch (err) {
             setApiError(err.message);
+            // Signale l'échec au parent pour qu'il puisse afficher un message ou refetch
+            if (typeof onSaved === "function") {
+                try {
+                    onSaved(
+                        false,
+                        err.message || "Erreur lors de la mise à jour",
+                    );
+                } catch (cbErr) {
+                    // Intentionally ignore callback errors to avoid logging or exposing data in production.
+                    void cbErr;
+                }
+            }
             const msg = err.message.toLowerCase();
             let fieldKey = null;
             if (msg.includes("matricule") || msg.includes(" im ")) {
@@ -570,10 +634,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             )}
 
             {/* ── OVERLAY : fond semi-transparent derrière le modal */}
-            <div
-                className={overlay}
-                onClick={handleBackdropClick}
-            >
+            <div className={overlay} onClick={handleBackdropClick}>
                 {/* ── MODAL ── */}
                 <div
                     className={`relative w-full max-w-2xl max-h-[90vh] rounded-2xl border shadow-2xl flex flex-col ${modalBg}`}
@@ -819,6 +880,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     placeholder="Ex: RAKOTO"
                                                 />
                                             </Field>
+
                                             <Field
                                                 label="Prénoms"
                                                 required
@@ -838,32 +900,10 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     placeholder="Ex: Jean Paul"
                                                 />
                                             </Field>
-                                            <Field
-                                                label="Matricule (IM)"
-                                                required
-                                                dark={dark}
-                                                error={errors.im}
-                                            >
-                                                <input
-                                                    type="text"
-                                                    value={form.im}
-                                                    onChange={(e) =>
-                                                        handleChange(
-                                                            "im",
-                                                            e.target.value.replace(
-                                                                /\s/g,
-                                                                "",
-                                                            ),
-                                                        )
-                                                    }
-                                                    className={inp("im")}
-                                                    placeholder="Ex: 371815"
-                                                />
-                                            </Field>
+
                                             <Field
                                                 label="Date de naissance"
                                                 dark={dark}
-                                                // [AJOUT] Liaison avec le message d'erreur
                                                 error={errors.date_naissance}
                                             >
                                                 <input
@@ -878,6 +918,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     className={inputCls}
                                                 />
                                             </Field>
+
                                             <Field
                                                 label="Sexe"
                                                 required
@@ -894,10 +935,58 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     }
                                                     className={sel("genre_id")}
                                                 >
-                                                    <option value="">Sélectionner</option>
-                                                    <option value="1">Masculin</option>
-                                                    <option value="2">Féminin</option>
+                                                    <option value="">
+                                                        Sélectionner
+                                                    </option>
+                                                    <option value="1">
+                                                        Masculin
+                                                    </option>
+                                                    <option value="2">
+                                                        Féminin
+                                                    </option>
                                                 </select>
+                                            </Field>
+
+                                            <Field
+                                                label="Téléphone"
+                                                required
+                                                dark={dark}
+                                                error={errors.telephone}
+                                            >
+                                                <input
+                                                    type="tel"
+                                                    value={formatPhoneDisplay(
+                                                        form.telephone,
+                                                    )}
+                                                    onChange={(e) =>
+                                                        handleChange(
+                                                            "telephone",
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    className={inp("telephone")}
+                                                    placeholder="Ex: 034 24 724 58"
+                                                />
+                                            </Field>
+
+                                            <Field
+                                                label="Email"
+                                                required
+                                                dark={dark}
+                                                error={errors.email}
+                                            >
+                                                <input
+                                                    type="email"
+                                                    value={form.email}
+                                                    onChange={(e) =>
+                                                        handleChange(
+                                                            "email",
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    className={inp("email")}
+                                                    placeholder="Ex: jean@hopital.mg"
+                                                />
                                             </Field>
                                         </div>
                                     </div>
@@ -907,8 +996,73 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                 {activeTab === "situation" && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <Field
-                                            label="Catégorie"
+                                            label="Matricule"
+                                            required
                                             dark={dark}
+                                            error={errors.im}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={form.im}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "im",
+                                                        e.target.value.replace(
+                                                            /\s/g,
+                                                            "",
+                                                        ),
+                                                    )
+                                                }
+                                                className={inp("im")}
+                                                placeholder="Ex: 371815"
+                                            />
+                                        </Field>
+                                        <Field
+                                            label="Statut"
+                                            required
+                                            dark={dark}
+                                            error={errors.statut}
+                                        >
+                                            <select
+                                                value={form.statut}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "statut",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={selectCls}
+                                            >
+                                                {STATUTS.map((s) => (
+                                                    <option key={s} value={s}>
+                                                        {s}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </Field>
+                                        <Field
+                                            label="Corps"
+                                            dark={dark}
+                                            error={errors.corps}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={form.corps || ""}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "corps",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={inp("corps")}
+                                                placeholder="Ex: Cadre supérieur"
+                                            />
+                                        </Field>
+                                        <Field
+                                            label="Catégorie"
+                                            required
+                                            dark={dark}
+                                            error={errors.categorie}
                                         >
                                             <select
                                                 value={form.categorie}
@@ -924,10 +1078,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     Sélectionner
                                                 </option>
                                                 {CATEGORIES.map((c) => (
-                                                    <option
-                                                        key={c}
-                                                        value={c}
-                                                    >
+                                                    <option key={c} value={c}>
                                                         {c}
                                                     </option>
                                                 ))}
@@ -935,7 +1086,9 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                         </Field>
                                         <Field
                                             label="Classe"
+                                            required
                                             dark={dark}
+                                            error={errors.classe}
                                         >
                                             <select
                                                 value={form.classe}
@@ -962,7 +1115,9 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                         </Field>
                                         <Field
                                             label="Échelon"
+                                            required
                                             dark={dark}
+                                            error={errors.echelon}
                                         >
                                             <select
                                                 value={form.echelon}
@@ -978,56 +1133,11 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     Sélectionner
                                                 </option>
                                                 {ECHELONS.map((e) => (
-                                                    <option
-                                                        key={e}
-                                                        value={e}
-                                                    >
+                                                    <option key={e} value={e}>
                                                         {e}
                                                     </option>
                                                 ))}
                                             </select>
-                                        </Field>
-                                        <Field
-                                            label="Statut"
-                                            dark={dark}
-                                        >
-                                            <select
-                                                value={form.statut}
-                                                onChange={(e) =>
-                                                    handleChange(
-                                                        "statut",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className={selectCls}
-                                            >
-                                                {STATUTS.map((s) => (
-                                                    <option
-                                                        key={s}
-                                                        value={s}
-                                                    >
-                                                        {s}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
-                                        <Field
-                                            label="Spécialité"
-                                            dark={dark}
-                                            error={errors.specialite}
-                                        >
-                                            <input
-                                                type="text"
-                                                value={form.specialite}
-                                                onChange={(e) =>
-                                                    handleChange(
-                                                        "specialite",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className={inputCls}
-                                                placeholder="Ex: Médecin spécialiste en chirurgie"
-                                            />
                                         </Field>
                                     </div>
                                 )}
@@ -1037,6 +1147,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <Field
                                             label="Service"
+                                            required
                                             dark={dark}
                                             error={errors.service_id}
                                         >
@@ -1065,6 +1176,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                         </Field>
                                         <Field
                                             label="Fonction"
+                                            required
                                             dark={dark}
                                             error={errors.fonction_id}
                                         >
@@ -1092,41 +1204,22 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                             </select>
                                         </Field>
                                         <Field
-                                            label="Téléphone"
+                                            label="Spécialité"
+                                            required
                                             dark={dark}
-                                            // [AJOUT] Liaison avec le message d'erreur
-                                            error={errors.telephone}
+                                            error={errors.specialite}
                                         >
                                             <input
-                                                type="tel"
-                                                value={form.telephone}
+                                                type="text"
+                                                value={form.specialite}
                                                 onChange={(e) =>
                                                     handleChange(
-                                                        "telephone",
+                                                        "specialite",
                                                         e.target.value,
                                                     )
                                                 }
-                                                className={inp("telephone")} // [MODIFIÉ] Utilise inp() pour la bordure rouge en cas d'erreur
-                                                placeholder="Ex: 034 24 724 58"
-                                            />
-                                        </Field>
-                                        <Field
-                                            label="Email"
-                                            dark={dark}
-                                            // [AJOUT] Liaison avec le message d'erreur
-                                            error={errors.email}
-                                        >
-                                            <input
-                                                type="email"
-                                                value={form.email}
-                                                onChange={(e) =>
-                                                    handleChange(
-                                                        "email",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className={inp("email")} // [MODIFIÉ] Utilise inp() pour la bordure rouge en cas d'erreur
-                                                placeholder="Ex: jean@chu.mg"
+                                                className={inp("specialite")}
+                                                placeholder="Ex: Médecin spécialiste en chirurgie"
                                             />
                                         </Field>
                                     </div>

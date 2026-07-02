@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from "react";
-import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
-import GenerateDocModal from "./GenerateDocModal"; // [NOUVEAU] modale de génération de docs
-import CertificatAdminForm from "./CertificatAdminForm"; // [NOUVEAU] formulaire certificat
+import { useEffect, useRef, useState } from "react";
 import "../App.css";
+import CertificatAdminForm from "./CertificatAdminForm"; // [NOUVEAU] formulaire certificat
+import GenerateDocModal from "./GenerateDocModal"; // [NOUVEAU] modale de génération de docs
+import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
 
 const API_BASE = "http://localhost:3000";
 
@@ -16,6 +16,28 @@ const formatClasse = (classe) => {
         EXCEPTIONNEL: "Exceptionnel",
     };
     return mapping[classe] || classe;
+};
+
+const formatEchelon = (echelon) => {
+    if (!echelon) return "";
+    const mapping = {
+        0: "-",
+        1: "1er échelon",
+        2: "2ème échelon",
+        3: "3ème échelon",
+    };
+    return mapping[echelon] || echelon;
+};
+
+const formatPhoneNumber = (phone) => {
+    if (!phone) return "";
+    // Supprime tous les caractères non-numériques
+    const cleaned = phone.replace(/\D/g, "");
+    // Formate comme: 034 45 555 54 (3-2-3-2 chiffres)
+    if (cleaned.length === 10) {
+        return `${cleaned.slice(0, 3)} ${cleaned.slice(3, 5)} ${cleaned.slice(5, 8)} ${cleaned.slice(8)}`;
+    }
+    return phone;
 };
 
 // [AJOUTÉ] Calcul de l'ancienneté en front-end à partir de la date d'entrée
@@ -166,10 +188,7 @@ function ProfileDocsDropdown({ dark, onCertificat }) {
         : "w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 hover:bg-violet-50 hover:text-violet-700 transition-colors cursor-pointer text-left";
 
     return (
-        <div
-            className="relative"
-            ref={ref}
-        >
+        <div className="relative" ref={ref}>
             <button
                 type="button"
                 onClick={() => setOpen((o) => !o)}
@@ -244,7 +263,13 @@ function ProfileDocsDropdown({ dark, onCertificat }) {
 // ════════════════════════════════════════════════════════════════════
 // Composant principal StaffProfile
 // ════════════════════════════════════════════════════════════════════
-export default function StaffProfile({ id, dark, onBack, showToast }) {
+export default function StaffProfile({
+    id,
+    dark,
+    onBack,
+    showToast,
+    refreshNotifications,
+}) {
     // Add showToast prop
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -421,6 +446,9 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
                                 message || "Profil mis à jour avec succès !",
                             );
                             setRefreshTrigger((prev) => prev + 1); // [MODIFIÉ] Déclenche le rechargement réel
+                            if (typeof refreshNotifications === "function") {
+                                refreshNotifications();
+                            }
                         } else {
                             localShowToast(
                                 message ||
@@ -993,7 +1021,7 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
                                 <InfoRow
                                     dark={dark}
                                     label="Téléphone"
-                                    value={profile.telephone}
+                                    value={formatPhoneNumber(profile.telephone)}
                                 />
                                 <InfoRow
                                     dark={dark}
@@ -1051,6 +1079,11 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
                                 />
                                 <InfoRow
                                     dark={dark}
+                                    label="Date de sortie"
+                                    value={profile.date_sortie || null}
+                                />
+                                <InfoRow
+                                    dark={dark}
                                     label="Accès SIH"
                                     value={profile.a_acces_sih ? "Oui" : "Non"}
                                 />
@@ -1091,8 +1124,8 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
                             >
                                 <InfoRow
                                     dark={dark}
-                                    label="Service"
-                                    value={profile.service}
+                                    label="Corps"
+                                    value={profile.corps}
                                 />
                                 <InfoRow
                                     dark={dark}
@@ -1119,13 +1152,9 @@ export default function StaffProfile({ id, dark, onBack, showToast }) {
                                 <InfoRow
                                     dark={dark}
                                     label="Échelon"
-                                    value={
-                                        profile.grade_actuel?.echelon != null
-                                            ? String(
-                                                  profile.grade_actuel.echelon,
-                                              )
-                                            : null
-                                    }
+                                    value={formatEchelon(
+                                        profile.grade_actuel?.echelon,
+                                    )}
                                 />
                                 {/* [AJOUTÉ] Indice — nouveau champ de grade_actuel */}
                                 {profile.grade_actuel?.indice != null && (

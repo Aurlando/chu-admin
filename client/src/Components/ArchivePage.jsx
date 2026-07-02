@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import StaffProfile from "./StaffProfile";
+import { useCallback, useEffect, useRef, useState } from "react";
 import SearchInput from "./SearchInput";
+import StaffProfile from "./StaffProfile";
 
 const API_BASE = "http://localhost:3000";
 const PER_PAGE = 10;
@@ -665,13 +665,7 @@ export default function ArchivePage({ dark }) {
                                                                 d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                                                             />
                                                         </svg>
-                                                        {p.date_sortie
-                                                            ? new Date(
-                                                                  p.date_sortie,
-                                                              ).toLocaleDateString(
-                                                                  "fr-FR",
-                                                              )
-                                                            : "—"}
+                                                        {p.date_sortie || "—"}
                                                     </span>
                                                 </td>
                                                 {/* [AJOUTÉ] Bouton Voir — ouvre le profil en lecture seule

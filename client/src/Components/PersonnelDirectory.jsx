@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import "../App.css";
+import CertificatAdminForm from "./CertificatAdminForm"; // [NOUVEAU] formulaire certificat
+import GenerateDocModal from "./GenerateDocModal"; // [NOUVEAU] modale de génération de docs
+import SearchInput from "./SearchInput";
 import StaffProfile from "./StaffProfile";
 import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
-import GenerateDocModal from "./GenerateDocModal"; // [NOUVEAU] modale de génération de docs
-import CertificatAdminForm from "./CertificatAdminForm"; // [NOUVEAU] formulaire certificat
-import SearchInput from "./SearchInput";
-import "../App.css";
 
 const API_BASE = "http://localhost:3000";
 const LIMIT = 10;
@@ -121,31 +121,69 @@ function DocsDropdown({ dark, onCertificat }) {
         <div className="relative" ref={ref}>
             <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen((o) => !o);
+                }}
                 className={triggerCls}
                 title="Générer un document"
             >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
                 </svg>
                 <span className="hidden sm:inline">Docs</span>
-                <svg className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                <svg
+                    className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M19 9l-7 7-7-7"
+                    />
                 </svg>
             </button>
 
             {open && (
                 <div className={menuCls}>
-                    <div className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${dark ? "text-slate-600" : "text-slate-400"}`}>
+                    <div
+                        className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest ${dark ? "text-slate-600" : "text-slate-400"}`}
+                    >
                         Documents disponibles
                     </div>
                     <button
                         type="button"
                         className={itemCls}
-                        onClick={(e) => { setOpen(false); onCertificat(e); }}
+                        onClick={(e) => {
+                            setOpen(false);
+                            onCertificat(e);
+                        }}
                     >
-                        <svg className="w-3.5 h-3.5 text-violet-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <svg
+                            className="w-3.5 h-3.5 text-violet-400 shrink-0"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2}
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
                         </svg>
                         Certificat Administratif
                     </button>
@@ -166,14 +204,22 @@ const CERT_DEFAULTS = () => ({
     signataire: "Directeur",
 });
 
-export default function PersonnelDirectory({ dark, onNavigate }) {
+export default function PersonnelDirectory({
+    dark,
+    onNavigate,
+    refreshNotifications,
+}) {
     // selectedId : null = liste, valeur = vue profil détail
     const [selectedId, setSelectedId] = useState(null);
     const [selectedIdUpdate, setSelectedIdUpdate] = useState(null);
     const [refreshKey, setRefreshKey] = useState(0); // Pour forcer le rafraîchissement de la liste
 
     // [AJOUTÉ] Logique de notification (Toast) manquante
-    const [toast, setToast] = useState({ show: false, msg: "", type: "success" });
+    const [toast, setToast] = useState({
+        show: false,
+        msg: "",
+        type: "success",
+    });
     const toastTimer = useRef(null);
 
     // [NOUVEAU] État pour la modale de génération de documents
@@ -185,9 +231,9 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
     const showToast = (msg, type = "success") => {
         if (toastTimer.current) clearTimeout(toastTimer.current);
         setToast({ show: true, msg, type });
-        toastTimer.current = setTimeout(() => 
-            setToast(prev => ({ ...prev, show: false })), 
-            2000
+        toastTimer.current = setTimeout(
+            () => setToast((prev) => ({ ...prev, show: false })),
+            2000,
         );
     };
 
@@ -214,7 +260,7 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
                         Authorization: `Bearer ${token}`,
                     },
                     body: JSON.stringify(certFields),
-                }
+                },
             );
             if (!res.ok) {
                 const json = await res.json().catch(() => ({}));
@@ -244,6 +290,7 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
                 dark={dark}
                 onBack={() => setSelectedId(null)}
                 showToast={showToast} // Pass showToast to StaffProfile
+                refreshNotifications={refreshNotifications}
             />
         );
     }
@@ -260,7 +307,10 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
                         setSelectedIdUpdate(null);
                         if (success) {
                             showToast(message || "Mise à jour réussie");
-                            setRefreshKey(prev => prev + 1); // Rafraîchit la liste
+                            setRefreshKey((prev) => prev + 1); // Rafraîchit la liste
+                            if (typeof refreshNotifications === "function") {
+                                refreshNotifications();
+                            }
                         } else {
                             showToast(message, "error");
                         }
@@ -298,10 +348,18 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
             />
 
             {/* Composant Toast */}
-            <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl text-sm font-medium transition-all duration-300
+            <div
+                className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl text-sm font-medium transition-all duration-300
                 ${toast.show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"}
-                ${dark ? "bg-[#0d1526] border border-white/10 text-slate-200" : "bg-slate-800 text-white"}`}>
-                <div className={toast.type === "success" ? "text-emerald-400" : "text-rose-400"}>
+                ${dark ? "bg-[#0d1526] border border-white/10 text-slate-200" : "bg-slate-800 text-white"}`}
+            >
+                <div
+                    className={
+                        toast.type === "success"
+                            ? "text-emerald-400"
+                            : "text-rose-400"
+                    }
+                >
                     {toast.type === "success" ? "✓" : "✕"}
                 </div>
                 {toast.msg}
@@ -310,7 +368,13 @@ export default function PersonnelDirectory({ dark, onNavigate }) {
     );
 }
 
-function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onOpenDocModal, onNavigate }) {
+function PersonnelList({
+    dark,
+    onSelectId,
+    onSelectIdUpdate,
+    onOpenDocModal,
+    onNavigate,
+}) {
     // ── États des données
     const [personnel, setPersonnel] = useState([]);
     const [pagination, setPagination] = useState({
@@ -503,11 +567,11 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onOpenDocModal, onN
             {/* ── Zone de filtres ── */}
             <div className={`rounded-2xl border p-4 mb-5 ${T.card}`}>
                 <div className="flex flex-nowrap gap-3 items-center">
-                    <SearchInput 
-                        value={search} 
-                        onChange={handleSearch} 
-                        dark={dark} 
-                        placeholder="Rechercher..." 
+                    <SearchInput
+                        value={search}
+                        onChange={handleSearch}
+                        dark={dark}
+                        placeholder="Rechercher..."
                         className="flex-1 min-w-37.5"
                     />
 
@@ -521,20 +585,34 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onOpenDocModal, onN
                             <option value="">Département</option>
                             {departments.map((d) => {
                                 const id = typeof d === "string" ? d : d.id;
-                                const label = typeof d === "string" ? d : d.libelle;
+                                const label =
+                                    typeof d === "string" ? d : d.libelle;
                                 return (
-                                    <option key={id} value={label}>{label}</option>
+                                    <option key={id} value={label}>
+                                        {label}
+                                    </option>
                                 );
                             })}
                         </select>
                         {filterDept && (
                             <button
                                 onClick={() => handleFilterDept("")}
-                                    type="button"
+                                type="button"
                                 className="absolute right-7 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="w-3.5 h-3.5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={3}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
                                 </svg>
                             </button>
                         )}
@@ -550,20 +628,34 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onOpenDocModal, onN
                             <option value="">Service</option>
                             {fonctions.map((f) => {
                                 const id = typeof f === "string" ? f : f.id;
-                                const label = typeof f === "string" ? f : f.libelle;
+                                const label =
+                                    typeof f === "string" ? f : f.libelle;
                                 return (
-                                    <option key={id} value={label}>{label}</option>
+                                    <option key={id} value={label}>
+                                        {label}
+                                    </option>
                                 );
                             })}
                         </select>
                         {filterFonc && (
                             <button
                                 onClick={() => handleFilterFonc("")}
-                                    type="button"
+                                type="button"
                                 className="absolute right-7 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="w-3.5 h-3.5"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth={3}
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
                                 </svg>
                             </button>
                         )}
@@ -641,13 +733,17 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onOpenDocModal, onN
 
             {/* ── Tableau ── */}
             {!loading && !error && (
-                <div className={`rounded-2xl border overflow-visible ${T.card}`}>
+                <div
+                    className={`rounded-2xl border overflow-visible ${T.card}`}
+                >
                     <table className="w-full text-sm">
                         <thead>
                             <tr
                                 className={`border-b text-left text-[11px] font-bold uppercase tracking-wider ${T.thHead}`}
                             >
-                                <th className="px-5 py-3.5 first:rounded-tl-2xl">Nom</th>
+                                <th className="px-5 py-3.5 first:rounded-tl-2xl">
+                                    Nom
+                                </th>
                                 <th className="px-5 py-3.5">Imatricule</th>
                                 <th className="px-5 py-3.5 hidden md:table-cell">
                                     Département
@@ -786,7 +882,7 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onOpenDocModal, onN
                                                         e.stopPropagation();
                                                         onOpenDocModal(
                                                             p.id,
-                                                            `${p.nom} ${p.prenoms}`
+                                                            `${p.nom} ${p.prenoms}`,
                                                         );
                                                     }}
                                                 />
