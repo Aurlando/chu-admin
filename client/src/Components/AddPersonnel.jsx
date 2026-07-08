@@ -1,8 +1,7 @@
 import { Component, useEffect, useRef, useState } from "react";
 import "../App.css";
 import ComfirmModal from "./ConfirModal";
-
-const API_BASE = "http://localhost:3000";
+import { API_BASE } from "../config/api.js";
 
 // ── Error Boundary : capture les erreurs de rendu et affiche un message clair
 // au lieu d'une page blanche

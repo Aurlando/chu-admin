@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import "../App.css";
-
-const API_BASE = "http://localhost:3000";
+import { API_BASE } from "../config/api.js";
 
 const formatClasse = (classe) => {
     if (!classe) return "";

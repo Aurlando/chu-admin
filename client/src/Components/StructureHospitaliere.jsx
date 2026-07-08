@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-
-const API_BASE = "http://localhost:3000/structure";
+import { API_BASE } from "../config/api.js";
 
 // ── Palette couleurs par groupe (index cyclique)
 const GROUP_PALETTE = [
@@ -209,19 +208,46 @@ function DetailModal({
 
     useEffect(() => {
         if (!open || !serviceId || !groupeId) return;
-        setLoading(true);
-        setError(null);
-        setData(null);
-        fetch(`${API_BASE}/detail/${serviceId}/${groupeId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then((r) => {
-                if (!r.ok) throw new Error(`Erreur ${r.status}`);
-                return r.json();
-            })
-            .then((json) => setData(json.data))
-            .catch((err) => setError(err.message))
-            .finally(() => setLoading(false));
+
+        let cancelled = false;
+
+        const loadDetail = async () => {
+            setLoading(true);
+            setError(null);
+            setData(null);
+
+            try {
+                const response = await fetch(
+                    `${API_BASE}/structure/detail/${serviceId}/${groupeId}`,
+                    {
+                        headers: { Authorization: `Bearer ${token}` },
+                    },
+                );
+
+                if (!response.ok) {
+                    throw new Error(`Erreur ${response.status}`);
+                }
+
+                const json = await response.json();
+                if (!cancelled) {
+                    setData(json.data ?? null);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setError(err.message || "Une erreur est survenue");
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        void loadDetail();
+
+        return () => {
+            cancelled = true;
+        };
     }, [open, serviceId, groupeId, token]);
 
     if (!open) return null;
@@ -477,23 +503,30 @@ export default function StructureHospitaliere({ dark }) {
         groupIdx: 0,
     });
 
-    const fetchRecap = useCallback(() => {
+    const fetchRecap = useCallback(async () => {
         setLoading(true);
         setError(null);
-        fetch(`${API_BASE}/recap`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then((r) => {
-                if (!r.ok) throw new Error(`Erreur ${r.status}`);
-                return r.json();
-            })
-            .then((json) => setRecap(json.data))
-            .catch((err) => setError(err.message))
-            .finally(() => setLoading(false));
+
+        try {
+            const response = await fetch(`${API_BASE}/structure/recap`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erreur ${response.status}`);
+            }
+
+            const json = await response.json();
+            setRecap(json.data ?? null);
+        } catch (err) {
+            setError(err.message || "Une erreur est survenue");
+        } finally {
+            setLoading(false);
+        }
     }, [token]);
 
     useEffect(() => {
-        fetchRecap();
+        void fetchRecap();
     }, [fetchRecap]);
 
     const [exporting, setExporting] = useState(false);
@@ -501,7 +534,7 @@ export default function StructureHospitaliere({ dark }) {
     const handleExport = async () => {
         setExporting(true);
         try {
-            const res = await fetch(`${API_BASE}/recap/export`, {
+            const res = await fetch(`${API_BASE}/structure/recap/export`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             if (!res.ok) throw new Error(`Erreur ${res.status}`);

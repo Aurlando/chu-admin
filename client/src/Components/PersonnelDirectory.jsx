@@ -5,8 +5,8 @@ import GenerateDocModal from "./GenerateDocModal"; // [NOUVEAU] modale de géné
 import SearchInput from "./SearchInput";
 import StaffProfile from "./StaffProfile";
 import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
+import { API_BASE } from "../config/api";
 
-const API_BASE = "http://localhost:3000";
 const LIMIT = 10;
 
 // ── Couleurs d'avatar tournantes (index de la ligne % 6)

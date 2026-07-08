@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 // [AJOUT] Import du modal de confirmation réutilisable
 import ConfirmModal from "./ConfirModal";
+import { API_BASE } from "../config/api";
 
-const API_BASE = "http://localhost:3000";
 const CATEGORIES = [
     "I",
     "II",

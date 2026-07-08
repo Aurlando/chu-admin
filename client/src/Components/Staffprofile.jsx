@@ -3,8 +3,7 @@ import "../App.css";
 import CertificatAdminForm from "./CertificatAdminForm"; // [NOUVEAU] formulaire certificat
 import GenerateDocModal from "./GenerateDocModal"; // [NOUVEAU] modale de génération de docs
 import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
-
-const API_BASE = "http://localhost:3000";
+import { API_BASE } from "../config/api";
 
 const formatClasse = (classe) => {
     if (!classe) return "";

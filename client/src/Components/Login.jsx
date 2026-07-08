@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import ToggleMode from "./ToggleMode";
+import { API_BASE } from "../config/api.js";
 
 export default function Login({ onLoginSuccess }) {
     const [darkMode, setDarkMode] = useState(
@@ -46,7 +47,7 @@ export default function Login({ onLoginSuccess }) {
 
         setLoading(true);
         try {
-            const res = await fetch("http://localhost:3000/auth/login", {
+            const res = await fetch(`${API_BASE}/auth/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, password }),

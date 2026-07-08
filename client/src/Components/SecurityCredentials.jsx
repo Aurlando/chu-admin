@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { API_BASE } from "../config/api.js";
 import SearchInput from "./SearchInput";
 
 // ── À adapter selon ton backend
-const API_BASE = "http://localhost:3000";
 const PER_PAGE = 8;
 const API_SECURITY = `${API_BASE}/security`;
 
@@ -215,10 +215,7 @@ function ResetPasswordModal({
                     </p>
                 </div>
 
-                <form
-                    onSubmit={handleSubmit}
-                    className="px-6 py-5 space-y-4"
-                >
+                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
                     <div>
                         <label
                             className={`text-[10px] font-bold uppercase tracking-widest mb-2 block ${sub}`}
@@ -413,34 +410,38 @@ export default function SecurityCredentials({ dark, onNavigate }) {
     };
 
     // ── GET /security?page=X&limit=8&search=Y
-    const fetchStaff = useCallback(() => {
+    const fetchStaff = useCallback(async () => {
         setLoading(true);
         setError(null);
         const params = new URLSearchParams({ page, limit: PER_PAGE });
         if (search) params.set("search", search);
 
-        fetch(`${API_SECURITY}?${params}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then((r) => {
-                if (!r.ok) throw new Error(`Erreur ${r.status}`);
-                return r.json();
-            })
-            .then((json) => {
-                setStaff(json.data ?? []);
-                setTotal(json.pagination?.total ?? 0);
-                setStats({
-                    actifs: json.stats?.actifs ?? json.pagination?.total ?? 0,
-                    reveals24h: json.stats?.reveals24h ?? 0,
-                    encryption: json.stats?.encryption ?? "bcrypt",
-                });
-            })
-            .catch((err) => setError(err.message))
-            .finally(() => setLoading(false));
+        try {
+            const response = await fetch(`${API_SECURITY}?${params}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erreur ${response.status}`);
+            }
+
+            const json = await response.json();
+            setStaff(json.data ?? []);
+            setTotal(json.pagination?.total ?? 0);
+            setStats({
+                actifs: json.stats?.actifs ?? json.pagination?.total ?? 0,
+                reveals24h: json.stats?.reveals24h ?? 0,
+                encryption: json.stats?.encryption ?? "bcrypt",
+            });
+        } catch (err) {
+            setError(err.message || "Une erreur est survenue");
+        } finally {
+            setLoading(false);
+        }
     }, [page, search, token]);
 
     useEffect(() => {
-        fetchStaff();
+        void fetchStaff();
     }, [fetchStaff]);
 
     // Debounce recherche 400ms
@@ -467,10 +468,10 @@ export default function SecurityCredentials({ dark, onNavigate }) {
                 if (!r.ok) throw new Error(`Erreur ${r.status}`);
                 return r.json();
             })
-            .then((json) => {
+            .then(() => {
                 showToast("Mot de passe réinitialisé avec succès");
                 setResetModal({ open: false, staff: null });
-                fetchStaff();
+                void fetchStaff();
             })
             .catch((err) => showToast(`Erreur : ${err.message}`))
             .finally(() => setResetting(false));
@@ -538,12 +539,6 @@ export default function SecurityCredentials({ dark, onNavigate }) {
         ? "px-5 py-[14px] border-b border-white/4"
         : "px-5 py-[14px] border-b border-slate-100";
     const trHover = dark ? "hover:bg-white/3" : "hover:bg-blue-50/30";
-    const inputCls = dark
-        ? "bg-white/5 border-white/10 text-white placeholder-slate-600 focus:border-blue-500/50 focus:bg-white/8"
-        : "bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-300 focus:bg-white";
-    const iconBtn = dark
-        ? "border-white/10 text-slate-500 hover:bg-white/8 hover:text-slate-300"
-        : "border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-600";
     const pgBtn = dark
         ? "border-white/10 text-slate-400 hover:bg-white/8"
         : "border-slate-200 text-slate-500 hover:bg-slate-100";

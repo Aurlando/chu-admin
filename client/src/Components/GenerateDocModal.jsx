@@ -60,7 +60,7 @@ export default function GenerateDocModal({
                 style={{ animation: "docModalIn .22s cubic-bezier(.34,1.56,.64,1)" }}
             >
                 {/* Barre décorative bleue en haut */}
-                <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-violet-500" />
+                <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-blue-500 to-violet-500" />
 
                 {/* En-tête */}
                 <div
@@ -76,7 +76,7 @@ export default function GenerateDocModal({
                             }`}
                         >
                             <svg
-                                className="w-4.5 h-4.5 w-5 h-5"
+                                className="w-5 h-5"
                                 fill="none"
                                 viewBox="0 0 24 24"
                                 stroke="currentColor"
@@ -114,7 +114,7 @@ export default function GenerateDocModal({
                         }`}
                     >
                         <svg
-                            className="w-4 h-4"
+                            className="w-5 h-5"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -138,7 +138,7 @@ export default function GenerateDocModal({
                         className={`mx-6 mb-4 flex items-start gap-2.5 px-3.5 py-3 rounded-xl border text-xs font-medium ${errBox}`}
                     >
                         <svg
-                            className="w-4 h-4 shrink-0 mt-0.5"
+                            className="w-5 h-5 shrink-0 mt-0.5"
                             fill="none"
                             viewBox="0 0 24 24"
                             stroke="currentColor"
@@ -178,7 +178,7 @@ export default function GenerateDocModal({
                         {loading ? (
                             <>
                                 <svg
-                                    className="w-4 h-4 animate-spin"
+                                    className="w-5 h-5 animate-spin"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                 >
@@ -201,7 +201,7 @@ export default function GenerateDocModal({
                         ) : (
                             <>
                                 <svg
-                                    className="w-4 h-4"
+                                    className="w-5 h-5"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"

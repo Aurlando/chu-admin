@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import SearchInput from "./SearchInput";
 import StaffProfile from "./StaffProfile";
+import { API_BASE } from "../config/api.js";
 
-const API_BASE = "http://localhost:3000";
 const PER_PAGE = 10;
 
 // Couleurs avatar cycliques

@@ -12,8 +12,7 @@ import Avancements from "./Avancements";
 import NotificationMenu from "./NotificationMenu";
 import SettingsMenu from "./SettingsMenu";
 import ToggleMode from "./ToggleMode";
-
-const API_URL = "http://localhost:3000/dashboard";
+import { API_BASE } from "../config/api.js";
 
 // Palette coherente cards + graphique
 const PALETTE = {
@@ -615,7 +614,7 @@ function AuditLogPanel({ dark, T, onNavigate, onLogout }) {
 
     useEffect(() => {
         const token = localStorage.getItem("token");
-        fetch("http://localhost:3000/audit-logs?limit=5", {
+        fetch(`${API_BASE}/audit-logs?limit=5`, {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then((res) => {
@@ -769,7 +768,7 @@ function DashboardHome({ dark, T, onNavigate, onLogout }) {
 
     useEffect(() => {
         const token = localStorage.getItem("token");
-        fetch(API_URL, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${API_BASE}/dashboard`, { headers: { Authorization: `Bearer ${token}` } })
             .then((res) => {
                 // Intercepter la session expirée / invalide
                 if (res.status === 401 || res.status === 403) {

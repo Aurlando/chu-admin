@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import SearchInput from "./SearchInput";
 import "../App.css";
-
-const API_BASE = "http://localhost:3000";
+import { API_BASE } from "../config/api.js";
 
 // ── Mapping styles + labels par type d'action
 const ACTION_STYLE = {

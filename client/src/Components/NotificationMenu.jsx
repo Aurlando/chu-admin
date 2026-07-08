@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { API_BASE } from "../config/api.js";
 
 export default function NotificationMenu({ dark, onNavigate, refreshKey }) {
     const [notifStats, setNotifStats] = useState(null);
@@ -10,7 +11,7 @@ export default function NotificationMenu({ dark, onNavigate, refreshKey }) {
     // ── Récupération des statistiques d'avancement
     useEffect(() => {
         if (!token) return;
-        fetch("http://localhost:3000/avancements/stats", {
+        fetch(`${API_BASE}/avancements/stats`, {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then((res) => (res.ok ? res.json() : null))
