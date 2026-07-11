@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { API_BASE } from "../config/api.js";
 import SearchInput from "./SearchInput";
 import StaffProfile from "./StaffProfile";
-import { API_BASE } from "../config/api.js";
 
 const PER_PAGE = 10;
 
@@ -133,7 +133,7 @@ function DeleteModal({
                 {/* Barre rose */}
                 <div className="absolute top-0 left-0 right-0 h-0.5 bg-linear-to-r from-rose-500 to-rose-600" />
 
-                <div className="px-6 py-6 space-y-4">
+                <div className={`px-6 py-6 space-y-4 border-b ${hdBorder}`}>
                     {/* Icône */}
                     <div
                         className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto
@@ -298,37 +298,44 @@ export default function ArchivePage({ dark }) {
     };
 
     // ── GET /staff/archives?page=X&limit=10&search=Y
-    const fetchArchives = useCallback(() => {
+    const fetchArchives = useCallback(async () => {
         setLoading(true);
         setError(null);
         const params = new URLSearchParams({ page, limit: PER_PAGE });
         if (search) params.set("search", search);
 
-        fetch(`${API_BASE}/staff/archives?${params}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then((r) => {
-                if (!r.ok) throw new Error(`Erreur ${r.status}`);
-                return r.json();
-            })
-            .then((json) => {
-                // Adapte selon la structure de ton API :
-                // json.data = tableau OU { staff: [], total: N }
-                const data = json.data;
-                if (Array.isArray(data)) {
-                    setStaff(data);
-                    setTotal(json.total ?? data.length);
-                } else {
-                    setStaff(data?.staff ?? []);
-                    setTotal(data?.total ?? 0);
-                }
-            })
-            .catch((err) => setError(err.message))
-            .finally(() => setLoading(false));
+        try {
+            const response = await fetch(
+                `${API_BASE}/staff/archives?${params}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                },
+            );
+
+            if (!response.ok) {
+                throw new Error(`Erreur ${response.status}`);
+            }
+
+            const json = await response.json();
+            // Adapte selon la structure de ton API :
+            // json.data = tableau OU { staff: [], total: N }
+            const data = json.data;
+            if (Array.isArray(data)) {
+                setStaff(data);
+                setTotal(json.total ?? data.length);
+            } else {
+                setStaff(data?.staff ?? []);
+                setTotal(data?.total ?? 0);
+            }
+        } catch (err) {
+            setError(err.message || "Une erreur est survenue");
+        } finally {
+            setLoading(false);
+        }
     }, [page, search, token]);
 
     useEffect(() => {
-        fetchArchives();
+        void fetchArchives();
     }, [fetchArchives]);
 
     // Debounce recherche
@@ -395,9 +402,6 @@ export default function ArchivePage({ dark }) {
         ? "px-5 py-[13px] border-b border-white/4"
         : "px-5 py-[13px] border-b border-slate-100";
     const trHover = dark ? "hover:bg-white/3" : "hover:bg-rose-50/20";
-    const inputCls = dark
-        ? "bg-white/5 border-white/10 text-white placeholder-slate-600 focus:border-blue-500/50"
-        : "bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-blue-300 focus:bg-white";
     const pgBtn = dark
         ? "border-white/10 text-slate-400 hover:bg-white/8"
         : "border-slate-200 text-slate-500 hover:bg-slate-100";

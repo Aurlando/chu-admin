@@ -333,30 +333,31 @@ export default function Avancements({ dark, refreshNotifications }) {
             .catch(() => {}); // silencieux — la bannière est facultative
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const fetchEligible = useCallback(() => {
+    const fetchEligible = useCallback(async () => {
         setLoading(true);
-        fetch(`${API_BASE}/avancements/proches`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then((res) => {
-                if (!res.ok)
-                    throw new Error(
-                        "Erreur lors de la récupération des agents éligibles",
-                    );
-                return res.json();
-            })
-            .then((data) => {
-                setAgents(data.data || data);
-                setLoading(false);
-            })
-            .catch((err) => {
-                setError(err.message);
-                setLoading(false);
+        setError(null);
+        try {
+            const res = await fetch(`${API_BASE}/avancements/proches`, {
+                headers: { Authorization: `Bearer ${token}` },
             });
+
+            if (!res.ok) {
+                throw new Error(
+                    "Erreur lors de la récupération des agents éligibles",
+                );
+            }
+
+            const data = await res.json();
+            setAgents(data.data || data);
+        } catch (err) {
+            setError(err.message || "Une erreur est survenue");
+        } finally {
+            setLoading(false);
+        }
     }, [token]);
 
     useEffect(() => {
-        fetchEligible();
+        void fetchEligible();
     }, [fetchEligible]);
 
     const bg = dark ? "bg-[#0a0f1e]" : "bg-slate-50";
