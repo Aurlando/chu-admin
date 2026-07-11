@@ -3,7 +3,7 @@ import "../App.css";
 import CertificatAdminForm from "./CertificatAdminForm"; // [NOUVEAU] formulaire certificat
 import GenerateDocModal from "./GenerateDocModal"; // [NOUVEAU] modale de génération de docs
 import SearchInput from "./SearchInput";
-import StaffProfile from "./StaffProfile";
+import StaffProfile from "./Staffprofile";
 import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
 import { API_BASE } from "../config/api";
 

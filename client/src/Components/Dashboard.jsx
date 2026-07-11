@@ -3,7 +3,7 @@ import "../App.css";
 import AddPersonnel from "./AddPersonnel";
 import PersonnelDirectory from "./PersonnelDirectory";
 import SecurityCredentials from "./SecurityCredentials";
-import Sidebar from "./SideBar";
+import Sidebar from "./Sidebar";
 import StructureHospitaliere from "./StructureHospitaliere";
 // [AJOUTÉ] Page archives du personnel
 import ArchivePage from "./ArchivePage";
