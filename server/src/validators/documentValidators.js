@@ -4,21 +4,30 @@
 
 const SIGNATAIRES_VALIDES = ['ADAAF', 'Directeur'];
 
+// Champs supplémentaires (au-delà du socle commun numero/date/signataire)
+// requis pour chaque type de document, avec leur libellé d'erreur.
+// Pour ajouter un document avec des champs obligatoires propres,
+// ajouter une entrée ici (ex: attestation_stage: [{ champ: 'periode', libelle: 'La période' }]).
+const CHAMPS_SUPPLEMENTAIRES_REQUIS = {
+    certificat_administratif: [
+        { champ: 'motif', libelle: 'Le motif' },
+    ],
+    attestation_non_interruption_service: [
+        // Aucun champ supplémentaire requis : corps/poste/grade viennent
+        // directement de la fiche de l'agent en base.
+    ],
+};
+
 /**
- * Valide le body pour la génération du certificat administratif.
+ * Valide les champs communs à tous les documents : numero, date_delivrance, signataire.
  * Retourne un tableau d'erreurs (vide si tout est OK).
  */
-function validerCertificatAdministratif({ numero, motif, date_delivrance, signataire }) {
+function validerChampsCommuns({ numero, date_delivrance, signataire }) {
     const erreurs = [];
 
     // numero — non vide
     if (!numero || String(numero).trim() === '') {
         erreurs.push('Le numéro de référence est requis.');
-    }
-
-    // motif — non vide
-    if (!motif || String(motif).trim() === '') {
-        erreurs.push('Le motif est requis.');
     }
 
     // date_delivrance — date valide format ISO YYYY-MM-DD
@@ -46,7 +55,28 @@ function validerCertificatAdministratif({ numero, motif, date_delivrance, signat
     return erreurs;
 }
 
+/**
+ * Valide le body pour un type de document donné : applique les
+ * règles communes, puis les règles spécifiques déclarées dans
+ * CHAMPS_SUPPLEMENTAIRES_REQUIS.
+ * @param {string} typeDocument - clé de CHAMPS_SUPPLEMENTAIRES_REQUIS
+ * @param {object} body
+ * @returns {string[]} tableau d'erreurs (vide si tout est OK)
+ */
+function validerDocument(typeDocument, body) {
+    const erreurs = validerChampsCommuns(body);
+
+    const champsRequis = CHAMPS_SUPPLEMENTAIRES_REQUIS[typeDocument] || [];
+    for (const { champ, libelle } of champsRequis) {
+        if (!body[champ] || String(body[champ]).trim() === '') {
+            erreurs.push(`${libelle} est requis.`);
+        }
+    }
+
+    return erreurs;
+}
+
 module.exports = {
-    validerCertificatAdministratif,
+    validerDocument,
     SIGNATAIRES_VALIDES,
 };
