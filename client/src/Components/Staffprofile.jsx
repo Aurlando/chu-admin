@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import "../App.css";
-import CertificatAdminForm from "./CertificatAdminForm"; // [NOUVEAU] formulaire certificat
-import GenerateDocModal from "./GenerateDocModal"; // [NOUVEAU] modale de génération de docs
+import DocsDropdown from "./DocsDropdown"; // [GÉNÉRIQUE] menu "Docs ▾" piloté par DOCUMENT_TYPES
+import { DOCUMENT_TYPES } from "./documentTypes"; // [GÉNÉRIQUE] registre des documents générables
+import DocumentForm from "./DocumentForm"; // [GÉNÉRIQUE] formulaire dynamique selon le type de document
+import GenerateDocModal from "./GenerateDocModal"; // modale de génération de docs
 import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
+import { useDocumentGenerator } from "./useDocumentGenerator"; // [GÉNÉRIQUE] logique partagée (state + appel API)
 import { API_BASE } from "../config/api";
 
 const formatClasse = (classe) => {
@@ -162,104 +165,6 @@ function SectionCard({ icon, title, children, dark }) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// ProfileDocsDropdown — bouton "Docs ▾" pour la barre du profil
-// ════════════════════════════════════════════════════════════════════
-function ProfileDocsDropdown({ dark, onCertificat }) {
-    const [open, setOpen] = useState(false);
-    const ref = useRef(null);
-
-    useEffect(() => {
-        const handler = (e) => {
-            if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-        };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
-    }, []);
-
-    const triggerCls = dark
-        ? "flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border border-violet-500/30 text-violet-400 hover:bg-violet-500/10 transition-all hover:-translate-y-0.5 cursor-pointer"
-        : "flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border border-violet-200 text-violet-600 hover:bg-violet-50 transition-all hover:-translate-y-0.5 cursor-pointer";
-    const menuCls = dark
-        ? "absolute right-0 top-full mt-1.5 w-56 rounded-xl border border-white/10 bg-[#0d1526] shadow-2xl z-30 py-1"
-        : "absolute right-0 top-full mt-1.5 w-56 rounded-xl border border-slate-200 bg-white shadow-2xl z-30 py-1";
-    const itemCls = dark
-        ? "w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-300 hover:bg-white/5 hover:text-white transition-colors cursor-pointer text-left"
-        : "w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 hover:bg-violet-50 hover:text-violet-700 transition-colors cursor-pointer text-left";
-
-    return (
-        <div className="relative" ref={ref}>
-            <button
-                type="button"
-                onClick={() => setOpen((o) => !o)}
-                className={triggerCls}
-                title="Générer un document"
-            >
-                <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                </svg>
-                Docs
-                <svg
-                    className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M19 9l-7 7-7-7"
-                    />
-                </svg>
-            </button>
-
-            {open && (
-                <div className={menuCls}>
-                    <div
-                        className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest ${dark ? "text-slate-600" : "text-slate-400"}`}
-                    >
-                        Documents disponibles
-                    </div>
-                    <button
-                        type="button"
-                        className={itemCls}
-                        onClick={() => {
-                            setOpen(false);
-                            onCertificat();
-                        }}
-                    >
-                        <svg
-                            className="w-4 h-4 text-violet-400 shrink-0"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                            />
-                        </svg>
-                        Certificat Administratif
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ════════════════════════════════════════════════════════════════════
 // Composant principal StaffProfile
 // ════════════════════════════════════════════════════════════════════
 export default function StaffProfile({
@@ -298,52 +203,18 @@ export default function StaffProfile({
     // [AJOUTÉ] archiveError : message d'erreur si l'archivage échoue
     const [archiveError, setArchiveError] = useState(null);
 
-    // [NOUVEAU] États pour la modale de génération de documents
-    const [showDocModal, setShowDocModal] = useState(false);
-    const [certFields, setCertFields] = useState({
-        numero: "",
-        motif: "",
-        date_delivrance: new Date().toISOString().split("T")[0],
-        signataire: "Directeur",
-    });
-    const [docLoading, setDocLoading] = useState(false);
-    const [docError, setDocError] = useState(null);
-
-    // [NOUVEAU] Génère le certificat et déclenche le téléchargement
-    const handleGenerate = async () => {
-        setDocLoading(true);
-        setDocError(null);
-        try {
-            const res = await fetch(
-                `${API_BASE}/documents/certificat-administratif/${id}`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify(certFields),
-                },
-            );
-            if (!res.ok) {
-                const json = await res.json().catch(() => ({}));
-                throw new Error(json.message || `Erreur ${res.status}`);
-            }
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `certificat_${id}.docx`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-            setShowDocModal(false);
-            localShowToast("Document généré avec succès !");
-        } catch (err) {
-            setDocError(err.message);
-        } finally {
-            setDocLoading(false);
-        }
-    };
+    // [GÉNÉRIQUE] État + logique de la modale de génération de documents,
+    // partagés avec PersonnelDirectory via useDocumentGenerator.js
+    const {
+        docModal, // { type, agentId } | null
+        docFields,
+        docLoading,
+        docError,
+        openDocModal,
+        closeDocModal,
+        updateDocField,
+        generateDoc,
+    } = useDocumentGenerator(localShowToast);
 
     // [AJOUTÉ] handleArchiver : appelle PATCH /staff/:id/archiver
     // En cas de succès → ferme le modal + retourne au répertoire (onBack)
@@ -463,21 +334,21 @@ export default function StaffProfile({
                 />
             )}
 
-            {/* [NOUVEAU] Modale de génération de documents */}
-            {showDocModal && (
+            {/* [GÉNÉRIQUE] Modale de génération de documents — titre et
+                formulaire s'adaptent au type choisi dans DOCUMENT_TYPES */}
+            {docModal && (
                 <GenerateDocModal
-                    title="Certificat Administratif"
+                    title={DOCUMENT_TYPES[docModal.type].label}
                     dark={dark}
                     loading={docLoading}
                     error={docError}
-                    onClose={() => !docLoading && setShowDocModal(false)}
-                    onSubmit={handleGenerate}
+                    onClose={closeDocModal}
+                    onSubmit={generateDoc}
                 >
-                    <CertificatAdminForm
-                        fields={certFields}
-                        onChange={(key, val) =>
-                            setCertFields((prev) => ({ ...prev, [key]: val }))
-                        }
+                    <DocumentForm
+                        type={docModal.type}
+                        fields={docFields}
+                        onChange={updateDocField}
                         dark={dark}
                     />
                 </GenerateDocModal>
@@ -754,21 +625,10 @@ export default function StaffProfile({
                                     Mettre à jour
                                 </button>
 
-                                {/* [NOUVEAU] Bouton dropdown "Docs ▾" */}
-                                <ProfileDocsDropdown
+                                {/* Bouton dropdown "Docs ▾" */}
+                                <DocsDropdown
                                     dark={dark}
-                                    onCertificat={() => {
-                                        setCertFields({
-                                            numero: "",
-                                            motif: "",
-                                            date_delivrance: new Date()
-                                                .toISOString()
-                                                .split("T")[0],
-                                            signataire: "Directeur",
-                                        });
-                                        setDocError(null);
-                                        setShowDocModal(true);
-                                    }}
+                                    onSelect={(type) => openDocModal(type, id)}
                                 />
 
                                 {/* Bouton "Fin de service" — visible uniquement si non archivé */}
