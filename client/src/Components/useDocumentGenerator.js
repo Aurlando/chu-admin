@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { API_BASE } from "../config/api";
+import { API_BASE, apiFetch } from "../config/api";
 import { DOCUMENT_TYPES } from "./documentTypes";
 
 const today = () => new Date().toISOString().split("T")[0];
@@ -49,18 +49,13 @@ export function useDocumentGenerator(showToast) {
     const generateDoc = async () => {
         if (!docModal) return;
         const config = DOCUMENT_TYPES[docModal.type];
-        const token = localStorage.getItem("token");
         setDocLoading(true);
         setDocError(null);
         try {
-            const res = await fetch(
+            const res = await apiFetch(
                 `${API_BASE}/documents/${config.endpoint}/${docModal.agentId}`,
                 {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
                     body: JSON.stringify(docFields),
                 },
             );

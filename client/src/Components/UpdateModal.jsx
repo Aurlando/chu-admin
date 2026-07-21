@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 // [AJOUT] Import du modal de confirmation réutilisable
 import ConfirmModal from "./ConfirModal";
-import { API_BASE } from "../config/api";
+import { API_BASE, apiFetch } from "../config/api";
 
 const CATEGORIES = [
     "I",
@@ -202,8 +202,6 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
     const [confirmSave, setConfirmSave] = useState(false);
     const [confirmClose, setConfirmClose] = useState(false);
 
-    const token = localStorage.getItem("token");
-
     // ── Styles partagés
     const inputCls = dark
         ? "w-full px-3.5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white text-sm placeholder:text-slate-600 outline-none focus:border-blue-500/60 transition-all [&_option]:text-black [&_option]:bg-white"
@@ -224,10 +222,8 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
     // Chargement du profil + dropdowns au montage
     // ════════════════════════════════════════════════════════════════════
     useEffect(() => {
-        const headers = { Authorization: `Bearer ${token}` };
-
         // Chargement du profil pour pré-remplir le formulaire
-        fetch(`${API_BASE}/staff/profile/${id}`, { headers })
+        apiFetch(`${API_BASE}/staff/profile/${id}`)
             .then((r) => {
                 if (!r.ok) throw new Error(`Erreur ${r.status}`);
                 return r.json();
@@ -286,7 +282,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             });
 
         // Chargement des dropdowns
-        fetch(`${API_BASE}/staff/departments`, { headers })
+        apiFetch(`${API_BASE}/staff/departments`)
             .then((r) => r.json())
             .then((json) => {
                 const data = json.data || [];
@@ -298,7 +294,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             })
             .catch(() => {});
 
-        fetch(`${API_BASE}/staff/fonctions`, { headers })
+        apiFetch(`${API_BASE}/staff/fonctions`)
             .then((r) => r.json())
             .then((json) => {
                 const data = json.data || [];
@@ -517,9 +513,8 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             fd.append("statut", form.statut);
             fd.append("diplomes", JSON.stringify(diplomes));
 
-            const res = await fetch(`${API_BASE}/staff/update/${id}`, {
+            const res = await apiFetch(`${API_BASE}/staff/update/${id}`, {
                 method: "PATCH",
-                headers: { Authorization: `Bearer ${token}` }, // pas de Content-Type → FormData le gère
                 body: fd,
             });
 

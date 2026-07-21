@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import "../App.css";
-import { API_BASE } from "../config/api.js";
+import { API_BASE, apiFetch } from "../config/api.js";
 
 const formatClasse = (classe) => {
     if (!classe) return "";
@@ -38,13 +38,9 @@ function PromotionModal({
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState(null);
 
-    const token = localStorage.getItem("token");
-
     const fetchHistory = useCallback(() => {
         setLoading(true);
-        fetch(`${API_BASE}/avancements/${personnelId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
+        apiFetch(`${API_BASE}/avancements/${personnelId}`)
             .then((res) => {
                 if (!res.ok)
                     throw new Error(
@@ -60,7 +56,7 @@ function PromotionModal({
                 setError(err.message);
                 setLoading(false);
             });
-    }, [personnelId, token]);
+    }, [personnelId]);
 
     useEffect(() => {
         fetchHistory();
@@ -76,12 +72,8 @@ function PromotionModal({
         setSubmitError(null);
 
         try {
-            const res = await fetch(`${API_BASE}/avancements/${personnelId}`, {
+            const res = await apiFetch(`${API_BASE}/avancements/${personnelId}`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
                 body: JSON.stringify({
                     num_arrete: numArrete.trim(),
                     date_signature: dateSignature,
@@ -319,13 +311,9 @@ export default function Avancements({ dark, refreshNotifications }) {
     // [NOUVEAU] Stats de notifications : dépassé / très proches / total
     const [notifStats, setNotifStats] = useState(null);
 
-    const token = localStorage.getItem("token");
-
     // [NOUVEAU] Fetch des stats de notifications au montage
     useEffect(() => {
-        fetch(`${API_BASE}/avancements/stats`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
+        apiFetch(`${API_BASE}/avancements/stats`)
             .then((res) => (res.ok ? res.json() : null))
             .then((json) => {
                 if (json?.data) setNotifStats(json.data);
@@ -337,9 +325,7 @@ export default function Avancements({ dark, refreshNotifications }) {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch(`${API_BASE}/avancements/proches`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const res = await apiFetch(`${API_BASE}/avancements/proches`);
 
             if (!res.ok) {
                 throw new Error(
@@ -354,7 +340,7 @@ export default function Avancements({ dark, refreshNotifications }) {
         } finally {
             setLoading(false);
         }
-    }, [token]);
+    }, []);
 
     useEffect(() => {
         void fetchEligible();

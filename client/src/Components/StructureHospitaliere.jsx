@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { API_BASE } from "../config/api.js";
+import { API_BASE, apiFetch } from "../config/api.js";
 
 // ── Palette couleurs par groupe (index cyclique)
 const GROUP_PALETTE = [
@@ -185,7 +185,6 @@ function DetailModal({
     groupeName,
     groupIdx,
     dark,
-    token,
 }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -217,11 +216,8 @@ function DetailModal({
             setData(null);
 
             try {
-                const response = await fetch(
+                const response = await apiFetch(
                     `${API_BASE}/structure/detail/${serviceId}/${groupeId}`,
-                    {
-                        headers: { Authorization: `Bearer ${token}` },
-                    },
                 );
 
                 if (!response.ok) {
@@ -248,7 +244,7 @@ function DetailModal({
         return () => {
             cancelled = true;
         };
-    }, [open, serviceId, groupeId, token]);
+    }, [open, serviceId, groupeId]);
 
     if (!open) return null;
 
@@ -489,8 +485,6 @@ function DetailModal({
 // COMPOSANT PRINCIPAL
 // ════════════════════════════════════════════════════════
 export default function StructureHospitaliere({ dark }) {
-    const token = localStorage.getItem("token");
-
     const [recap, setRecap] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -508,9 +502,7 @@ export default function StructureHospitaliere({ dark }) {
         setError(null);
 
         try {
-            const response = await fetch(`${API_BASE}/structure/recap`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response = await apiFetch(`${API_BASE}/structure/recap`);
 
             if (!response.ok) {
                 throw new Error(`Erreur ${response.status}`);
@@ -523,7 +515,7 @@ export default function StructureHospitaliere({ dark }) {
         } finally {
             setLoading(false);
         }
-    }, [token]);
+    }, []);
 
     useEffect(() => {
         void fetchRecap();
@@ -534,9 +526,7 @@ export default function StructureHospitaliere({ dark }) {
     const handleExport = async () => {
         setExporting(true);
         try {
-            const res = await fetch(`${API_BASE}/structure/recap/export`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const res = await apiFetch(`${API_BASE}/structure/recap/export`);
             if (!res.ok) throw new Error(`Erreur ${res.status}`);
             const blob = await res.blob();
             const url = URL.createObjectURL(blob);
@@ -603,7 +593,6 @@ export default function StructureHospitaliere({ dark }) {
                 groupeName={modal.groupeName}
                 groupIdx={modal.groupIdx}
                 dark={dark}
-                token={token}
             />
 
             <div className="max-w-6xl mx-auto px-5 py-6 space-y-6">

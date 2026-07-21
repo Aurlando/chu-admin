@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import ToggleMode from "./ToggleMode";
-import { API_BASE } from "../config/api.js";
+import { API_BASE, apiFetch } from "../config/api.js";
 
 export default function Login({ onLoginSuccess }) {
     const [darkMode, setDarkMode] = useState(
@@ -47,9 +47,8 @@ export default function Login({ onLoginSuccess }) {
 
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE}/auth/login`, {
+            const res = await apiFetch(`${API_BASE}/auth/login`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, password }),
             });
 
@@ -76,15 +75,17 @@ export default function Login({ onLoginSuccess }) {
             }`}
         >
             {/* ── Bouton Toggle Nuit/Jour — coin supérieur droit ── */}
-            <ToggleMode
-                dark={darkMode}
-                onToggle={() => setDarkMode(!darkMode)}
-                className={`absolute bottom-75 left-260 shadow-xl transition-all duration-700 ${
-                    mounted
-                        ? "opacity-100 translate-y-0"
-                        : "opacity-0 -translate-y-4"
-                }`}
-            />
+            <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-50">
+                <ToggleMode
+                    dark={darkMode}
+                    onToggle={() => setDarkMode(!darkMode)}
+                    className={`shadow-xl transition-all duration-700 ${
+                        mounted
+                            ? "opacity-100 translate-y-0"
+                            : "opacity-0 -translate-y-4"
+                    }`}
+                />
+            </div>
 
             {/* ── Carte principale (animation d'entrée via mounted) ── */}
             <div

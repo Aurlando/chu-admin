@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { API_BASE } from "../config/api.js";
+import { API_BASE, apiFetch } from "../config/api.js";
 import SearchInput from "./SearchInput";
 
 // ── À adapter selon ton backend
@@ -378,8 +378,6 @@ function ResetPasswordModal({
     );
 }
 export default function SecurityCredentials({ dark, onNavigate }) {
-    const token = localStorage.getItem("token");
-
     const [staff, setStaff] = useState([]);
     const [total, setTotal] = useState(0);
     const [stats, setStats] = useState({
@@ -417,9 +415,7 @@ export default function SecurityCredentials({ dark, onNavigate }) {
         if (search) params.set("search", search);
 
         try {
-            const response = await fetch(`${API_SECURITY}?${params}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response = await apiFetch(`${API_SECURITY}?${params}`);
 
             if (!response.ok) {
                 throw new Error(`Erreur ${response.status}`);
@@ -438,7 +434,7 @@ export default function SecurityCredentials({ dark, onNavigate }) {
         } finally {
             setLoading(false);
         }
-    }, [page, search, token]);
+    }, [page, search]);
 
     useEffect(() => {
         void fetchStaff();
@@ -456,12 +452,8 @@ export default function SecurityCredentials({ dark, onNavigate }) {
     // ── PATCH /security/:id/reset-password
     const handleResetPassword = (accountId, newPassword) => {
         setResetting(true);
-        fetch(`${API_SECURITY}/${accountId}/reset-password`, {
+        apiFetch(`${API_SECURITY}/${accountId}/reset-password`, {
             method: "PATCH",
-            headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-            },
             body: JSON.stringify({ new_password: newPassword }),
         })
             .then((r) => {
@@ -480,12 +472,8 @@ export default function SecurityCredentials({ dark, onNavigate }) {
     // ── PATCH /security/:id/toggle-actif
     const handleToggleActif = (member) => {
         setToggling(member.id);
-        fetch(`${API_SECURITY}/${member.id}/toggle-actif`, {
+        apiFetch(`${API_SECURITY}/${member.id}/toggle-actif`, {
             method: "PATCH",
-            headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-            },
         })
             .then(async (r) => {
                 if (!r.ok) throw new Error(`Erreur ${r.status}`);

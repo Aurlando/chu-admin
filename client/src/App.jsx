@@ -11,13 +11,15 @@ function App() {
   );
 
   const handleLoginSuccess = (token) => {
-    localStorage.setItem("token", token); // 💾 Sauvegarde le token
-    setIsAuthenticated(true);             // 🔓 Déverrouille le Dashboard
+    localStorage.setItem("token", token); 
+    localStorage.removeItem("dernierePageAdmin"); // 🧹 On force le retour à zéro
+    setIsAuthenticated(true); 
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token"); // 🗑️ Supprime le token
-    setIsAuthenticated(false);        // 🔒 Retour au Login
+    localStorage.removeItem("token"); 
+    localStorage.removeItem("dernierePageAdmin"); // 🧹 On oublie la dernière page visitée
+    setIsAuthenticated(false); 
   };
 
   return (

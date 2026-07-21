@@ -6,7 +6,7 @@ import DocumentForm from "./DocumentForm"; // [GÉNÉRIQUE] formulaire dynamique
 import GenerateDocModal from "./GenerateDocModal"; // modale de génération de docs
 import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
 import { useDocumentGenerator } from "./useDocumentGenerator"; // [GÉNÉRIQUE] logique partagée (state + appel API)
-import { API_BASE } from "../config/api";
+import { API_BASE, apiFetch } from "../config/api";
 
 const formatClasse = (classe) => {
     if (!classe) return "";
@@ -222,9 +222,8 @@ export default function StaffProfile({
         setArchiving(true);
         setArchiveError(null);
         try {
-            const res = await fetch(`${API_BASE}/staff/${id}/archiver`, {
+            const res = await apiFetch(`${API_BASE}/staff/${id}/archiver`, {
                 method: "PATCH",
-                headers: { Authorization: `Bearer ${token}` },
             });
             if (!res.ok) {
                 const json = await res.json().catch(() => ({}));
@@ -240,9 +239,6 @@ export default function StaffProfile({
         }
     };
 
-    // ── Lecture du token JWT depuis localStorage (voir App.jsx ligne 28)
-    const token = localStorage.getItem("token");
-
     // ── useEffect : appel API au montage du composant
     // [id] = dépendance → si id change, on refetch automatiquement
     // (cas où on navigue d'un profil à un autre sans démonter le composant)
@@ -255,9 +251,7 @@ export default function StaffProfile({
 
         // GET /staff/profile/:id  (voir staffRoutes.js)
         // On utilise l'id (clé primaire BDD) — PAS le matricule
-        fetch(`${API_BASE}/staff/profile/${id}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
+        apiFetch(`${API_BASE}/staff/profile/${id}`)
             .then((res) => {
                 if (!res.ok) throw new Error(`Erreur ${res.status}`);
                 return res.json();
@@ -275,7 +269,7 @@ export default function StaffProfile({
                 setError(err.message);
                 setLoading(false);
             });
-    }, [id, refreshTrigger, token]);
+    }, [id, refreshTrigger]);
 
     // ── Tokens thème
     const bg = dark ? "bg-[#0a0f1e]" : "bg-slate-50";

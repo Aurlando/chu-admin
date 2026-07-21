@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { API_BASE } from "../config/api.js";
+import { API_BASE, apiFetch } from "../config/api.js";
 import SearchInput from "./SearchInput";
 import StaffProfile from "./StaffProfile";
 
@@ -265,8 +265,6 @@ function DeleteModal({
 // COMPOSANT PRINCIPAL — ArchivePage
 // ════════════════════════════════════════════════════════
 export default function ArchivePage({ dark }) {
-    const token = localStorage.getItem("token");
-
     const [staff, setStaff] = useState([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -305,11 +303,8 @@ export default function ArchivePage({ dark }) {
         if (search) params.set("search", search);
 
         try {
-            const response = await fetch(
+            const response = await apiFetch(
                 `${API_BASE}/staff/archives?${params}`,
-                {
-                    headers: { Authorization: `Bearer ${token}` },
-                },
             );
 
             if (!response.ok) {
@@ -332,7 +327,7 @@ export default function ArchivePage({ dark }) {
         } finally {
             setLoading(false);
         }
-    }, [page, search, token]);
+    }, [page, search]);
 
     useEffect(() => {
         void fetchArchives();
@@ -353,9 +348,8 @@ export default function ArchivePage({ dark }) {
         setDeleting(true);
         setDeleteError(null);
 
-        fetch(`${API_BASE}/staff/${modal.staff.id}`, {
+        apiFetch(`${API_BASE}/staff/${modal.staff.id}`, {
             method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
         })
             .then((r) => {
                 if (!r.ok) throw new Error(`Erreur ${r.status}`);

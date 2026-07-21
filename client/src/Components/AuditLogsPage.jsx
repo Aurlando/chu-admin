@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import SearchInput from "./SearchInput";
 import "../App.css";
-import { API_BASE } from "../config/api.js";
+import { API_BASE, apiFetch } from "../config/api.js";
 
 // ── Mapping styles + labels par type d'action
 const ACTION_STYLE = {
@@ -281,8 +281,6 @@ export default function AuditLogsPage({ dark }) {
     const [counts, setCounts] = useState({});
     const [selectedLog, setSelectedLog] = useState(null);
 
-    const token = localStorage.getItem("token");
-
     // ── Tokens thème
     const bg = dark ? "bg-[#0a0f1e]" : "bg-[#f4f6fb]";
     const card = dark
@@ -308,9 +306,7 @@ export default function AuditLogsPage({ dark }) {
             if (searchText) params.set("search", searchText);
             if (filterAction) params.set("type_action", filterAction);
 
-            return fetch(`${API_BASE}/audit-logs?${params}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            })
+            return apiFetch(`${API_BASE}/audit-logs?${params}`)
                 .then((res) => {
                     if (!res.ok) throw new Error(`Erreur ${res.status}`);
                     return res.json();
@@ -331,7 +327,7 @@ export default function AuditLogsPage({ dark }) {
                 .catch((err) => setError(err.message))
                 .finally(() => setLoading(false));
         },
-        [currentPage, searchText, filterAction, token],
+        [currentPage, searchText, filterAction],
     );
 
     useEffect(() => {

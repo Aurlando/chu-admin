@@ -8,7 +8,7 @@ import SearchInput from "./SearchInput";
 import { useDocumentGenerator } from "./useDocumentGenerator"; // [GÉNÉRIQUE] logique partagée (state + appel API)
 import StaffProfile from "./Staffprofile";
 import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
-import { API_BASE } from "../config/api";
+import { API_BASE, apiFetch } from "../config/api";
 
 const LIMIT = 10;
 
@@ -251,10 +251,6 @@ function PersonnelList({
     const [departments, setDepartments] = useState([]);
     const [fonctions, setFonctions] = useState([]);
 
-    const token = localStorage.getItem("token"); // voir App.jsx ligne 28
-
-    // ── fetchPersonnel : useCallback pour éviter la boucle infinie dans useEffect
-    // Se recréé uniquement quand search/filterDept/filterFonc/page changent
     const fetchPersonnel = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -267,9 +263,7 @@ function PersonnelList({
                 limit: LIMIT,
             });
 
-            const res = await fetch(`${API_BASE}/staff/show-all?${params}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const res = await apiFetch(`${API_BASE}/staff/show-all?${params}`);
 
             if (!res.ok) throw new Error(`Erreur ${res.status}`);
             const json = await res.json();
@@ -280,7 +274,7 @@ function PersonnelList({
         } finally {
             setLoading(false);
         }
-    }, [search, filterDept, filterFonc, page, token]);
+    }, [search, filterDept, filterFonc, page]);
 
     // ── Se déclenche à chaque fois que fetchPersonnel est recréée (= filtre change)
     useEffect(() => {
@@ -289,18 +283,14 @@ function PersonnelList({
 
     // ── Chargement unique des listes de dropdowns au montage
     useEffect(() => {
-        fetch(`${API_BASE}/staff/departments`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
+        apiFetch(`${API_BASE}/staff/departments`)
             .then((r) => r.json())
             .then((j) => setDepartments(j.data || []))
             .catch(() => {});
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
-        fetch(`${API_BASE}/staff/fonctions`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
+        apiFetch(`${API_BASE}/staff/fonctions`)
             .then((r) => r.json())
             .then((j) => setFonctions(j.data || []))
             .catch(() => {});

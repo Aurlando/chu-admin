@@ -1,25 +1,21 @@
 import { useEffect, useRef, useState } from "react";
-import { API_BASE } from "../config/api.js";
+import { API_BASE, apiFetch } from "../config/api.js";
 
 export default function NotificationMenu({ dark, onNavigate, refreshKey }) {
     const [notifStats, setNotifStats] = useState(null);
     const [showNotifMenu, setShowNotifMenu] = useState(false);
     const notifMenuRef = useRef(null);
 
-    const token = localStorage.getItem("token");
-
     // ── Récupération des statistiques d'avancement
     useEffect(() => {
-        if (!token) return;
-        fetch(`${API_BASE}/avancements/stats`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
+        if (!localStorage.getItem("token")) return;
+        apiFetch(`${API_BASE}/avancements/stats`)
             .then((res) => (res.ok ? res.json() : null))
             .then((json) => {
                 if (json && json.data) setNotifStats(json.data);
             })
             .catch((err) => console.error("Error fetching notif stats:", err));
-    }, [token, refreshKey]);
+    }, [refreshKey]);
 
     // ── Fermeture du menu lors d'un clic à l'extérieur
     useEffect(() => {

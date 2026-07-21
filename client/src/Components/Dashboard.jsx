@@ -12,7 +12,7 @@ import Avancements from "./Avancements";
 import NotificationMenu from "./NotificationMenu";
 import SettingsMenu from "./SettingsMenu";
 import ToggleMode from "./ToggleMode";
-import { API_BASE } from "../config/api.js";
+import { API_BASE, apiFetch } from "../config/api.js";
 
 // Palette coherente cards + graphique
 const PALETTE = {
@@ -613,15 +613,8 @@ function AuditLogPanel({ dark, T, onNavigate, onLogout }) {
     const [loadError, setLoadError] = useState(null);
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
-        fetch(`${API_BASE}/audit-logs?limit=5`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
+        apiFetch(`${API_BASE}/audit-logs?limit=5`)
             .then((res) => {
-                if (res.status === 401 || res.status === 403) {
-                    onLogout();
-                    throw new Error("Session expirée");
-                }
                 if (!res.ok) throw new Error(`Erreur ${res.status}`);
                 return res.json();
             })
@@ -633,7 +626,7 @@ function AuditLogPanel({ dark, T, onNavigate, onLogout }) {
                 setLoadError(err.message);
                 setLoadingLogs(false);
             });
-    }, [onLogout]);
+    }, []);
 
     return (
         <div
@@ -767,14 +760,8 @@ function DashboardHome({ dark, T, onNavigate, onLogout }) {
     const [selectedGroup, setSelectedGroup] = useState("Total");
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
-        fetch(`${API_BASE}/dashboard`, { headers: { Authorization: `Bearer ${token}` } })
+        apiFetch(`${API_BASE}/dashboard`)
             .then((res) => {
-                // Intercepter la session expirée / invalide
-                if (res.status === 401 || res.status === 403) {
-                    onLogout();
-                    throw new Error("Session expirée");
-                }
                 if (!res.ok) throw new Error("Erreur reseau");
                 return res.json();
             })
@@ -786,7 +773,7 @@ function DashboardHome({ dark, T, onNavigate, onLogout }) {
                 setError(err.message);
                 setLoading(false);
             });
-    }, [onLogout]);
+    }, []);
 
     const hour = new Date().getHours();
     const greeting =
@@ -1063,7 +1050,17 @@ function DashboardHome({ dark, T, onNavigate, onLogout }) {
 // ════════════════════════════════════════════════════════════════════
 export default function Dashboard({ onLogout }) {
     const [mobileOpen, setMobileOpen] = useState(false);
-    const [activeNav, setActiveNav] = useState("Dashboard");
+    
+    // 1. Initialisation avec vérification de la mémoire
+    const [activeNav, setActiveNav] = useState(() => {
+        return localStorage.getItem("dernierePageAdmin") || "Dashboard";
+    });
+
+    // 2. Sauvegarde automatique à chaque changement d'onglet
+    useEffect(() => {
+        localStorage.setItem("dernierePageAdmin", activeNav);
+    }, [activeNav]);
+
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [dark, setDark] = useState(
         () =>

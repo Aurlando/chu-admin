@@ -1,7 +1,7 @@
 import { Component, useEffect, useRef, useState } from "react";
 import "../App.css";
 import ComfirmModal from "./ConfirModal";
-import { API_BASE } from "../config/api.js";
+import { API_BASE, apiFetch } from "../config/api.js";
 
 // ── Error Boundary : capture les erreurs de rendu et affiche un message clair
 // au lieu d'une page blanche
@@ -331,8 +331,6 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
     const [confirmSave, setConfirmSave] = useState(false);
     const [confirmleave, setConfirmLeave] = useState(false);
 
-    const token = localStorage.getItem("token");
-
     // ── Sauvegarde automatique dans localStorage
     const updateTimestamp = () => {
         localStorage.setItem("add_personnel_timestamp", Date.now().toString());
@@ -373,8 +371,7 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
     };
 
     useEffect(() => {
-        const headers = { Authorization: `Bearer ${token}` };
-        fetch(`${API_BASE}/staff/departments`, { headers })
+        apiFetch(`${API_BASE}/staff/departments`)
             .then((r) => r.json())
             .then((json) => {
                 const data = json.data || [];
@@ -385,7 +382,7 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                 );
             })
             .catch(() => {});
-        fetch(`${API_BASE}/staff/fonctions`, { headers })
+        apiFetch(`${API_BASE}/staff/fonctions`)
             .then((r) => r.json())
             .then((json) => {
                 const data = json.data || [];
@@ -703,9 +700,8 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                 fd.append("role", form.role || "user");
             }
 
-            const res = await fetch(`${API_BASE}/staff/add`, {
+            const res = await apiFetch(`${API_BASE}/staff/add`, {
                 method: "POST",
-                headers: { Authorization: `Bearer ${token}` },
                 body: fd,
             });
             if (!res.ok) {
