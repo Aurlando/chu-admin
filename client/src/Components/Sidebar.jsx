@@ -1,5 +1,7 @@
 import { useState } from "react";
 import "../App.css";
+// Importation du logo CHU Anosiala depuis le dossier assets
+import chuLogo from "../assets/chuLOGO.png";
 
 const navItems = [
     {
@@ -102,7 +104,6 @@ export default function Sidebar({
         dark ? "bg-white border-l border-b border-slate-200" : "bg-slate-900"
     }`;
 
-    // NOUVEAU : Classes d'accentuation rouge pour le bouton de déconnexion
     const logoutBtnStyle = dark
         ? "bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20 hover:border-rose-500/40"
         : "bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100 hover:border-rose-300";
@@ -125,29 +126,31 @@ export default function Sidebar({
           ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}
             >
-                {/* ── En-tête logo ── */}
+                {/* ── En-tête avec Logo et Nom Français ── */}
                 <div
                     className={`relative flex items-center border-b h-14.25 ${dark ? "border-white/5" : "border-slate-200"} justify-between px-4 ${collapsed ? "lg:justify-center lg:px-3" : ""}`}
                 >
                     <div className="flex items-center gap-3">
                         <div className="relative group flex items-center">
-                            <div className="w-9 h-9 shrink-0 rounded-xl bg-linear-to-br from-blue-500 to-blue-700 flex items-center justify-center text-sm font-bold shadow-lg shadow-blue-500/20 text-white">
-                                H
+                            {/* Remplacement du rectangle bleu "H" par l'image du logo */}
+                            <div className="w-9 h-9 shrink-0 rounded-xl bg-white p-1 border border-slate-200/60 shadow-sm flex items-center justify-center overflow-hidden">
+                                <img src={chuLogo} alt="Logo CHU Anosiala" className="w-full h-full object-contain" />
                             </div>
+                            
                             {collapsed && (
                                 <div className={tooltipStyle}>
                                     <div className={arrowStyle} />
-                                    <span className="relative z-10">HIS Admin</span>
+                                    <span className="relative z-10">SIH — Gestion RH</span>
                                 </div>
                             )}
                         </div>
 
                         <div className={`min-w-0 overflow-hidden ${collapsed ? "lg:hidden" : ""}`}>
                             <div className={`text-sm font-bold whitespace-nowrap ${logoText}`}>
-                                HIS Admin
+                                Gestion RH - SIH
                             </div>
                             <div className={`text-[10px] whitespace-nowrap ${logoSub}`}>
-                                Système Hospitalier
+                                CHU Anosiala
                             </div>
                         </div>
                     </div>
@@ -209,7 +212,7 @@ export default function Sidebar({
                     })}
                 </nav>
 
-                {/* ── Footer : Mode complet avec bouton de déconnexion rouge ── */}
+                {/* ── Footer : Mode complet ── */}
                 <div
                     className={`border-t ${dark ? "border-white/5" : "border-slate-200"} p-3 space-y-2 ${collapsed ? "lg:hidden" : ""}`}
                 >
@@ -227,7 +230,6 @@ export default function Sidebar({
                         </div>
                     </div>
 
-                    {/* Bouton de déconnexion stylisé en rouge */}
                     <button
                         onClick={onLogout}
                         className={`
@@ -242,7 +244,7 @@ export default function Sidebar({
                     </button>
                 </div>
 
-                {/* ── Footer : Mode compact avec icône déconnexion rouge ── */}
+                {/* ── Footer : Mode compact ── */}
                 <div
                     className={`border-t ${dark ? "border-white/5" : "border-slate-200"} p-2 flex-col items-center gap-2 hidden ${collapsed ? "lg:flex" : "lg:hidden"}`}
                 >
