@@ -1,16 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "../App.css";
-import DocsDropdown from "./DocsDropdown"; // [GÉNÉRIQUE] menu "Docs ▾" piloté par DOCUMENT_TYPES
-import { DOCUMENT_TYPES } from "./documentTypes"; // [GÉNÉRIQUE] registre des documents générables
-import DocumentForm from "./DocumentForm"; // [GÉNÉRIQUE] formulaire dynamique selon le type de document
-import GenerateDocModal from "./GenerateDocModal"; // modale de génération de docs
+import DocsDropdown from "./DocsDropdown";
+import { DOCUMENT_TYPES } from "./documentTypes";
+import DocumentForm from "./DocumentForm";
+import GenerateDocModal from "./GenerateDocModal";
 import SearchInput from "./SearchInput";
-import { useDocumentGenerator } from "./useDocumentGenerator"; // [GÉNÉRIQUE] logique partagée (state + appel API)
+import { useDocumentGenerator } from "./useDocumentGenerator";
 import StaffProfile from "./Staffprofile";
-import UpdateModal from "./UpdateModal"; // [NOUVEAU] modal de mise à jour
+import UpdateModal from "./UpdateModal";
 import { API_BASE, apiFetch } from "../config/api";
 
 const LIMIT = 10;
+
+// ── NOUVEAU : Liste des types/statuts exacts de ta base de données
+// "value" sera envoyé à l'API (ex: STAGIAIRE), "label" sera affiché à l'écran (ex: Stagiaire)
+const AVAILABLE_TYPES = [
+    { value: "FONCTIONNAIRE", label: "Fonctionnaire" },
+    { value: "BENEVOLE", label: "Bénévole" },
+    { value: "STAGIAIRE", label: "Stagiaire" }
+];
 
 // ── Couleurs d'avatar tournantes (index de la ligne % 6)
 const AVATAR_COLORS = [
@@ -54,42 +62,16 @@ function StatutBadge({ statut = "Actif", dark }) {
 
 function EyeIcon() {
     return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-3.5 h-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-        >
-            <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-            <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-            />
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
         </svg>
     );
 }
 function EditIcon() {
     return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-3.5 h-3.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-        >
-            <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-            />
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
         </svg>
     );
 }
@@ -97,22 +79,12 @@ function EditIcon() {
 // ════════════════════════════════════════════════════════════════════
 // Composant principal
 // ════════════════════════════════════════════════════════════════════
-export default function PersonnelDirectory({
-    dark,
-    onNavigate,
-    refreshNotifications,
-}) {
-    // selectedId : null = liste, valeur = vue profil détail
+export default function PersonnelDirectory({ dark, onNavigate, refreshNotifications }) {
     const [selectedId, setSelectedId] = useState(null);
     const [selectedIdUpdate, setSelectedIdUpdate] = useState(null);
-    const [refreshKey, setRefreshKey] = useState(0); // Pour forcer le rafraîchissement de la liste
+    const [refreshKey, setRefreshKey] = useState(0);
 
-    // [AJOUTÉ] Logique de notification (Toast) manquante
-    const [toast, setToast] = useState({
-        show: false,
-        msg: "",
-        type: "success",
-    });
+    const [toast, setToast] = useState({ show: false, msg: "", type: "success" });
     const toastTimer = useRef(null);
 
     const showToast = (msg, type = "success") => {
@@ -124,33 +96,12 @@ export default function PersonnelDirectory({
         );
     };
 
-    // [GÉNÉRIQUE] État + logique de la modale de génération de documents,
-    // partagés avec StaffProfile via useDocumentGenerator.js
-    const {
-        docModal, // { type, agentId } | null
-        docFields,
-        docLoading,
-        docError,
-        openDocModal,
-        closeDocModal,
-        updateDocField,
-        generateDoc,
-    } = useDocumentGenerator(showToast);
+    const { docModal, docFields, docLoading, docError, openDocModal, closeDocModal, updateDocField, generateDoc } = useDocumentGenerator(showToast);
 
-    // Vue profil — remplace toute la page
     if (selectedId !== null) {
-        return (
-            <StaffProfile
-                id={selectedId}
-                dark={dark}
-                onBack={() => setSelectedId(null)}
-                showToast={showToast} // Pass showToast to StaffProfile
-                refreshNotifications={refreshNotifications}
-            />
-        );
+        return <StaffProfile id={selectedId} dark={dark} onBack={() => setSelectedId(null)} showToast={showToast} refreshNotifications={refreshNotifications} />;
     }
 
-    // Vue liste — avec les modaux superposés si nécessaire
     return (
         <>
             {selectedIdUpdate !== null && (
@@ -162,10 +113,8 @@ export default function PersonnelDirectory({
                         setSelectedIdUpdate(null);
                         if (success) {
                             showToast(message || "Mise à jour réussie");
-                            setRefreshKey((prev) => prev + 1); // Rafraîchit la liste
-                            if (typeof refreshNotifications === "function") {
-                                refreshNotifications();
-                            }
+                            setRefreshKey((prev) => prev + 1);
+                            if (typeof refreshNotifications === "function") refreshNotifications();
                         } else {
                             showToast(message, "error");
                         }
@@ -173,48 +122,20 @@ export default function PersonnelDirectory({
                 />
             )}
 
-            {/* [GÉNÉRIQUE] Modale de génération de documents — titre et
-                formulaire s'adaptent au type choisi dans DOCUMENT_TYPES */}
             {docModal && (
-                <GenerateDocModal
-                    title={DOCUMENT_TYPES[docModal.type].label}
-                    dark={dark}
-                    loading={docLoading}
-                    error={docError}
-                    onClose={closeDocModal}
-                    onSubmit={generateDoc}
-                >
-                    <DocumentForm
-                        type={docModal.type}
-                        fields={docFields}
-                        onChange={updateDocField}
-                        dark={dark}
-                    />
+                <GenerateDocModal title={DOCUMENT_TYPES[docModal.type].label} dark={dark} loading={docLoading} error={docError} onClose={closeDocModal} onSubmit={generateDoc}>
+                    <DocumentForm type={docModal.type} fields={docFields} onChange={updateDocField} dark={dark} />
                 </GenerateDocModal>
             )}
 
-            <PersonnelList
-                key={refreshKey}
-                dark={dark}
-                onSelectId={setSelectedId}
-                onSelectIdUpdate={setSelectedIdUpdate}
-                onOpenDocModal={openDocModal}
-                onNavigate={onNavigate}
-            />
+            <PersonnelList key={refreshKey} dark={dark} onSelectId={setSelectedId} onSelectIdUpdate={setSelectedIdUpdate} onOpenDocModal={openDocModal} onNavigate={onNavigate} />
 
-            {/* Composant Toast */}
             <div
                 className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl text-sm font-medium transition-all duration-300
                 ${toast.show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3 pointer-events-none"}
                 ${dark ? "bg-[#0d1526] border border-white/10 text-slate-200" : "bg-slate-800 text-white"}`}
             >
-                <div
-                    className={
-                        toast.type === "success"
-                            ? "text-emerald-400"
-                            : "text-rose-400"
-                    }
-                >
+                <div className={toast.type === "success" ? "text-emerald-400" : "text-rose-400"}>
                     {toast.type === "success" ? "✓" : "✕"}
                 </div>
                 {toast.msg}
@@ -223,28 +144,19 @@ export default function PersonnelDirectory({
     );
 }
 
-function PersonnelList({
-    dark,
-    onSelectId,
-    onSelectIdUpdate,
-    onOpenDocModal,
-    onNavigate,
-}) {
+function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onOpenDocModal, onNavigate }) {
     // ── États des données
     const [personnel, setPersonnel] = useState([]);
-    const [pagination, setPagination] = useState({
-        total: 0,
-        page: 1,
-        limit: LIMIT,
-        totalPages: 1,
-    });
+    const [pagination, setPagination] = useState({ total: 0, page: 1, limit: LIMIT, totalPages: 1 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // ── États des filtres
+    // ── États des filtres et du tri
     const [search, setSearch] = useState("");
     const [filterDept, setFilterDept] = useState("");
     const [filterFonc, setFilterFonc] = useState("");
+    const [sortOrder, setSortOrder] = useState("asc"); 
+    const [selectedTypes, setSelectedTypes] = useState([]); 
     const [page, setPage] = useState(1);
 
     // ── Données des dropdowns
@@ -259,6 +171,8 @@ function PersonnelList({
                 ...(search && { search }),
                 ...(filterDept && { department: filterDept }),
                 ...(filterFonc && { fonction: filterFonc }),
+                order: sortOrder,
+                ...(selectedTypes.length > 0 && { types: selectedTypes.join(",") }),
                 page,
                 limit: LIMIT,
             });
@@ -274,46 +188,38 @@ function PersonnelList({
         } finally {
             setLoading(false);
         }
-    }, [search, filterDept, filterFonc, page]);
+    }, [search, filterDept, filterFonc, sortOrder, selectedTypes, page]);
 
-    // ── Se déclenche à chaque fois que fetchPersonnel est recréée (= filtre change)
     useEffect(() => {
         fetchPersonnel();
     }, [fetchPersonnel]);
 
-    // ── Chargement unique des listes de dropdowns au montage
     useEffect(() => {
-        apiFetch(`${API_BASE}/staff/departments`)
-            .then((r) => r.json())
-            .then((j) => setDepartments(j.data || []))
-            .catch(() => {});
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        apiFetch(`${API_BASE}/staff/departments`).then((r) => r.json()).then((j) => setDepartments(j.data || [])).catch(() => {});
+        apiFetch(`${API_BASE}/staff/fonctions`).then((r) => r.json()).then((j) => setFonctions(j.data || [])).catch(() => {});
+    }, []);
 
-    useEffect(() => {
-        apiFetch(`${API_BASE}/staff/fonctions`)
-            .then((r) => r.json())
-            .then((j) => setFonctions(j.data || []))
-            .catch(() => {});
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // ── Helpers
+    const handleSearch = (v) => { setSearch(v); setPage(1); };
+    const handleFilterDept = (v) => { setFilterDept(v); setPage(1); };
+    const handleFilterFonc = (v) => { setFilterFonc(v); setPage(1); };
+    
+    // Gérer la sélection multiple des statuts
+    const toggleType = (typeValue) => {
+        setSelectedTypes(prev => 
+            prev.includes(typeValue) ? prev.filter(t => t !== typeValue) : [...prev, typeValue]
+        );
+        setPage(1);
+    };
 
-    // ── Helpers filtres : reset page à 1 à chaque changement de filtre
-    const handleSearch = (v) => {
-        setSearch(v);
-        setPage(1);
-    };
-    const handleFilterDept = (v) => {
-        setFilterDept(v);
-        setPage(1);
-    };
-    const handleFilterFonc = (v) => {
-        setFilterFonc(v);
-        setPage(1);
-    };
-    const hasActiveFilter = search || filterDept || filterFonc;
+    const hasActiveFilter = search || filterDept || filterFonc || selectedTypes.length > 0;
+    
     const resetFiltres = () => {
         setSearch("");
         setFilterDept("");
         setFilterFonc("");
+        setSelectedTypes([]);
+        setSortOrder("asc");
         setPage(1);
     };
 
@@ -321,49 +227,26 @@ function PersonnelList({
     const T = {
         title: dark ? "text-white" : "text-slate-800",
         sub: dark ? "text-slate-400" : "text-slate-500",
-        card: dark
-            ? "bg-[#0d1526] border-white/8"
-            : "bg-white border-slate-200 shadow-sm",
-        input: dark
-            ? "bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-500/50"
-            : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-blue-400",
-        select: dark
-            ? "bg-white/5 border-white/10 text-slate-300 focus:border-blue-500/50 [&_option]:text-black [&_option]:bg-white"
-            : "bg-white border-slate-200 text-slate-700 focus:border-blue-400",
-        thHead: dark
-            ? "text-slate-500 border-white/8 bg-white/3"
-            : "text-slate-400 border-slate-200 bg-slate-50",
-        trHover: dark
-            ? "hover:bg-white/3 border-white/5 "
-            : "hover:bg-slate-50/80 border-slate-100",
+        card: dark ? "bg-[#0d1526] border-white/8" : "bg-white border-slate-200 shadow-sm",
+        input: dark ? "bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:border-blue-500/50" : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-blue-400",
+        select: dark ? "bg-white/5 border-white/10 text-slate-300 focus:border-blue-500/50 [&_option]:text-black [&_option]:bg-white" : "bg-white border-slate-200 text-slate-700 focus:border-blue-400",
+        thHead: dark ? "text-slate-500 border-white/8 bg-white/3" : "text-slate-400 border-slate-200 bg-slate-50",
+        trHover: dark ? "hover:bg-white/3 border-white/5 " : "hover:bg-slate-50/80 border-slate-100",
         tdText: dark ? "text-slate-200 " : "text-slate-700",
         tdSub: dark ? "text-slate-500" : "text-slate-400",
-        pagBtn: dark
-            ? "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
-            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50",
+        pagBtn: dark ? "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50",
         pagBtnAct: "bg-blue-600 border-blue-600 text-white",
         iconColor: dark ? "text-slate-500" : "text-slate-400",
-        // [MODIFIÉ] Bouton "Voir" — maintenant avec onClick fonctionnel
-        actionView: dark
-            ? "flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-blue-500/20 text-blue-400 hover:bg-blue-500/10 transition-all"
-            : "flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-all",
-        actionEdit: dark
-            ? "flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-white/10 text-slate-400 hover:bg-white/5 transition-all"
-            : "flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 transition-all",
+        actionView: dark ? "flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-blue-500/20 text-blue-400 hover:bg-blue-500/10 transition-all" : "flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-all",
+        actionEdit: dark ? "flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-white/10 text-slate-400 hover:bg-white/5 transition-all" : "flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 transition-all",
     };
 
-    // ── Génère les numéros de pages à afficher (avec ellipsis)
     const buildPageNumbers = () => {
         const total = pagination.totalPages;
         if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
         const pages = [1];
         if (page > 3) pages.push("...");
-        for (
-            let i = Math.max(2, page - 1);
-            i <= Math.min(total - 1, page + 1);
-            i++
-        )
-            pages.push(i);
+        for (let i = Math.max(2, page - 1); i <= Math.min(total - 1, page + 1); i++) pages.push(i);
         if (page < total - 2) pages.push("...");
         pages.push(total);
         return pages;
@@ -374,36 +257,20 @@ function PersonnelList({
             {/* ── En-tête ── */}
             <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
                 <div>
-                    <h1 className={`text-2xl lg:text-3xl font-bold ${T.title}`}>
-                        Répertoire du Personnel
-                    </h1>
+                    <h1 className={`text-2xl lg:text-3xl font-bold ${T.title}`}>Répertoire du Personnel</h1>
                     <p className={`text-sm mt-1 ${T.sub}`}>
                         Gérez et consultez le personnel du CHU Anosiala.
                         {pagination.total > 0 && (
-                            <span className="ml-2 font-medium">
-                                {pagination.total} membres
-                            </span>
+                            <span className="ml-2 font-medium">{pagination.total} membres</span>
                         )}
                     </p>
                 </div>
                 <button
                     onClick={() => onNavigate?.("Ajouter un personnel")}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-600/20 hover:-translate-y-0.5 shrink-0 cursor-pointer
-          "
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-blue-600/20 hover:-translate-y-0.5 shrink-0 cursor-pointer"
                 >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2.5}
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                        />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                     </svg>
                     Ajouter un personnel
                 </button>
@@ -411,128 +278,105 @@ function PersonnelList({
 
             {/* ── Zone de filtres ── */}
             <div className={`rounded-2xl border p-4 mb-5 ${T.card}`}>
-                <div className="flex flex-nowrap gap-3 items-center">
-                    <SearchInput
-                        value={search}
-                        onChange={handleSearch}
-                        dark={dark}
-                        placeholder="Rechercher..."
-                        className="flex-1 min-w-37.5"
-                    />
+                <div className="flex flex-col gap-4">
+                    {/* Ligne 1 : Recherche, Départements, Services */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-row gap-3 items-center">
+                        <SearchInput
+                            value={search}
+                            onChange={handleSearch}
+                            dark={dark}
+                            placeholder="Rechercher par nom, matricule..."
+                            className="w-full lg:w-80 shrink-0" 
+                        />
 
-                    {/* Dropdown Département → ?department= */}
-                    <div className="relative shrink-0">
-                        <select
-                            value={filterDept}
-                            onChange={(e) => handleFilterDept(e.target.value)}
-                            className={`text-sm pl-3 pr-7 py-2 rounded-xl border outline-none cursor-pointer transition-all ${T.select}`}
-                        >
-                            <option value="">Département</option>
-                            {departments.map((d) => {
-                                const id = typeof d === "string" ? d : d.id;
-                                const label =
-                                    typeof d === "string" ? d : d.libelle;
-                                return (
-                                    <option key={id} value={label}>
-                                        {label}
-                                    </option>
-                                );
-                            })}
-                        </select>
-                        {filterDept && (
-                            <button
-                                onClick={() => handleFilterDept("")}
-                                type="button"
-                                className="absolute right-7 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
+                        <div className="relative w-full lg:w-64 shrink-0">
+                            <select
+                                value={filterDept}
+                                onChange={(e) => handleFilterDept(e.target.value)}
+                                className={`w-full text-sm pl-3 pr-7 py-2.5 rounded-xl border outline-none cursor-pointer transition-all ${T.select}`}
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="w-3.5 h-3.5"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={3}
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M6 18L18 6M6 6l12 12"
-                                    />
-                                </svg>
-                            </button>
-                        )}
+                                <option value="">Tous les départements</option>
+                                {departments.map((d) => {
+                                    const id = typeof d === "string" ? d : d.id;
+                                    const label = typeof d === "string" ? d : d.libelle;
+                                    return <option key={id} value={label}>{label}</option>;
+                                })}
+                            </select>
+                        </div>
+
+                        <div className="relative w-full lg:flex-1">
+                            <select
+                                value={filterFonc}
+                                onChange={(e) => handleFilterFonc(e.target.value)}
+                                className={`w-full text-sm pl-3 pr-7 py-2.5 rounded-xl border outline-none cursor-pointer transition-all ${T.select}`}
+                            >
+                                <option value="">Tous les services</option>
+                                {fonctions.map((f) => {
+                                    const id = typeof f === "string" ? f : f.id;
+                                    const label = typeof f === "string" ? f : f.libelle;
+                                    return <option key={id} value={label}>{label}</option>;
+                                })}
+                            </select>
+                        </div>
                     </div>
 
-                    {/* Dropdown Service (= m.fonction dans la BDD) → ?fonction= */}
-                    <div className="relative shrink-0">
-                        <select
-                            value={filterFonc}
-                            onChange={(e) => handleFilterFonc(e.target.value)}
-                            className={`text-sm pl-3 pr-7 py-2 rounded-xl border outline-none cursor-pointer transition-all ${T.select}`}
-                        >
-                            <option value="">Service</option>
-                            {fonctions.map((f) => {
-                                const id = typeof f === "string" ? f : f.id;
-                                const label =
-                                    typeof f === "string" ? f : f.libelle;
+                    {/* Ligne 2 : Tri alphabétique & Types de personnel */}
+                    <div className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pt-4 border-t ${dark ? "border-white/10" : "border-slate-100"}`}>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className={`text-xs font-medium mr-1 ${T.sub}`}>Types :</span>
+                            {/* NOUVEAU RENDU DES BOUTONS TYPES ICI */}
+                            {AVAILABLE_TYPES.map(typeObj => {
+                                const isSelected = selectedTypes.includes(typeObj.value);
                                 return (
-                                    <option key={id} value={label}>
-                                        {label}
-                                    </option>
+                                    <button
+                                        key={typeObj.value}
+                                        onClick={() => toggleType(typeObj.value)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+                                            isSelected
+                                                ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                                                : dark 
+                                                    ? "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10" 
+                                                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        {typeObj.label}
+                                    </button>
                                 );
                             })}
-                        </select>
-                        {filterFonc && (
-                            <button
-                                onClick={() => handleFilterFonc("")}
-                                type="button"
-                                className="absolute right-7 top-1/2 -translate-y-1/2 text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
-                            >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="w-3.5 h-3.5"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    strokeWidth={3}
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        d="M6 18L18 6M6 6l12 12"
-                                    />
-                                </svg>
-                            </button>
-                        )}
-                    </div>
+                        </div>
 
-                    {/* Bouton reset filtres — visible uniquement si un filtre est actif */}
-                    {hasActiveFilter && (
-                        <button
-                            onClick={resetFiltres}
-                            className={`flex items-center gap-1.5 text-xs px-2 py-2 rounded-xl border transition-all cursor-pointer shrink-0 ${
-                                dark
-                                    ? "text-slate-400 hover:text-white border-white/10 hover:border-white/20"
-                                    : "text-slate-500 hover:text-slate-800 border-slate-200 hover:border-slate-300"
-                            }`}
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="w-3.5 h-3.5"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                            <button
+                                onClick={() => {
+                                    setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+                                    setPage(1);
+                                }}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+                                    dark 
+                                        ? "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10" 
+                                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                                }`}
                             >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M6 18L18 6M6 6l12 12"
-                                />
-                            </svg>
-                            Réinitialiser
-                        </button>
-                    )}
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d={sortOrder === "asc" ? "M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" : "M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4"} />
+                                </svg>
+                                Tri : {sortOrder === "asc" ? "A à Z" : "Z à A"}
+                            </button>
+
+                            {hasActiveFilter && (
+                                <button
+                                    onClick={resetFiltres}
+                                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-all cursor-pointer shrink-0 ml-auto md:ml-0 ${
+                                        dark
+                                            ? "text-rose-400 hover:text-white border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20"
+                                            : "text-rose-600 hover:text-rose-700 border-rose-200 bg-rose-50 hover:bg-rose-100"
+                                    }`}
+                                >
+                                    Effacer filtres
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -545,32 +389,12 @@ function PersonnelList({
 
             {/* ── Erreur ── */}
             {!loading && error && (
-                <div
-                    className={`rounded-2xl border p-5 flex items-center gap-3 text-sm ${
-                        dark
-                            ? "bg-rose-500/10 border-rose-500/20 text-rose-400"
-                            : "bg-rose-50 border-rose-200 text-rose-600"
-                    }`}
-                >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="w-5 h-5 shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                        />
+                <div className={`rounded-2xl border p-5 flex items-center gap-3 text-sm ${dark ? "bg-rose-500/10 border-rose-500/20 text-rose-400" : "bg-rose-50 border-rose-200 text-rose-600"}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                     Impossible de charger le personnel : {error}
-                    <button
-                        onClick={fetchPersonnel}
-                        className="ml-auto underline text-xs cursor-pointer"
-                    >
+                    <button onClick={fetchPersonnel} className="ml-auto underline text-xs cursor-pointer">
                         Réessayer
                     </button>
                 </div>
@@ -578,157 +402,64 @@ function PersonnelList({
 
             {/* ── Tableau ── */}
             {!loading && !error && (
-                <div
-                    className={`rounded-2xl border overflow-visible ${T.card}`}
-                >
-                    <table className="w-full text-sm">
+                <div className={`rounded-2xl border overflow-x-auto ${T.card}`}>
+                    <table className="w-full text-sm min-w-175">
                         <thead>
-                            <tr
-                                className={`border-b text-left text-[11px] font-bold uppercase tracking-wider ${T.thHead}`}
-                            >
-                                <th className="px-5 py-3.5 first:rounded-tl-2xl">
-                                    Nom
-                                </th>
-                                <th className="px-5 py-3.5">Imatricule</th>
-                                <th className="px-5 py-3.5 hidden md:table-cell">
-                                    Département
-                                </th>
-                                <th className="px-5 py-3.5 hidden lg:table-cell">
-                                    Service
-                                </th>
+                            <tr className={`border-b text-left text-[11px] font-bold uppercase tracking-wider ${T.thHead}`}>
+                                <th className="px-5 py-3.5 first:rounded-tl-2xl">Nom</th>
+                                <th className="px-5 py-3.5">Matricule</th>
+                                <th className="px-5 py-3.5 hidden md:table-cell">Département</th>
+                                <th className="px-5 py-3.5 hidden lg:table-cell">Service</th>
                                 <th className="px-5 py-3.5">Statut</th>
-                                <th className="px-5 py-3.5 text-right last:rounded-tr-2xl">
-                                    Action
-                                </th>
+                                <th className="px-5 py-3.5 text-right last:rounded-tr-2xl">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             {personnel.length === 0 ? (
                                 <tr>
-                                    <td
-                                        colSpan={6}
-                                        className={`px-5 py-14 text-center text-sm ${T.sub}`}
-                                    >
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            className="w-10 h-10 mx-auto mb-3 opacity-30"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                            strokeWidth={1.5}
-                                        >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M17 20H7a4 4 0 01-4-4v0a4 4 0 014-4h10a4 4 0 014 4v0a4 4 0 01-4 4zM12 3a4 4 0 110 8 4 4 0 010-8z"
-                                            />
+                                    <td colSpan={6} className={`px-5 py-14 text-center text-sm ${T.sub}`}>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 mx-auto mb-3 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M17 20H7a4 4 0 01-4-4v0a4 4 0 014-4h10a4 4 0 014 4v0a4 4 0 01-4 4zM12 3a4 4 0 110 8 4 4 0 010-8z" />
                                         </svg>
-                                        Aucun personnel trouvé pour ces
-                                        critères.
+                                        Aucun personnel trouvé pour ces critères.
                                     </td>
                                 </tr>
                             ) : (
                                 personnel.map((p, i) => (
-                                    <tr
-                                        key={`${p.matricule}-${i}`}
-                                        className={`border-b transition-colors ${T.trHover}`}
-                                    >
-                                        {/* Nom + avatar */}
+                                    <tr key={`${p.matricule}-${i}`} className={`border-b transition-colors ${T.trHover}`}>
                                         <td className="px-5 py-3.5">
                                             <div className="flex items-center gap-3">
-                                                <div
-                                                    className={`w-8 h-8 rounded-full bg-linear-to-br ${AVATAR_COLORS[i % AVATAR_COLORS.length]} flex items-center justify-center text-xs font-bold text-white shrink-0`}
-                                                >
-                                                    {getInitiales(
-                                                        p.nom,
-                                                        p.prenoms,
-                                                    )}
+                                                <div className={`w-8 h-8 rounded-full bg-linear-to-br ${AVATAR_COLORS[i % AVATAR_COLORS.length]} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
+                                                    {getInitiales(p.nom, p.prenoms)}
                                                 </div>
-                                                <div
-                                                    className={`font-semibold leading-tight ${T.tdText}`}
-                                                >
+                                                <div className={`font-semibold leading-tight ${T.tdText}`}>
                                                     {p.nom} {p.prenoms}
                                                 </div>
                                             </div>
                                         </td>
-
-                                        {/* Matricule = m.im dans la BDD (voir staffModels.js ligne 78) */}
-                                        <td
-                                            className={`px-5 py-3.5 font-mono text-xs ${T.tdSub}`}
-                                        >
+                                        <td className={`px-5 py-3.5 font-mono text-xs ${T.tdSub}`}>
                                             #{p.matricule}
                                         </td>
-
-                                        {/* Département = INITCAP(s.libelle) (voir staffModels.js ligne 79) */}
-                                        <td
-                                            className={`px-5 py-3.5 hidden md:table-cell ${T.tdText}`}
-                                        >
-                                            {p.departement || (
-                                                <span className={T.tdSub}>
-                                                    —
-                                                </span>
-                                            )}
+                                        <td className={`px-5 py-3.5 hidden md:table-cell ${T.tdText}`}>
+                                            {p.departement || <span className={T.tdSub}>—</span>}
                                         </td>
-
-                                        {/* Service = m.fonction renommé (voir staffModels.js ligne 80) */}
-                                        <td
-                                            className={`px-5 py-3.5 hidden lg:table-cell ${T.tdSub}`}
-                                        >
-                                            {p.service || (
-                                                <span className="opacity-50">
-                                                    —
-                                                </span>
-                                            )}
+                                        <td className={`px-5 py-3.5 hidden lg:table-cell ${T.tdSub}`}>
+                                            {p.service || <span className="opacity-50">—</span>}
                                         </td>
-
-                                        {/* Statut */}
                                         <td className="px-5 py-3.5">
-                                            <StatutBadge
-                                                statut={p.statut || "Actif"}
-                                                dark={dark}
-                                            />
+                                            <StatutBadge statut={p.statut || "Actif"} dark={dark} />
                                         </td>
-
-                                        {/* Actions */}
                                         <td className="px-5 py-3.5">
                                             <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onSelectId(p.id);
-                                                    }}
-                                                    className={`${T.actionView} cursor-pointer`}
-                                                    title="Voir le profil"
-                                                >
+                                                <button onClick={(e) => { e.stopPropagation(); onSelectId(p.id); }} className={`${T.actionView} cursor-pointer`} title="Voir le profil">
                                                     <EyeIcon />
-                                                    <span className="hidden sm:inline cursor-pointer">
-                                                        Voir
-                                                    </span>
+                                                    <span className="hidden sm:inline cursor-pointer">Voir</span>
                                                 </button>
-
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onSelectIdUpdate(p.id);
-                                                    }}
-                                                    className={`${T.actionEdit} cursor-pointer`}
-                                                    title="Mettre à jour"
-                                                >
+                                                <button onClick={(e) => { e.stopPropagation(); onSelectIdUpdate(p.id); }} className={`${T.actionEdit} cursor-pointer`} title="Mettre à jour">
                                                     <EditIcon />
-                                                    <span className="hidden sm:inline cursor-pointer w-max">
-                                                        Mis à jour
-                                                    </span>
+                                                    <span className="hidden sm:inline cursor-pointer w-max">Éditer</span>
                                                 </button>
-
-                                                {/* Bouton "Docs ▾" — menu de génération de documents */}
-                                                <DocsDropdown
-                                                    dark={dark}
-                                                    size="sm"
-                                                    onSelect={(type, e) => {
-                                                        e.stopPropagation();
-                                                        onOpenDocModal(type, p.id);
-                                                    }}
-                                                />
+                                                <DocsDropdown dark={dark} size="sm" onSelect={(type, e) => { e.stopPropagation(); onOpenDocModal(type, p.id); }} />
                                             </div>
                                         </td>
                                     </tr>
@@ -739,84 +470,29 @@ function PersonnelList({
 
                     {/* ── Pagination ── */}
                     {pagination.totalPages > 1 && (
-                        <div
-                            className={`flex items-center justify-between px-5 py-3.5 border-t ${dark ? "border-white/8" : "border-slate-100"}`}
-                        >
+                        <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 px-5 py-3.5 border-t ${dark ? "border-white/8" : "border-slate-100"}`}>
                             <p className={`text-xs ${T.sub}`}>
-                                Affichage{" "}
-                                {(pagination.page - 1) * pagination.limit + 1}–
-                                {Math.min(
-                                    pagination.page * pagination.limit,
-                                    pagination.total,
-                                )}{" "}
-                                sur {pagination.total}
+                                Affichage {(pagination.page - 1) * pagination.limit + 1}–
+                                {Math.min(pagination.page * pagination.limit, pagination.total)} sur {pagination.total}
                             </p>
                             <div className="flex items-center gap-1.5">
-                                <button
-                                    onClick={() =>
-                                        setPage((p) => Math.max(1, p - 1))
-                                    }
-                                    disabled={page === 1}
-                                    className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all ${T.pagBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
-                                >
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        className="w-3.5 h-3.5"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        strokeWidth={2}
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M15 19l-7-7 7-7"
-                                        />
+                                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all ${T.pagBtn} disabled:opacity-40 disabled:cursor-not-allowed`}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                                     </svg>
                                 </button>
                                 {buildPageNumbers().map((n, i) =>
                                     n === "..." ? (
-                                        <span
-                                            key={`e-${i}`}
-                                            className={`w-8 h-8 flex items-center justify-center text-xs ${T.sub}`}
-                                        >
-                                            …
-                                        </span>
+                                        <span key={`e-${i}`} className={`w-8 h-8 flex items-center justify-center text-xs ${T.sub}`}>…</span>
                                     ) : (
-                                        <button
-                                            key={n}
-                                            onClick={() => setPage(n)}
-                                            className={`w-8 h-8 rounded-lg border text-xs font-semibold transition-all ${page === n ? T.pagBtnAct : T.pagBtn}`}
-                                        >
+                                        <button key={n} onClick={() => setPage(n)} className={`w-8 h-8 rounded-lg border text-xs font-semibold transition-all ${page === n ? T.pagBtnAct : T.pagBtn}`}>
                                             {n}
                                         </button>
-                                    ),
+                                    )
                                 )}
-                                <button
-                                    onClick={() =>
-                                        setPage((p) =>
-                                            Math.min(
-                                                pagination.totalPages,
-                                                p + 1,
-                                            ),
-                                        )
-                                    }
-                                    disabled={page === pagination.totalPages}
-                                    className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all ${T.pagBtn} disabled:opacity-40 disabled:cursor-not-allowed`}
-                                >
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        className="w-3.5 h-3.5"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        strokeWidth={2}
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M9 5l7 7-7 7"
-                                        />
+                                <button onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))} disabled={page === pagination.totalPages} className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-all ${T.pagBtn} disabled:opacity-40 disabled:cursor-not-allowed`}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                                     </svg>
                                 </button>
                             </div>
