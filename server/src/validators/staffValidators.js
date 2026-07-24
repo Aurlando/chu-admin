@@ -241,6 +241,87 @@ function validerAccesSIH({
 }
 
 // ------------------------------------------------------------------
+//  verification du type de personnel (FONCTIONNAIRE / BENEVOLE / STAGIAIRE)
+// ------------------------------------------------------------------
+const TYPES_PERSONNEL = ["FONCTIONNAIRE", "BENEVOLE", "STAGIAIRE"];
+
+function normaliserTypePersonnel(typeRaw) {
+    if (!typeRaw) return "FONCTIONNAIRE"; // valeur par defaut
+    const type = typeRaw.toString().trim().toUpperCase();
+    return TYPES_PERSONNEL.includes(type) ? type : null;
+}
+
+function validerTypePersonnel(typeRaw) {
+    if (!typeRaw) return null; // absent => defaut FONCTIONNAIRE, valide
+    const type = typeRaw.toString().trim().toUpperCase();
+    if (!TYPES_PERSONNEL.includes(type)) {
+        return "Type de personnel invalide (attendu : Fonctionnaire, Benevole ou Stagiaire).";
+    }
+    return null;
+}
+
+// ------------------------------------------------------------------
+//  verification + normalisation des infos de stage (stagiaire_details)
+//  date_fin_stage = date_entree_admin + duree_mois
+// ------------------------------------------------------------------
+function normaliserStagiaireDetails(raw, dateEntreeAdmin) {
+    if (!raw) {
+        return {
+            erreur: "Les informations de stage (établissement, niveau, durée) sont requises pour un stagiaire.",
+            details: null,
+        };
+    }
+
+    try {
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+
+        const etablissement = parsed?.etablissement?.toString().trim() || "";
+        const niveau = parsed?.niveau?.toString().trim() || "";
+        const filiere_parcours =
+            parsed?.filiere_parcours?.toString().trim() || null;
+        const duree_mois = parseInt(parsed?.duree_mois, 10);
+
+        if (!etablissement) {
+            return {
+                erreur: "L'établissement du stagiaire est requis.",
+                details: null,
+            };
+        }
+        if (!niveau) {
+            return {
+                erreur: "Le niveau du stagiaire est requis (ex: L2, L3, M1).",
+                details: null,
+            };
+        }
+        if (!Number.isFinite(duree_mois) || duree_mois <= 0) {
+            return {
+                erreur: "La durée du stage (en mois) est invalide.",
+                details: null,
+            };
+        }
+
+        const dateFinStage = new Date(dateEntreeAdmin);
+        dateFinStage.setMonth(dateFinStage.getMonth() + duree_mois);
+
+        return {
+            erreur: null,
+            details: {
+                etablissement,
+                niveau,
+                filiere_parcours,
+                duree_mois,
+                date_fin_stage: dateFinStage,
+            },
+        };
+    } catch (error) {
+        return {
+            erreur: "Format des informations de stage invalide.",
+            details: null,
+        };
+    }
+}
+
+// ------------------------------------------------------------------
 //  supprimer un fichier du disque si validation echoue
 // ------------------------------------------------------------------
 function supprimerFichierSiExiste(chemin) {
@@ -267,4 +348,8 @@ module.exports = {
     validerAccesSIH,
     supprimerFichierSiExiste,
     validerChronologie,
+    TYPES_PERSONNEL,
+    normaliserTypePersonnel,
+    validerTypePersonnel,
+    normaliserStagiaireDetails,
 };

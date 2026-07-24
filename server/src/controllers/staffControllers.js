@@ -155,34 +155,56 @@ async function addStaff(req, res) {
         date_entree_admin,
         corps,
         diplomes: diplomesRaw,
+        type_personnel: typePersonnelRaw,
+        tous_les_services: tousLesServicesRaw,
+        stagiaire_details: stagiaireDetailsRaw,
     } = req.body;
+
+    // ── 0. Type de personnel : FONCTIONNAIRE (défaut) | BENEVOLE | STAGIAIRE
+    const erreurType = validators.validerTypePersonnel(typePersonnelRaw);
+    if (erreurType) return erreur400(erreurType);
+    const typePersonnel = validators.normaliserTypePersonnel(typePersonnelRaw);
+    const estFonctionnaireType = typePersonnel === "FONCTIONNAIRE";
+    const estStagiaireType = typePersonnel === "STAGIAIRE";
+    const tousLesServices = estStagiaireType && tousLesServicesRaw === "true";
 
     // ── Résolution du grade : id_grade_actuel (si fourni) OU
     //    lookup BDD depuis categorie + classe + echelon
-    //    Pour la classe STAGIAIRE, l'échelon est optionnel
-    const estStagiaire = classe?.toString().toUpperCase() === "STAGIAIRE";
+    //    Pour la classe de grade STAGIAIRE (distincte du type_personnel STAGIAIRE),
+    //    l'échelon est optionnel. Ne concerne que les FONCTIONNAIRES.
+    const estClasseGradeStagiaire =
+        classe?.toString().toUpperCase() === "STAGIAIRE";
     let gradeIdResolu = id_grade_actuel;
-    if (!gradeIdResolu && categorie && classe && (echelon || estStagiaire)) {
+    if (
+        estFonctionnaireType &&
+        !gradeIdResolu &&
+        categorie &&
+        classe &&
+        (echelon || estClasseGradeStagiaire)
+    ) {
         const gradeFound = await staffModels.trouverGrade({
             categorie,
             classe,
-            echelon: estStagiaire ? null : echelon,
+            echelon: estClasseGradeStagiaire ? null : echelon,
         });
         if (gradeFound) gradeIdResolu = String(gradeFound.id_grade);
     }
 
-    // champs obligatoire pour creer un personnel
-    const champsObligatoires = {
-        nom,
-        prenoms,
-        im,
-        date_naissance,
-        telephone,
-        service_id,
-        fonction_id,
-        statut,
-        date_effet,
-    };
+    // champs obligatoires : le socle commun + ce qui dépend du type
+    const champsObligatoires = { nom, prenoms, date_naissance, telephone, statut };
+    if (estFonctionnaireType) {
+        Object.assign(champsObligatoires, {
+            im,
+            service_id,
+            fonction_id,
+            date_effet,
+        });
+    } else if (typePersonnel === "BENEVOLE") {
+        Object.assign(champsObligatoires, { service_id, fonction_id });
+    } else if (estStagiaireType && !tousLesServices) {
+        champsObligatoires.service_id = service_id;
+    }
+
     const manquants = Object.entries(champsObligatoires)
         .filter(([_, valeur]) => !valeur || valeur.toString().trim() === "")
         .map(([cle]) => cle);
@@ -194,36 +216,48 @@ async function addStaff(req, res) {
         });
     }
 
-    // Si le grade n'a pas pu être résolu
-    // (uniquement si des infos de grade ont été fournies mais ne correspondent à rien)
-    if (!gradeIdResolu && (categorie || classe)) {
+    // Si le grade n'a pas pu être résolu (fonctionnaire uniquement)
+    if (estFonctionnaireType && !gradeIdResolu && (categorie || classe)) {
         validators.supprimerFichierSiExiste(cheminFichier);
         return res.status(400).json({
-            message: estStagiaire
+            message: estClasseGradeStagiaire
                 ? `Grade STAGIAIRE introuvable pour la catégorie ${categorie}. Veuillez vérifier la configuration des grades.`
                 : `Grade introuvable pour la combinaison : Catégorie ${categorie}, Classe ${classe}, Échelon ${echelon}. Veuillez vérifier la configuration des grades.`,
         });
     }
 
-    const serviceId = parseInt(service_id, 10);
-    const fonctionId = parseInt(fonction_id, 10);
-    const gradeId = parseInt(gradeIdResolu, 10);
-    if (Number.isNaN(serviceId) || serviceId <= 0) {
-        return erreur400("service_id invalide");
+    let serviceId = null;
+    if (!(estStagiaireType && tousLesServices)) {
+        serviceId = parseInt(service_id, 10);
+        if (Number.isNaN(serviceId) || serviceId <= 0) {
+            return erreur400("service_id invalide");
+        }
     }
-    if (Number.isNaN(fonctionId) || fonctionId <= 0) {
-        return erreur400("fonction_id invalide");
+
+    let fonctionId = null;
+    if (!estStagiaireType) {
+        fonctionId = parseInt(fonction_id, 10);
+        if (Number.isNaN(fonctionId) || fonctionId <= 0) {
+            return erreur400("fonction_id invalide");
+        }
     }
-    if (Number.isNaN(gradeId) || gradeId <= 0) {
-        return erreur400("id_grade_actuel invalide");
+
+    let gradeId = null;
+    if (estFonctionnaireType) {
+        gradeId = parseInt(gradeIdResolu, 10);
+        if (Number.isNaN(gradeId) || gradeId <= 0) {
+            return erreur400("id_grade_actuel invalide");
+        }
     }
 
     const statutNormalise = validators.normaliserStatut(statut);
     if (!statutNormalise) return erreur400("Statut invalide");
 
     // ── 2. Validations métier ─────────────────────────────────────
-    const erreurIM = validators.validerIM(im);
-    if (erreurIM) return erreur400(erreurIM);
+    if (estFonctionnaireType) {
+        const erreurIM = validators.validerIM(im);
+        if (erreurIM) return erreur400(erreurIM);
+    }
 
     const erreurAge = validators.validerAge(date_naissance);
     if (erreurAge) return erreur400(erreurAge);
@@ -235,12 +269,15 @@ async function addStaff(req, res) {
     );
     if (erreurEntree) return erreur400(erreurEntree);
 
-    const erreurEffet = validators.validerChronologie(
-        date_naissance,
-        date_effet,
-        "date d'effet",
-    );
-    if (erreurEffet) return erreur400(erreurEffet);
+    // date_effet ne concerne que les fonctionnaires (grade/avancement)
+    if (estFonctionnaireType) {
+        const erreurEffet = validators.validerChronologie(
+            date_naissance,
+            date_effet,
+            "date d'effet",
+        );
+        if (erreurEffet) return erreur400(erreurEffet);
+    }
 
     const erreurTel = validators.validerTelephone(telephone);
     if (erreurTel) return erreur400(erreurTel);
@@ -252,7 +289,7 @@ async function addStaff(req, res) {
     const erreurGenre = await validators.validerGenreId(genre_id);
     if (erreurGenre) return erreur400(erreurGenre);
 
-    // ── 3. Accès SIH ──────────────────────────────────────────────
+    // ── 3. Accès SIH (tous types) ───────────────────────────────────
     const accesBoolean = (donner_access ?? donner_acces) === "true";
     const erreurSIH = validators.validerAccesSIH({
         donner_acces: accesBoolean,
@@ -262,16 +299,36 @@ async function addStaff(req, res) {
     });
     if (erreurSIH) return erreur400(erreurSIH);
 
-    // ── 4. Diplômes ───────────────────────────────────────────────
-    const { erreur: erreurDiplomes, diplomes } =
-        validators.normaliserDiplomes(diplomesRaw);
-    if (erreurDiplomes) return erreur400(erreurDiplomes);
+    // ── 4. Diplômes (fonctionnaire + bénévole facultatif) OU infos de stage
+    let diplomes = [];
+    let stagiaireDetails = null;
+
+    if (!estStagiaireType) {
+        const { erreur: erreurDiplomes, diplomes: diplomesNormalises } =
+            validators.normaliserDiplomes(diplomesRaw);
+        if (erreurDiplomes) return erreur400(erreurDiplomes);
+        diplomes = diplomesNormalises;
+    } else {
+        const dateEntreeAdminCalc = date_entree_admin
+            ? new Date(date_entree_admin)
+            : new Date();
+        const { erreur: erreurStage, details } =
+            validators.normaliserStagiaireDetails(
+                stagiaireDetailsRaw,
+                dateEntreeAdminCalc,
+            );
+        if (erreurStage) return erreur400(erreurStage);
+        stagiaireDetails = details;
+    }
 
     // ── 5. IM normalisé + unicité BDD ─────────────────────────────
-    const imNormalise = validators.formatIM(im);
+    // im n'existe que pour les fonctionnaires ; pour bénévole/stagiaire on
+    // n'inclut pas la clé "im" dans la vérification d'unicité (voir
+    // verifierUniciteBDD : la clé absente n'est simplement pas vérifiée)
+    const imNormalise = estFonctionnaireType ? validators.formatIM(im) : null;
 
     const erreurUnicite = await validators.verifierUniciteBDD({
-        im: imNormalise,
+        ...(estFonctionnaireType ? { im: imNormalise } : {}),
         telephone: telephone?.trim(),
         email: email?.trim() || null,
     });
@@ -301,18 +358,24 @@ async function addStaff(req, res) {
             date_naissance,
             id_grade_actuel: gradeId,
             // Supporte "num_arrete" (nom API) ET "arrete" (ancien nom frontend)
-            num_arrete: num_arrete || req.body.arrete || null,
-            date_effet,
-            specialite: specialite?.trim() || null,
-            corps: corps?.trim() || null,
+            num_arrete: estFonctionnaireType
+                ? num_arrete || req.body.arrete || null
+                : null,
+            date_effet: estFonctionnaireType ? date_effet : null,
+            specialite: estStagiaireType ? null : specialite?.trim() || null,
+            corps: estFonctionnaireType ? corps?.trim() || null : null,
             telephone: telephone.trim(),
             email: email?.trim() || null,
             service_id: serviceId,
             fonction_id: fonctionId,
             genre_id: genre_id ? parseInt(genre_id, 10) : null,
             statut: statutNormalise,
+            // Fonctionnaire : nom de fichier connu à l'avance (basé sur le matricule)
+            // Bénévole/stagiaire : pas de matricule -> photo posée après coup (étape 8)
             photo_profil: req.file
-                ? `photo-profil-${imNormalise.replaceAll(" ", "")}.png`
+                ? estFonctionnaireType
+                    ? `photo-profil-${imNormalise.replaceAll(" ", "")}.png`
+                    : "default-avatar.png"
                 : "default-avatar.png",
             diplomes,
             donner_acces: accesBoolean,
@@ -321,17 +384,30 @@ async function addStaff(req, res) {
             role: accesBoolean ? role : "user",
             adminId: req.user?.id,
             date_entree_admin,
+            type_personnel: typePersonnel,
+            tous_les_services: tousLesServices,
+            stagiaireDetails,
         });
 
-        // ── 8. Renommer le fichier photo ──────────────────────────
+        // ── 8. Renommer / associer le fichier photo ────────────────
         if (req.file) {
             const dossier = path.join(__dirname, "..", "..", "uploads");
             const ancienChemin = path.join(dossier, req.file.filename);
-            const nouveauNom = `photo-profil-${personnelIm.toString().replaceAll(" ", "")}.png`;
+            const nouveauNom = estFonctionnaireType
+                ? `photo-profil-${personnelIm.toString().replaceAll(" ", "")}.png`
+                : `photo-profil-${personnelId}.png`;
             const nouveauChemin = path.join(dossier, nouveauNom);
 
             try {
                 fs.renameSync(ancienChemin, nouveauChemin);
+                // Pour bénévole/stagiaire le nom final n'était pas connu à la
+                // création (pas de matricule) -> on met à jour l'enregistrement
+                if (!estFonctionnaireType) {
+                    await staffModels.definirPhotoProfil(
+                        personnelId,
+                        nouveauNom,
+                    );
+                }
             } catch (error) {
                 validators.supprimerFichierSiExiste(ancienChemin);
                 console.error("[addStaff] Erreur renommage photo :", error);

@@ -291,6 +291,15 @@ async function getStaffById(id) {
                     est_principal: true,
                 },
             },
+            stagiaire_details: {
+                select: {
+                    etablissement: true,
+                    niveau: true,
+                    filiere_parcours: true,
+                    duree_mois: true,
+                    date_fin_stage: true,
+                },
+            },
             grade: {
                 select: {
                     id_grade: true,
@@ -427,12 +436,28 @@ async function getStaffById(id) {
         statut: validators.formatStatutPourClient(personnel.statut),
         a_acces_sih: Boolean(personnel.auth_user),
         username_sih: personnel.auth_user?.username ?? null,
+        type_personnel: personnel.type_personnel,
+        tous_les_services: personnel.tous_les_services,
         diplomes: personnel.diplome,
+        stagiaire_details: personnel.stagiaire_details
+            ? {
+                  ...personnel.stagiaire_details,
+                  date_fin_stage: formaterDate(
+                      personnel.stagiaire_details.date_fin_stage,
+                  ),
+              }
+            : null,
         audit_logs: combinedLogs,
     };
 }
 
 // ── AJOUT ─────────────────────────────────────────────────────────
+// type_personnel : "FONCTIONNAIRE" (défaut, comportement inchangé) | "BENEVOLE" | "STAGIAIRE"
+//   - FONCTIONNAIRE : grade + avancement obligatoires (code de base, inchangé)
+//   - BENEVOLE      : pas de matricule/corps/arrêté/grade ; diplômes facultatifs conservés
+//   - STAGIAIRE     : pas de matricule/corps/arrêté/grade/fonction/spécialité ;
+//                     pas de diplômes -> une ligne chu.stagiaire_details à la place ;
+//                     peut être affecté à "tous les services" (service_id = null)
 async function addPersonnel({
     nom,
     prenoms,
@@ -457,31 +482,50 @@ async function addPersonnel({
     role = "user",
     adminId,
     date_entree_admin,
+    type_personnel = "FONCTIONNAIRE",
+    tous_les_services = false,
+    stagiaireDetails = null,
 }) {
-    const grade = await prisma.grade.findUnique({
-        where: { id_grade: parseInt(id_grade_actuel, 10) },
-        select: { duree_mois: true, classe: true },
-    });
+    const estFonctionnaire = type_personnel === "FONCTIONNAIRE";
+    const estStagiaireType = type_personnel === "STAGIAIRE";
 
-    if (!grade)
-        throw new Error(
-            `Grade introuvable : id_grade_actuel = ${id_grade_actuel}`,
-        );
+    // Le grade/avancement ne concerne que les fonctionnaires
+    let grade = null;
+    if (estFonctionnaire) {
+        grade = await prisma.grade.findUnique({
+            where: { id_grade: parseInt(id_grade_actuel, 10) },
+            select: { duree_mois: true, classe: true },
+        });
+
+        if (!grade)
+            throw new Error(
+                `Grade introuvable : id_grade_actuel = ${id_grade_actuel}`,
+            );
+    }
 
     const dateAujourdhui = new Date();
     const dateEntreeAdmin = date_entree_admin
         ? new Date(date_entree_admin)
         : dateAujourdhui;
-    const dateEffetVal = new Date(date_effet);
-    const dateProchain = new Date(dateEffetVal);
-    dateProchain.setMonth(dateProchain.getMonth() + grade.duree_mois);
 
-    let type_mouvement;
-    if (grade.classe === "STAGIAIRE") {
-        type_mouvement = "NOMINATION";
-    } else {
-        type_mouvement = "INITIALISATION";
+    let dateEffetVal = null;
+    let dateProchain = null;
+    let type_mouvement = null;
+    if (estFonctionnaire) {
+        dateEffetVal = new Date(date_effet);
+        dateProchain = new Date(dateEffetVal);
+        dateProchain.setMonth(dateProchain.getMonth() + grade.duree_mois);
+        type_mouvement =
+            grade.classe === "STAGIAIRE" ? "NOMINATION" : "INITIALISATION";
     }
+
+    // Une seule action d'audit pour tout ajout de personnel ; seule la
+    // description distingue Fonctionnaire / Bénévole / Stagiaire
+    const LIBELLES_AJOUT = {
+        FONCTIONNAIRE: "Nouveau personnel",
+        BENEVOLE: "Nouveau bénévole",
+        STAGIAIRE: "Nouveau stagiaire",
+    };
 
     return await prisma.$transaction(async (tx) => {
         // INSERT chu.personnel
@@ -489,16 +533,29 @@ async function addPersonnel({
             data: {
                 nom,
                 prenoms,
-                im,
+                im: estFonctionnaire ? im : null,
                 date_naissance: new Date(date_naissance),
-                id_grade_actuel: parseInt(id_grade_actuel, 10),
+                type_personnel,
+                tous_les_services: estStagiaireType
+                    ? Boolean(tous_les_services)
+                    : false,
+                id_grade_actuel: estFonctionnaire
+                    ? parseInt(id_grade_actuel, 10)
+                    : null,
                 date_entree_admin: dateEntreeAdmin,
-                specialite,
-                corps,
+                specialite: estStagiaireType ? null : specialite,
+                corps: estFonctionnaire ? corps : null,
                 telephone,
                 email,
-                service_id: BigInt(service_id),
-                fonction_id: fonction_id !== undefined ? fonction_id : null,
+                service_id:
+                    estStagiaireType && tous_les_services
+                        ? null
+                        : BigInt(service_id),
+                fonction_id: estStagiaireType
+                    ? null
+                    : fonction_id !== undefined
+                      ? fonction_id
+                      : null,
                 genre_id:
                     genre_id !== undefined && genre_id !== null
                         ? BigInt(genre_id)
@@ -511,21 +568,24 @@ async function addPersonnel({
         const personnelId = personnel.id;
         const personnelIm = personnel.im;
 
-        // Insertion dans avancements -> grade initial
-        await tx.avancements.create({
-            data: {
-                id_personnel: personnelId,
-                id_grade_obtenu: parseInt(id_grade_actuel, 10),
-                num_arrete: num_arrete || "", // facultatif
-                date_signature: dateAujourdhui,
-                date_effet: dateEffetVal,
-                date_prochain_avancement: dateProchain,
-                type_mouvement: type_mouvement,
-            },
-        });
+        // Insertion dans avancements -> grade initial (fonctionnaire uniquement)
+        if (estFonctionnaire) {
+            await tx.avancements.create({
+                data: {
+                    id_personnel: personnelId,
+                    id_grade_obtenu: parseInt(id_grade_actuel, 10),
+                    num_arrete: num_arrete || "", // facultatif
+                    date_signature: dateAujourdhui,
+                    date_effet: dateEffetVal,
+                    date_prochain_avancement: dateProchain,
+                    type_mouvement: type_mouvement,
+                },
+            });
+        }
 
-        // INSERT ref.diplome
-        if (diplomes.length > 0) {
+        // INSERT ref.diplome (fonctionnaire obligatoire côté métier, bénévole facultatif)
+        // Les stagiaires n'ont pas de diplômes -> voir stagiaire_details ci-dessous
+        if (!estStagiaireType && diplomes.length > 0) {
             await tx.diplome.createMany({
                 data: diplomes.map((d) => ({
                     libelle: d.libelle,
@@ -537,7 +597,21 @@ async function addPersonnel({
             });
         }
 
-        // INSERT ref.auth_user si acces SIH donne
+        // INSERT chu.stagiaire_details (stagiaire uniquement)
+        if (estStagiaireType && stagiaireDetails) {
+            await tx.stagiaire_details.create({
+                data: {
+                    personnel_id: personnelId,
+                    etablissement: stagiaireDetails.etablissement,
+                    niveau: stagiaireDetails.niveau,
+                    filiere_parcours: stagiaireDetails.filiere_parcours,
+                    duree_mois: stagiaireDetails.duree_mois,
+                    date_fin_stage: stagiaireDetails.date_fin_stage,
+                },
+            });
+        }
+
+        // INSERT ref.auth_user si acces SIH donne (tous types confondus)
         if (donner_acces && username && password_hash) {
             await tx.auth_user.create({
                 data: {
@@ -553,12 +627,12 @@ async function addPersonnel({
         const dateArrivee = formaterDate(dateEntreeAdmin);
         await tx.ref_audit_log.create({
             data: {
-                action: "AJOUT_PERSONNEL",
+                action: "AJOUT_EMPLOYE",
                 cible_type: "personnel",
                 cible_id: personnelId,
                 fait_par_id: adminId ? BigInt(adminId) : null,
                 details: {
-                    description: `Nouveau personnel ${nom} ${prenoms} arrive le ${dateArrivee}`,
+                    description: `${LIBELLES_AJOUT[type_personnel] || "Nouveau personnel"} ${nom} ${prenoms} arrive le ${dateArrivee}`,
                 },
             },
         });
@@ -769,6 +843,14 @@ async function updatePersonnel({
     return { success: true, data: profile };
 }
 
+// ── PHOTO APRÈS COUP (bénévole/stagiaire, pas de matricule à la création) ──
+async function definirPhotoProfil(id, photo_profil) {
+    await prisma.personnel.update({
+        where: { id: BigInt(id) },
+        data: { photo_profil },
+    });
+}
+
 // Fonction auxiliaire : supprime l'ancienne photo du serveur
 function supprimerAnciennePhoto(photo_profil, anciennePhoto) {
     if (
@@ -866,6 +948,7 @@ module.exports = {
     getStaffById,
     addPersonnel,
     updatePersonnel,
+    definirPhotoProfil,
     supprimerAnciennePhoto,
     archiverPersonnel,
     trouverGrade,
