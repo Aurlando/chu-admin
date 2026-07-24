@@ -280,6 +280,8 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
     // ── Données du formulaire
     const [form, setForm] = useState(() => {
         return getValidDraft("add_personnel_form", {
+            type_personnel: "FONCTIONNAIRE", // Par défaut
+            tous_les_services: false, // Pour STAGIAIRE
             nom: "",
             prenoms: "",
             im: "",
@@ -301,6 +303,16 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
             username: "",
             password: "",
             role: "user",
+        });
+    });
+
+    // Nouvel état pour les détails du stagiaire
+    const [stagiaireDetails, setStagiaireDetails] = useState(() => {
+        return getValidDraft("add_personnel_stagiaire", {
+            etablissement: "",
+            niveau: "",
+            filiere_parcours: "",
+            duree_mois: "",
         });
     });
 
@@ -358,6 +370,14 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
     }, [creerCompte]);
 
     useEffect(() => {
+        localStorage.setItem(
+            "add_personnel_stagiaire",
+            JSON.stringify(stagiaireDetails),
+        );
+        updateTimestamp();
+    }, [stagiaireDetails]);
+
+    useEffect(() => {
         localStorage.setItem("add_personnel_step", currentStep.toString());
         updateTimestamp();
     }, [currentStep]);
@@ -366,6 +386,7 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
         localStorage.removeItem("add_personnel_form");
         localStorage.removeItem("add_personnel_diplomes");
         localStorage.removeItem("add_personnel_creerCompte");
+        localStorage.removeItem("add_personnel_stagiaire");
         localStorage.removeItem("add_personnel_step");
         localStorage.removeItem("add_personnel_timestamp");
     };
@@ -393,15 +414,43 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                 );
             })
             .catch(() => {});
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);
 
     // ════════════════════════════════════════════════════════════════════
     // Handlers
     // ════════════════════════════════════════════════════════════════════
 
     const handleChange = (name, value) => {
-        setForm((prev) => ({ ...prev, [name]: value }));
-        if (errors[name]) setErrors((prev) => ({ ...prev, [name]: null }));
+        setForm((prev) => {
+            const next = { ...prev, [name]: value };
+            if (name === "type_personnel") {
+                if (value !== "FONCTIONNAIRE") {
+                    next.im = "";
+                    next.categorie = "";
+                    next.classe = "";
+                    next.echelon = "";
+                    next.corps = "";
+                    next.date_effet = "";
+                    next.num_arrete = "";
+                }
+            }
+            return next;
+        });
+
+        setErrors((prev) => {
+            const next = { ...prev };
+            if (next[name]) next[name] = null;
+            if (name === "type_personnel") {
+                next.im = null;
+                next.date_effet = null;
+                next.categorie = null;
+                next.classe = null;
+                next.echelon = null;
+                next.corps = null;
+                next.num_arrete = null;
+            }
+            return next;
+        });
     };
 
     const formatPhoneDisplay = (value) => {
@@ -440,6 +489,21 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
             .replace(/[^\d+]/g, "")
             .replace(/\s+/g, "")
             .replace(/-/g, "");
+
+    // Ne garde que les 6 premiers chiffres (ignorant les espaces)
+    const handleImChange = (e) => {
+        const rawValue = e.target.value.replace(/\D/g, "").slice(0, 6);
+        handleChange("im", rawValue);
+    };
+
+    // Ajoute un espace après le 3ème chiffre uniquement pour l'affichage
+    const formatImDisplay = (val) => {
+        if (!val) return "";
+        if (val.length > 3) {
+            return `${val.slice(0, 3)} ${val.slice(3, 6)}`;
+        }
+        return val;
+    };
 
     const handlePhoto = (file) => {
         if (!file) return;
@@ -531,24 +595,26 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
             }
         }
         if (step === 2) {
-            if (!im.trim()) e.im = "Requis";
-            else if (!/^\d+$/.test(im.trim()))
-                e.im = "Le matricule doit contenir uniquement des chiffres";
-            if (!form.categorie) e.categorie = "Requis";
-            if (!form.classe) e.classe = "Requis";
-            if (!form.echelon) e.echelon = "Requis";
-            if (!dateEffet) {
-                e.date_effet = "Requis";
-            } else if (dateNaissance) {
-                const effectDate = new Date(dateEffet);
-                const birthDate = new Date(dateNaissance);
-                if (
-                    !Number.isNaN(effectDate.getTime()) &&
-                    !Number.isNaN(birthDate.getTime()) &&
-                    effectDate < birthDate
-                ) {
-                    e.date_effet =
-                        "La date d'effet ne peut pas être inférieure ou égal à la date de naissance";
+            if (form.type_personnel === "FONCTIONNAIRE") {
+                if (!im.trim()) e.im = "Requis";
+                else if (!/^\d+$/.test(im.trim()))
+                    e.im = "Le matricule doit contenir uniquement des chiffres";
+                if (!form.categorie) e.categorie = "Requis";
+                if (!form.classe) e.classe = "Requis";
+                if (!form.echelon) e.echelon = "Requis";
+                if (!dateEffet) {
+                    e.date_effet = "Requis";
+                } else if (dateNaissance) {
+                    const effectDate = new Date(dateEffet);
+                    const birthDate = new Date(dateNaissance);
+                    if (
+                        !Number.isNaN(effectDate.getTime()) &&
+                        !Number.isNaN(birthDate.getTime()) &&
+                        effectDate < birthDate
+                    ) {
+                        e.date_effet =
+                            "La date d'effet ne peut pas être inférieure ou égale à la date de naissance";
+                    }
                 }
             }
             if (dateEntreeAdmin && dateNaissance) {
@@ -560,35 +626,52 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                     entryDate < birthDate
                 ) {
                     e.date_entree_admin =
-                        "La date d'entrée ne peut pas être inférieur ou égal à la date de naissance";
+                        "La date d'entrée ne peut pas être inférieure ou égale à la date de naissance";
                 }
             }
         }
         if (step === 3) {
-            if (!form.service_id) e.service_id = "Requis";
-            if (!form.fonction_id) e.fonction_id = "Requis";
-            if (!specialite.trim()) e.specialite = "Requis";
-            else if (!noSpecialCharsAlphanumRegex.test(specialite))
-                e.specialite =
-                    "Seules les lettres, chiffres, espaces, accents, apostrophes et traits d'union sont autorisés";
+            if (form.type_personnel === "STAGIAIRE") {
+                if (!form.tous_les_services && !form.service_id)
+                    e.service_id = "Requis";
+            } else if (form.type_personnel === "BENEVOLE") {
+                if (!form.service_id) e.service_id = "Requis";
+                if (!form.fonction_id) e.fonction_id = "Requis";
+            } else {
+                // FONCTIONNAIRE
+                if (!form.service_id) e.service_id = "Requis";
+                if (!form.fonction_id) e.fonction_id = "Requis";
+                if (!specialite.trim()) e.specialite = "Requis";
+            }
         }
         if (step === 4) {
-            if (
-                !safeDiplomes[0] ||
-                !getSafeText(safeDiplomes[0].libelle).trim()
-            )
-                e.diplome0 = "Le diplôme principal est requis";
-            safeDiplomes.forEach((d, i) => {
-                const libelle = getSafeText(d?.libelle);
-                const etablissement = getSafeText(d?.etablissement);
-                if (libelle && !noSpecialCharsAlphanumRegex.test(libelle))
-                    e[`diplome${i}`] = "Pas de caractères spéciaux";
+            if (form.type_personnel === "STAGIAIRE") {
+                if (!stagiaireDetails.etablissement.trim())
+                    e.etablissement = "Requis";
+                if (!stagiaireDetails.niveau.trim()) e.niveau = "Requis";
                 if (
-                    etablissement &&
-                    !noSpecialCharsAlphanumRegex.test(etablissement)
+                    !stagiaireDetails.duree_mois ||
+                    isNaN(stagiaireDetails.duree_mois)
                 )
-                    e[`etab${i}`] = "Pas de caractères spéciaux";
-            });
+                    e.duree_mois = "Requis";
+            } else if (form.type_personnel === "FONCTIONNAIRE") {
+                if (
+                    !safeDiplomes[0] ||
+                    !getSafeText(safeDiplomes[0].libelle).trim()
+                )
+                    e.diplome0 = "Le diplôme principal est requis";
+                safeDiplomes.forEach((d, i) => {
+                    const libelle = getSafeText(d?.libelle);
+                    const etablissement = getSafeText(d?.etablissement);
+                    if (libelle && !noSpecialCharsAlphanumRegex.test(libelle))
+                        e[`diplome${i}`] = "Pas de caractères spéciaux";
+                    if (
+                        etablissement &&
+                        !noSpecialCharsAlphanumRegex.test(etablissement)
+                    )
+                        e[`etab${i}`] = "Pas de caractères spéciaux";
+                });
+            }
         }
         if (step === 5 && creerCompte) {
             if (!username.trim()) e.username = "Requis";
@@ -665,33 +748,51 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
         setApiError(null);
         try {
             const fd = new FormData();
+            fd.append("type_personnel", form.type_personnel); // Toujours envoyé
             if (photoFile) fd.append("photo", photoFile);
             fd.append("nom", form.nom.trim());
             fd.append("prenoms", form.prenoms.trim());
-            fd.append("im", form.im.trim());
             fd.append("date_naissance", form.date_naissance);
             fd.append("genre_id", form.genre_id);
-            fd.append("categorie", form.categorie);
-            fd.append("classe", form.classe);
-            fd.append("echelon", form.echelon);
-            fd.append("specialite", form.specialite.trim());
-            fd.append("corps", form.corps?.trim() || "");
-            fd.append("date_effet", form.date_effet);
-            fd.append("num_arrete", form.num_arrete?.trim() || "");
-            // [NOUVEAU] Date d'entrée admin — envoyée uniquement si renseignée
-            if (form.date_entree_admin)
-                fd.append("date_entree_admin", form.date_entree_admin);
+            fd.append("statut", form.statut);
             fd.append("telephone", normalizePhoneForBackend(form.telephone));
             fd.append("email", form.email.trim());
-            fd.append("service_id", form.service_id);
-            fd.append("fonction_id", form.fonction_id);
-            fd.append("statut", form.statut);
-            fd.append("diplomes", JSON.stringify(diplomes));
 
-            // donner_access : booléen envoyé dans TOUS les cas (true ou false)
-            // Le back l'utilise pour décider de créer ou non un compte utilisateur.
-            // FormData ne supporte pas les booléens → on convertit en string "true"/"false"
-            // Le back fait : const donnerAccess = req.body.donner_access === "true"
+            if (form.date_entree_admin)
+                fd.append("date_entree_admin", form.date_entree_admin);
+
+            if (form.type_personnel === "FONCTIONNAIRE") {
+                fd.append("im", form.im.trim());
+                fd.append("categorie", form.categorie);
+                fd.append("classe", form.classe);
+                fd.append("echelon", form.echelon);
+                fd.append("corps", form.corps?.trim() || "");
+                fd.append("date_effet", form.date_effet);
+                fd.append("num_arrete", form.num_arrete?.trim() || "");
+            }
+
+            if (form.type_personnel === "STAGIAIRE") {
+                fd.append(
+                    "tous_les_services",
+                    form.tous_les_services ? "true" : "false",
+                );
+                if (!form.tous_les_services)
+                    fd.append("service_id", form.service_id);
+                fd.append(
+                    "stagiaire_details",
+                    JSON.stringify(stagiaireDetails),
+                );
+            } else if (form.type_personnel === "BENEVOLE") {
+                fd.append("service_id", form.service_id);
+                fd.append("fonction_id", form.fonction_id);
+            } else {
+                // FONCTIONNAIRE
+                fd.append("service_id", form.service_id);
+                fd.append("fonction_id", form.fonction_id);
+                fd.append("specialite", form.specialite.trim());
+                fd.append("diplomes", JSON.stringify(diplomes));
+            }
+
             fd.append("donner_access", String(creerCompte));
 
             if (creerCompte) {
@@ -1044,7 +1145,10 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                 <div className={`rounded-2xl border ${card}`}>
                     {/* ── ÉTAPE 1 : IDENTITÉ ── */}
                     {currentStep === 1 && (
-                        <div key="step-1" className="p-5 lg:p-6 space-y-5">
+                        <div
+                            key="step-1"
+                            className="p-5 lg:p-6 space-y-5"
+                        >
                             <div
                                 className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}
                             >
@@ -1182,6 +1286,53 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                                 </div>
                             </div>
 
+                            {/* Sélection du Type de Personnel */}
+                            <div className="mb-6 space-y-2">
+                                <label
+                                    className={`text-[11px] font-bold uppercase tracking-widest ${dark ? "text-slate-500" : "text-slate-400"}`}
+                                >
+                                    Type de profil
+                                </label>
+                                <div className="flex flex-wrap gap-3">
+                                    {[
+                                        "FONCTIONNAIRE",
+                                        "BENEVOLE",
+                                        "STAGIAIRE",
+                                    ].map((type) => (
+                                        <label
+                                            key={type}
+                                            className={`flex-1 flex items-center justify-center py-2.5 px-4 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                                                form.type_personnel === type
+                                                    ? dark
+                                                        ? "bg-blue-600/20 border-blue-500 text-blue-400"
+                                                        : "bg-blue-50 border-blue-600 text-blue-700"
+                                                    : dark
+                                                      ? "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                                                      : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                                            }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="type_personnel"
+                                                value={type}
+                                                checked={
+                                                    form.type_personnel === type
+                                                }
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "type_personnel",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className="hidden"
+                                            />
+                                            {type.charAt(0) +
+                                                type.slice(1).toLowerCase()}
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {/* Nom */}
                                 <Field
@@ -1314,7 +1465,10 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
 
                     {/* ── ÉTAPE 2 : SITUATION ADMINISTRATIVE ── */}
                     {currentStep === 2 && (
-                        <div key="step-2" className="p-5 lg:p-6 space-y-5">
+                        <div
+                            key="step-2"
+                            className="p-5 lg:p-6 space-y-5"
+                        >
                             <div
                                 className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}
                             >
@@ -1325,39 +1479,41 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                                 </div>
                                 <div>
                                     <h2 className={`text-sm font-bold ${ttl}`}>
-                                        Situation administrative
+                                        {form.type_personnel === "STAGIAIRE"
+                                            ? "Informations de stage"
+                                            : form.type_personnel === "BENEVOLE"
+                                              ? "Situation du bénévole"
+                                              : "Situation administrative"}
                                     </h2>
                                     <p className={`text-xs ${sub}`}>
-                                        Matricule, statut, affectation et grade
+                                        {form.type_personnel === "STAGIAIRE"
+                                            ? "Statut et date de début de stage"
+                                            : form.type_personnel === "BENEVOLE"
+                                              ? "Statut et date d'entrée"
+                                              : "Matricule, statut, affectation et grade"}
                                     </p>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {/* Matricule */}
-                                <Field
-                                    label="Matricule"
-                                    required
-                                    dark={dark}
-                                    error={errors.im}
-                                >
-                                    <input
-                                        type="text"
-                                        placeholder="Ex: 371815"
-                                        value={form.im}
-                                        onChange={(e) =>
-                                            handleChange(
-                                                "im",
-                                                e.target.value.replace(
-                                                    /\s/g,
-                                                    "",
-                                                ),
-                                            )
-                                        }
-                                        className={inp("im")}
-                                    />
-                                </Field>
 
-                                {/* Statut */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {form.type_personnel === "FONCTIONNAIRE" && (
+                                    <Field
+                                        label="Matricule"
+                                        required
+                                        dark={dark}
+                                        error={errors.im}
+                                    >
+                                        <input
+                                            type="text"
+                                            placeholder="Ex: 371 815"
+                                            value={formatImDisplay(form.im)}
+                                            onChange={handleImChange}
+                                            maxLength={7}
+                                            className={inp("im")}
+                                        />
+                                    </Field>
+                                )}
+
                                 <Field
                                     label="Statut"
                                     required
@@ -1375,16 +1531,22 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                                         className={sel("statut")}
                                     >
                                         {STATUTS.map((s) => (
-                                            <option key={s} value={s}>
+                                            <option
+                                                key={s}
+                                                value={s}
+                                            >
                                                 {s}
                                             </option>
                                         ))}
                                     </select>
                                 </Field>
 
-                                {/* Date d'entrée dans l'administration */}
                                 <Field
-                                    label="Date d'entrée dans l'administration"
+                                    label={
+                                        form.type_personnel === "STAGIAIRE"
+                                            ? "Date début de stage"
+                                            : "Date d'entrée dans l'administration"
+                                    }
                                     required
                                     dark={dark}
                                     error={errors.date_entree_admin}
@@ -1406,188 +1568,167 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                                         }
                                     />
                                 </Field>
-
-                                {/* Corps */}
-                                <Field
-                                    label="Corps"
-                                    dark={dark}
-                                    error={errors.corps}
-                                >
-                                    <input
-                                        type="text"
-                                        placeholder="Ex: Cadre supérieur, Cadre moyen"
-                                        value={form.corps || ""}
-                                        onChange={(e) =>
-                                            handleChange(
-                                                "corps",
-                                                e.target.value,
-                                            )
-                                        }
-                                        className={inp("corps")}
-                                    />
-                                </Field>
-
-                                {/* Numéro d'arrêté */}
-                                <Field
-                                    label="Numéro d'arrêté"
-                                    dark={dark}
-                                    error={errors.num_arrete}
-                                >
-                                    <input
-                                        type="text"
-                                        placeholder="Ex: 11551/2025/MEN"
-                                        value={form.num_arrete ?? ""}
-                                        onChange={(e) =>
-                                            handleChange(
-                                                "num_arrete",
-                                                e.target.value,
-                                            )
-                                        }
-                                        className={inp("num_arrete")}
-                                    />
-                                </Field>
-
-                                {/* Date d'effet */}
-                                <Field
-                                    label="Date d'effet"
-                                    required
-                                    dark={dark}
-                                    error={errors.date_effet}
-                                >
-                                    <input
-                                        type="date"
-                                        value={form.date_effet}
-                                        onChange={(e) =>
-                                            handleChange(
-                                                "date_effet",
-                                                e.target.value,
-                                            )
-                                        }
-                                        className={inp("date_effet")}
-                                    />
-                                </Field>
-
-                                {/* Catégorie */}
-                                <Field
-                                    label="Catégorie"
-                                    required
-                                    dark={dark}
-                                    error={errors.categorie}
-                                >
-                                    <select
-                                        value={form.categorie}
-                                        onChange={(e) =>
-                                            handleChange(
-                                                "categorie",
-                                                e.target.value,
-                                            )
-                                        }
-                                        className={sel("categorie")}
-                                    >
-                                        <option value="">Sélectionner</option>
-                                        {CATEGORIES.map((c) => (
-                                            <option
-                                                key={c.value}
-                                                value={c.value}
-                                            >
-                                                {c.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </Field>
-
-                                {/* Classe */}
-                                <Field
-                                    label="Classe"
-                                    required
-                                    dark={dark}
-                                    error={errors.classe}
-                                >
-                                    <select
-                                        value={form.classe}
-                                        onChange={(e) =>
-                                            handleChange(
-                                                "classe",
-                                                e.target.value,
-                                            )
-                                        }
-                                        className={sel("classe")}
-                                    >
-                                        <option value="">Sélectionner</option>
-                                        {CLASSES.map((c) => (
-                                            <option
-                                                key={c.value}
-                                                value={c.value}
-                                            >
-                                                {c.label}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </Field>
-
-                                {/* Échelon */}
-                                <Field
-                                    label="Échelon"
-                                    required
-                                    dark={dark}
-                                    error={errors.echelon}
-                                >
-                                    <select
-                                        value={form.echelon}
-                                        onChange={(e) =>
-                                            handleChange(
-                                                "echelon",
-                                                e.target.value,
-                                            )
-                                        }
-                                        className={sel("echelon")}
-                                    >
-                                        <option value="">Sélectionner</option>
-                                        {ECHELONS.map((e) => (
-                                            <option key={e} value={e}>
-                                                {e}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </Field>
                             </div>
 
-                            {/* Message d'aide sur les grades */}
-                            <div
-                                className={`mt-4 p-3 rounded-xl border flex items-start gap-3 transition-all
-                ${dark ? "bg-blue-500/5 border-blue-500/10" : "bg-blue-50 border-blue-100"}`}
-                            >
-                                <div className="pt-0.5">
-                                    <svg
-                                        className={`w-4 h-4 ${dark ? "text-blue-400" : "text-blue-500"}`}
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        strokeWidth={2.5}
+                            {form.type_personnel === "FONCTIONNAIRE" && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <Field
+                                        label="Corps"
+                                        dark={dark}
+                                        error={errors.corps}
                                     >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                                        <input
+                                            type="text"
+                                            placeholder="Ex: Cadre supérieur, Cadre moyen"
+                                            value={form.corps || ""}
+                                            onChange={(e) =>
+                                                handleChange(
+                                                    "corps",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className={inp("corps")}
                                         />
-                                    </svg>
+                                    </Field>
+
+                                    <Field
+                                        label="Numéro d'arrêté"
+                                        dark={dark}
+                                        error={errors.num_arrete}
+                                    >
+                                        <input
+                                            type="text"
+                                            placeholder="Ex: 11551/2025/MEN"
+                                            value={form.num_arrete ?? ""}
+                                            onChange={(e) =>
+                                                handleChange(
+                                                    "num_arrete",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className={inp("num_arrete")}
+                                        />
+                                    </Field>
+
+                                    <Field
+                                        label="Date d'effet"
+                                        required
+                                        dark={dark}
+                                        error={errors.date_effet}
+                                    >
+                                        <input
+                                            type="date"
+                                            value={form.date_effet}
+                                            onChange={(e) =>
+                                                handleChange(
+                                                    "date_effet",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className={inp("date_effet")}
+                                        />
+                                    </Field>
+
+                                    <Field
+                                        label="Catégorie"
+                                        required
+                                        dark={dark}
+                                        error={errors.categorie}
+                                    >
+                                        <select
+                                            value={form.categorie}
+                                            onChange={(e) =>
+                                                handleChange(
+                                                    "categorie",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className={sel("categorie")}
+                                        >
+                                            <option value="">
+                                                Sélectionner
+                                            </option>
+                                            {CATEGORIES.map((c) => (
+                                                <option
+                                                    key={c.value}
+                                                    value={c.value}
+                                                >
+                                                    {c.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </Field>
+
+                                    <Field
+                                        label="Classe"
+                                        required
+                                        dark={dark}
+                                        error={errors.classe}
+                                    >
+                                        <select
+                                            value={form.classe}
+                                            onChange={(e) =>
+                                                handleChange(
+                                                    "classe",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className={sel("classe")}
+                                        >
+                                            <option value="">
+                                                Sélectionner
+                                            </option>
+                                            {CLASSES.map((c) => (
+                                                <option
+                                                    key={c.value}
+                                                    value={c.value}
+                                                >
+                                                    {c.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </Field>
+
+                                    <Field
+                                        label="Échelon"
+                                        required
+                                        dark={dark}
+                                        error={errors.echelon}
+                                    >
+                                        <select
+                                            value={form.echelon}
+                                            onChange={(e) =>
+                                                handleChange(
+                                                    "echelon",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className={sel("echelon")}
+                                        >
+                                            <option value="">
+                                                Sélectionner
+                                            </option>
+                                            {ECHELONS.map((e) => (
+                                                <option
+                                                    key={e}
+                                                    value={e}
+                                                >
+                                                    {e}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </Field>
                                 </div>
-                                <p
-                                    className={`text-[11px] leading-relaxed font-medium ${dark ? "text-blue-300/80" : "text-blue-700/80"}`}
-                                >
-                                    <span className="font-bold">Note :</span> La
-                                    combinaison Catégorie + Classe + Échelon
-                                    doit correspondre à un grade existant dans
-                                    la base de données de référence pour valider
-                                    l'enregistrement.
-                                </p>
-                            </div>
+                            )}
                         </div>
                     )}
 
                     {/* ── ÉTAPE 3 : AFFECTATION ── */}
                     {currentStep === 3 && (
-                        <div key="step-3" className="p-5 lg:p-6 space-y-5">
+                        <div
+                            key="step-3"
+                            className="p-5 lg:p-6 space-y-5 animate-fade-in"
+                        >
                             <div
                                 className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}
                             >
@@ -1605,90 +1746,128 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                                     </p>
                                 </div>
                             </div>
+
+                            {form.type_personnel === "STAGIAIRE" && (
+                                <div className="col-span-full mb-2">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={form.tous_les_services}
+                                            onChange={(e) =>
+                                                handleChange(
+                                                    "tous_les_services",
+                                                    e.target.checked,
+                                                )
+                                            }
+                                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        <span
+                                            className={`text-sm font-medium ${dark ? "text-slate-300" : "text-slate-700"}`}
+                                        >
+                                            Le stagiaire tourne dans tous les
+                                            services
+                                        </span>
+                                    </label>
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {/* Service */}
-                                <Field
-                                    label="Service"
-                                    required
-                                    dark={dark}
-                                    error={errors.service_id}
-                                >
-                                    <select
-                                        value={form.service_id}
-                                        onChange={(e) =>
-                                            handleChange(
-                                                "service_id",
-                                                e.target.value,
-                                            )
-                                        }
-                                        className={sel("service_id")}
+                                {(!form.tous_les_services ||
+                                    form.type_personnel !== "STAGIAIRE") && (
+                                    <Field
+                                        label="Service"
+                                        required
+                                        dark={dark}
+                                        error={errors.service_id}
                                     >
-                                        <option value="">
-                                            Sélectionner un service
-                                        </option>
-                                        {services.map((s) => (
-                                            <option key={s.id} value={s.id}>
-                                                {s.libelle}
+                                        <select
+                                            value={form.service_id}
+                                            onChange={(e) =>
+                                                handleChange(
+                                                    "service_id",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className={sel("service_id")}
+                                        >
+                                            <option value="">
+                                                Sélectionner un service
                                             </option>
-                                        ))}
-                                    </select>
-                                </Field>
+                                            {services.map((s) => (
+                                                <option
+                                                    key={s.id}
+                                                    value={s.id}
+                                                >
+                                                    {s.libelle}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </Field>
+                                )}
 
-                                {/* Fonction */}
-                                <Field
-                                    label="Fonction"
-                                    required
-                                    dark={dark}
-                                    error={errors.fonction_id}
-                                >
-                                    <select
-                                        value={form.fonction_id}
-                                        onChange={(e) =>
-                                            handleChange(
-                                                "fonction_id",
-                                                e.target.value,
-                                            )
-                                        }
-                                        className={sel("fonction_id")}
+                                {form.type_personnel !== "STAGIAIRE" && (
+                                    <Field
+                                        label="Fonction"
+                                        required
+                                        dark={dark}
+                                        error={errors.fonction_id}
                                     >
-                                        <option value="">
-                                            Sélectionner une fonction
-                                        </option>
-                                        {fonctions.map((f) => (
-                                            <option key={f.id} value={f.id}>
-                                                {f.libelle}
+                                        <select
+                                            value={form.fonction_id}
+                                            onChange={(e) =>
+                                                handleChange(
+                                                    "fonction_id",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className={sel("fonction_id")}
+                                        >
+                                            <option value="">
+                                                Sélectionner une fonction
                                             </option>
-                                        ))}
-                                    </select>
-                                </Field>
+                                            {fonctions.map((f) => (
+                                                <option
+                                                    key={f.id}
+                                                    value={f.id}
+                                                >
+                                                    {f.libelle}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </Field>
+                                )}
 
-                                {/* Spécialité */}
-                                <Field
-                                    label="Spécialité"
-                                    required
-                                    dark={dark}
-                                    error={errors.specialite}
-                                >
-                                    <input
-                                        type="text"
-                                        placeholder="Ex: Médecin spécialiste en chirurgie"
-                                        value={form.specialite}
-                                        onChange={(e) =>
-                                            handleChange(
-                                                "specialite",
-                                                e.target.value,
-                                            )
-                                        }
-                                        className={inp("specialite")}
-                                    />
-                                </Field>
+                                {form.type_personnel === "FONCTIONNAIRE" && (
+                                    <Field
+                                        label="Spécialité"
+                                        required
+                                        dark={dark}
+                                        error={errors.specialite}
+                                    >
+                                        <input
+                                            type="text"
+                                            placeholder="Ex: Comptabilité, Droit..."
+                                            value={form.specialite}
+                                            onChange={(e) =>
+                                                handleChange(
+                                                    "specialite",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className={inp("specialite")}
+                                        />
+                                    </Field>
+                                )}
                             </div>
                         </div>
                     )}
 
                     {/* ── ÉTAPE 4 : DIPLÔMES ── */}
                     {currentStep === 4 && (
-                        <div key="step-4" className="p-5 lg:p-6 space-y-5">
+                        <div
+                            key="step-4"
+                            className="p-5 lg:p-6 space-y-5"
+                        >
                             <div
                                 className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}
                             >
@@ -1709,169 +1888,286 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                             </div>
 
                             <div className="space-y-3">
-                                {diplomes.map((diplome, index) => (
-                                    <div key={index} className={dipCard}>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span
-                                                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                                                    diplome.est_principal
-                                                        ? dark
-                                                            ? "text-blue-400 border-blue-500/20 bg-blue-500/10"
-                                                            : "text-blue-600 border-blue-200 bg-blue-50"
-                                                        : dark
-                                                          ? "text-slate-500 border-white/10 bg-white/5"
-                                                          : "text-slate-500 border-slate-200 bg-slate-100"
-                                                }`}
-                                            >
-                                                {diplome.est_principal
-                                                    ? "★ Principal"
-                                                    : `Diplôme ${index + 1}`}
-                                            </span>
-                                            {!diplome.est_principal && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        supprimerDiplome(index)
-                                                    }
-                                                    className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors cursor-pointer"
-                                                >
-                                                    <svg
-                                                        xmlns="http://www.w3.org/2000/svg"
-                                                        className="w-3.5 h-3.5"
-                                                        fill="none"
-                                                        viewBox="0 0 24 24"
-                                                        stroke="currentColor"
-                                                        strokeWidth={2}
-                                                    >
-                                                        <path
-                                                            strokeLinecap="round"
-                                                            strokeLinejoin="round"
-                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                                        />
-                                                    </svg>
-                                                    Supprimer
-                                                </button>
-                                            )}
-                                        </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            <Field
-                                                label="Intitulé du diplôme"
-                                                required={diplome.est_principal}
-                                                dark={dark}
-                                                error={
-                                                    index === 0
-                                                        ? errors.diplome0 ||
-                                                          errors.diplome0
-                                                        : errors[
-                                                              `diplome${index}`
-                                                          ]
+                                {form.type_personnel === "STAGIAIRE" ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <Field
+                                            label="Établissement"
+                                            required
+                                            dark={dark}
+                                            error={errors.etablissement}
+                                        >
+                                            <input
+                                                type="text"
+                                                placeholder="Ex: Université d'Antananarivo"
+                                                value={
+                                                    stagiaireDetails.etablissement
                                                 }
-                                            >
-                                                <input
-                                                    type="text"
-                                                    placeholder="Ex: Doctorat en Médecine"
-                                                    value={diplome.libelle}
-                                                    onChange={(e) =>
-                                                        handleDiplomeChange(
-                                                            index,
-                                                            "libelle",
+                                                onChange={(e) =>
+                                                    setStagiaireDetails({
+                                                        ...stagiaireDetails,
+                                                        etablissement:
                                                             e.target.value,
-                                                        )
-                                                    }
-                                                    className={
-                                                        (index === 0 &&
-                                                            errors.diplome0) ||
-                                                        errors[
-                                                            `diplome${index}`
-                                                        ]
-                                                            ? inputErr
-                                                            : inputCls
-                                                    }
-                                                />
-                                            </Field>
-                                            <Field
-                                                label="Établissement"
-                                                dark={dark}
-                                                error={errors[`etab${index}`]}
-                                            >
-                                                <input
-                                                    type="text"
-                                                    placeholder="Ex: Université d'Antananarivo"
-                                                    value={
-                                                        diplome.etablissement
-                                                    }
-                                                    onChange={(e) =>
-                                                        handleDiplomeChange(
-                                                            index,
-                                                            "etablissement",
+                                                    })
+                                                }
+                                                className={inp("etablissement")}
+                                            />
+                                        </Field>
+                                        <Field
+                                            label="Niveau"
+                                            required
+                                            dark={dark}
+                                            error={errors.niveau}
+                                        >
+                                            <input
+                                                type="text"
+                                                placeholder="Ex: M1, L3"
+                                                value={stagiaireDetails.niveau}
+                                                onChange={(e) =>
+                                                    setStagiaireDetails({
+                                                        ...stagiaireDetails,
+                                                        niveau: e.target.value,
+                                                    })
+                                                }
+                                                className={inp("niveau")}
+                                            />
+                                        </Field>
+                                        <Field
+                                            label="Filière / Parcours"
+                                            dark={dark}
+                                        >
+                                            <input
+                                                type="text"
+                                                placeholder="Ex: Médecine générale"
+                                                value={
+                                                    stagiaireDetails.filiere_parcours
+                                                }
+                                                onChange={(e) =>
+                                                    setStagiaireDetails({
+                                                        ...stagiaireDetails,
+                                                        filiere_parcours:
                                                             e.target.value,
-                                                        )
-                                                    }
-                                                    className={
-                                                        errors[`etab${index}`]
-                                                            ? inputErr
-                                                            : inputCls
-                                                    }
-                                                />
-                                            </Field>
-                                            <Field
-                                                label="Année d'obtention"
-                                                dark={dark}
-                                            >
-                                                <input
-                                                    type="number"
-                                                    min="1950"
-                                                    max={new Date().getFullYear()}
-                                                    placeholder="Ex: 2010"
-                                                    value={
-                                                        diplome.annee_obtention
-                                                    }
-                                                    onChange={(e) =>
-                                                        handleDiplomeChange(
-                                                            index,
-                                                            "annee_obtention",
+                                                    })
+                                                }
+                                                className={inputCls}
+                                            />
+                                        </Field>
+                                        <Field
+                                            label="Durée du stage (en mois)"
+                                            required
+                                            dark={dark}
+                                            error={errors.duree_mois}
+                                        >
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                placeholder="Ex: 6"
+                                                value={
+                                                    stagiaireDetails.duree_mois
+                                                }
+                                                onChange={(e) =>
+                                                    setStagiaireDetails({
+                                                        ...stagiaireDetails,
+                                                        duree_mois:
                                                             e.target.value,
-                                                        )
-                                                    }
-                                                    className={inputCls}
-                                                />
-                                            </Field>
-                                        </div>
+                                                    })
+                                                }
+                                                className={inp("duree_mois")}
+                                            />
+                                        </Field>
                                     </div>
-                                ))}
+                                ) : (
+                                    <>
+                                        <p className={`text-xs ${sub}`}>
+                                            {form.type_personnel === "BENEVOLE"
+                                                ? "(Facultatif) Renseignez les diplômes si pertinent"
+                                                : "Renseignez le diplôme principal et les diplômes supplémentaires"}
+                                        </p>
+                                        {diplomes.map((diplome, index) => (
+                                            <div
+                                                key={index}
+                                                className={dipCard}
+                                            >
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span
+                                                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                                                            diplome.est_principal
+                                                                ? dark
+                                                                    ? "text-blue-400 border-blue-500/20 bg-blue-500/10"
+                                                                    : "text-blue-600 border-blue-200 bg-blue-50"
+                                                                : dark
+                                                                  ? "text-slate-500 border-white/10 bg-white/5"
+                                                                  : "text-slate-500 border-slate-200 bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        {diplome.est_principal
+                                                            ? "★ Principal"
+                                                            : `Diplôme ${index + 1}`}
+                                                    </span>
+                                                    {!diplome.est_principal && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                supprimerDiplome(
+                                                                    index,
+                                                                )
+                                                            }
+                                                            className="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors cursor-pointer"
+                                                        >
+                                                            <svg
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                className="w-3.5 h-3.5"
+                                                                fill="none"
+                                                                viewBox="0 0 24 24"
+                                                                stroke="currentColor"
+                                                                strokeWidth={2}
+                                                            >
+                                                                <path
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                                />
+                                                            </svg>
+                                                            Supprimer
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    <Field
+                                                        label="Intitulé du diplôme"
+                                                        required={
+                                                            diplome.est_principal
+                                                        }
+                                                        dark={dark}
+                                                        error={
+                                                            index === 0
+                                                                ? errors.diplome0 ||
+                                                                  errors.diplome0
+                                                                : errors[
+                                                                      `diplome${index}`
+                                                                  ]
+                                                        }
+                                                    >
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Ex: Doctorat en Médecine"
+                                                            value={
+                                                                diplome.libelle
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleDiplomeChange(
+                                                                    index,
+                                                                    "libelle",
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            className={
+                                                                (index === 0 &&
+                                                                    errors.diplome0) ||
+                                                                errors[
+                                                                    `diplome${index}`
+                                                                ]
+                                                                    ? inputErr
+                                                                    : inputCls
+                                                            }
+                                                        />
+                                                    </Field>
+                                                    <Field
+                                                        label="Établissement"
+                                                        dark={dark}
+                                                        error={
+                                                            errors[
+                                                                `etab${index}`
+                                                            ]
+                                                        }
+                                                    >
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Ex: Université d'Antananarivo"
+                                                            value={
+                                                                diplome.etablissement
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleDiplomeChange(
+                                                                    index,
+                                                                    "etablissement",
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            className={
+                                                                errors[
+                                                                    `etab${index}`
+                                                                ]
+                                                                    ? inputErr
+                                                                    : inputCls
+                                                            }
+                                                        />
+                                                    </Field>
+                                                    <Field
+                                                        label="Année d'obtention"
+                                                        dark={dark}
+                                                    >
+                                                        <input
+                                                            type="number"
+                                                            min="1950"
+                                                            max={new Date().getFullYear()}
+                                                            placeholder="Ex: 2010"
+                                                            value={
+                                                                diplome.annee_obtention
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleDiplomeChange(
+                                                                    index,
+                                                                    "annee_obtention",
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            className={inputCls}
+                                                        />
+                                                    </Field>
+                                                </div>
+                                            </div>
+                                        ))}
 
-                                <button
-                                    type="button"
-                                    onClick={ajouterDiplome}
-                                    className={`w-full py-2.5 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                                        dark
-                                            ? "border-white/10 border-dashed text-slate-500 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5"
-                                            : "border-slate-300 border-dashed text-slate-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/50"
-                                    }`}
-                                >
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        className="w-4 h-4"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                        strokeWidth={2}
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            d="M12 4v16m8-8H4"
-                                        />
-                                    </svg>
-                                    Ajouter un autre diplôme
-                                </button>
+                                        <button
+                                            type="button"
+                                            onClick={ajouterDiplome}
+                                            className={`w-full py-2.5 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                                                dark
+                                                    ? "border-white/10 border-dashed text-slate-500 hover:text-blue-400 hover:border-blue-500/30 hover:bg-blue-500/5"
+                                                    : "border-slate-300 border-dashed text-slate-400 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/50"
+                                            }`}
+                                        >
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                className="w-4 h-4"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                                strokeWidth={2}
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    d="M12 4v16m8-8H4"
+                                                />
+                                            </svg>
+                                            Ajouter un autre diplôme
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     )}
 
                     {/* ── ÉTAPE 5 : COMPTE + RÉCAPITULATIF ── */}
                     {currentStep === 5 && (
-                        <div key="step-5" className="p-5 lg:p-6 space-y-5">
+                        <div
+                            key="step-5"
+                            className="p-5 lg:p-6 space-y-5"
+                        >
                             <div
                                 className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}
                             >
