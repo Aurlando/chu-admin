@@ -14,6 +14,11 @@ async function getStaff(req, res) {
         const department = req.query.department || "";
         const fonction = req.query.fonction || "";
 
+        // NOUVEAU : Récupération des paramètres de tri et de types
+        const order = req.query.order === "desc" ? "desc" : "asc";
+        const typesRaw = req.query.types || "";
+        // On transforme "Fonctionnaire,Stagiaire" en tableau ["Fonctionnaire", "Stagiaire"]
+        const types = typesRaw ? typesRaw.split(",").map(t => t.trim()) : [];
         // parseInt(..., 10) convertit "2" (string) → 2 (number), base 10
         // || 1 et || 10 sont les valeurs par défaut si le paramètre est absent ou invalide
         const page = parseInt(req.query.page, 10) || 1;
@@ -28,6 +33,8 @@ async function getStaff(req, res) {
             search,
             department,
             fonction,
+            order, // <-- Ajout du paramètre pour le tri
+            types, // <-- Ajout du paramètre pour le filtre multi-choix
             page,
             limit: safeLimit,
         });

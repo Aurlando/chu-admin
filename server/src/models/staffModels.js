@@ -43,18 +43,17 @@ async function getAllStaff({
     search = "",
     department = "",
     fonction = "",
+    order = "asc", // <-- Paramètre par défaut
+    types = [],    // <-- Paramètre par défaut
     page = 1,
     limit = 10,
 } = {}) {
-    // Construction du WHERE dynamique Prisma pour les filtres
     const where = {
         AND: [
-            // Filtre permanent : n'afficher que le personnel actif (non archivé)
             { statut: { not: "Sortie" } },
         ],
     };
 
-    // Filtre de recherche (nom, prenoms ou matricule)
     if (search) {
         where.AND.push({
             OR: [
@@ -65,7 +64,6 @@ async function getAllStaff({
         });
     }
 
-    // Filtre de departement
     if (department) {
         where.AND.push({
             service: {
@@ -74,7 +72,6 @@ async function getAllStaff({
         });
     }
 
-    // Filtre de fonction
     if (fonction) {
         where.AND.push({
             fonction: {
@@ -83,10 +80,18 @@ async function getAllStaff({
         });
     }
 
-    // Le filtre statut est toujours présent, on utilise directement where
+    // NOUVEAU FILTRE : types de personnel (multi-sélection)
+    if (types.length > 0) {
+        where.AND.push({
+            OR: types.map(t => ({
+                // On cible la bonne colonne au lieu de statut
+                type_personnel: t 
+            }))
+        });
+    }
+
     const whereClause = where;
 
-    // Execution en parallele : findMany + count
     const [data, total] = await Promise.all([
         prisma.personnel.findMany({
             where: whereClause,
@@ -102,8 +107,8 @@ async function getAllStaff({
                     select: { libelle: true },
                 },
             },
-            orderBy: [{ nom: "asc" }, { prenoms: "asc" }],
-            // Pagination : skip = OFFSET, take = LIMIT
+            // NOUVEAU TRI : on remplace le tri statique par le paramètre `order`
+            orderBy: [{ nom: order }, { prenoms: order }],
             skip: (page - 1) * limit,
             take: limit,
         }),

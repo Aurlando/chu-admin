@@ -375,36 +375,40 @@ model patient_counters {
 }
 
 model personnel {
-  id                 BigInt            @id(map: "medecin_traitant_pkey") @default(autoincrement())
+  id                 BigInt               @id(map: "medecin_traitant_pkey") @default(autoincrement())
   service_id         BigInt?
-  nom                String            @db.VarChar(100)
-  prenoms            String?           @db.VarChar(100)
+  nom                String               @db.VarChar(100)
+  prenoms            String?              @db.VarChar(100)
   im                 String?
-  date_naissance     DateTime?         @db.Date
+  date_naissance     DateTime?            @db.Date
   corps              String?
   categorie          String?
   classe             String?
   echelon            String?
-  date_effet         DateTime?         @db.Date
-  date_entree_admin  DateTime?         @db.Date
+  date_effet         DateTime?            @db.Date
+  date_entree_admin  DateTime?            @db.Date
   annee_entree_admin Int?
   annee_exercice     Int?
   specialite         String?
   autres_diplomes    String?
   telephone          String?
-  email              String?           @unique(map: "medecin_traitant_email_key")
+  email              String?              @unique(map: "medecin_traitant_email_key")
   fonction_id        Int?
-  statut             statut_personnel  @default(En_activit_)
-  photo_profil       String?           @default("default-avatar.png") @db.VarChar(255)
-  date_sortie        DateTime?         @db.Date
+  statut             statut_personnel     @default(En_activit_)
+  photo_profil       String?              @default("default-avatar.png") @db.VarChar(255)
+  date_sortie        DateTime?            @db.Date
   id_grade_actuel    Int?
   genre_id           BigInt?
+  type_personnel     type_personnel       @default(FONCTIONNAIRE)
+  tous_les_services  Boolean              @default(false)
   consultation       consultation[]
   hospitalisation    hospitalisation[]
-  genre              genre?            @relation(fields: [genre_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_personnel_genre")
-  fonction           fonction?         @relation(fields: [fonction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  grade              grade?            @relation(fields: [id_grade_actuel], references: [id_grade], onUpdate: NoAction)
-  service            service?          @relation(fields: [service_id], references: [id])
+  genre              genre?               @relation(fields: [genre_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_personnel_genre")
+  fonction           fonction?            @relation(fields: [fonction_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  grade              grade?               @relation(fields: [id_grade_actuel], references: [id_grade], onUpdate: NoAction)
+  service            service?             @relation(fields: [service_id], references: [id])
+  stagiaire_details  stagiaire_details?
+  stagiaire_services stagiaire_services[]
   auth_user          auth_user?
   avancements        avancements[]
   diplome            diplome[]
@@ -803,15 +807,16 @@ model role {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model service {
-  id              BigInt            @id @default(autoincrement())
-  code            String?           @unique(map: "service_code_key_idx") @db.VarChar(20)
-  libelle         String            @unique(map: "service_libelle_key_idx") @db.VarChar(255)
-  domain          String?
-  actif           Boolean           @default(true)
-  consultation    consultation[]
-  hospitalisation hospitalisation[]
-  personnel       personnel[]
-  saisie_rma      saisie_rma[]
+  id                 BigInt               @id @default(autoincrement())
+  code               String?              @unique(map: "service_code_key_idx") @db.VarChar(20)
+  libelle            String               @unique(map: "service_libelle_key_idx") @db.VarChar(255)
+  domain             String?
+  actif              Boolean              @default(true)
+  consultation       consultation[]
+  hospitalisation    hospitalisation[]
+  personnel          personnel[]
+  saisie_rma         saisie_rma[]
+  stagiaire_services stagiaire_services[]
 
   @@index([domain], where: raw("actif"))
   @@schema("ref")
@@ -934,10 +939,41 @@ model types_prestations {
   @@schema("ref")
 }
 
+model stagiaire_details {
+  id               BigInt    @id @default(autoincrement())
+  personnel_id     BigInt    @unique
+  etablissement    String    @db.VarChar(255)
+  niveau           String    @db.VarChar(50)
+  filiere_parcours String?
+  duree_mois       Int
+  date_fin_stage   DateTime  @db.Date
+  personnel        personnel @relation(fields: [personnel_id], references: [id], onDelete: Cascade, map: "fk_stagiaire_personnel")
+
+  @@schema("chu")
+}
+
+model stagiaire_services {
+  personnel_id BigInt
+  service_id   BigInt
+  personnel    personnel @relation(fields: [personnel_id], references: [id], onDelete: Cascade, map: "fk_stagiaire_services_personnel")
+  service      service   @relation(fields: [service_id], references: [id], onDelete: Cascade, map: "fk_stagiaire_services_service")
+
+  @@id([personnel_id, service_id])
+  @@schema("chu")
+}
+
 enum statut_personnel {
   En_activit_ @map("En activité")
   En_absence  @map("En absence")
   Sortie
+
+  @@schema("chu")
+}
+
+enum type_personnel {
+  FONCTIONNAIRE
+  BENEVOLE
+  STAGIAIRE
 
   @@schema("chu")
 }
