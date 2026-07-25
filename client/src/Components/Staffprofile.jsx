@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import "../App.css";
 import DocsDropdown from "./DocsDropdown"; // [GÉNÉRIQUE] menu "Docs ▾" piloté par DOCUMENT_TYPES
 import { DOCUMENT_TYPES } from "./documentTypes"; // [GÉNÉRIQUE] registre des documents générables
@@ -59,6 +59,36 @@ const getSeniorityLabel = (dateEntreeStr) => {
     }
     if (years <= 0) return "Moins d'un an";
     return `${years} an${years > 1 ? "s" : ""}`;
+};
+
+// [AJOUTÉ] Libellé en toutes lettres du type de personnel
+const formatTypePersonnel = (type) => {
+    const mapping = {
+        FONCTIONNAIRE: "Fonctionnaire",
+        BENEVOLE: "Bénévole",
+        STAGIAIRE: "Stagiaire",
+    };
+    return mapping[type] || type || null;
+};
+
+// [AJOUTÉ] Libellé du département, en tenant compte de tous_les_services
+// (utilisé notamment pour les stagiaires affectés à tous les services)
+const getDepartementLabel = (profile) => {
+    if (profile?.tous_les_services) return "Tous les services";
+    return profile?.departement || null;
+};
+
+// [AJOUTÉ] Durée de stage lisible à partir de stagiaire_details.duree_mois
+const formatDureeStage = (dureeMois) => {
+    if (dureeMois === null || dureeMois === undefined) return null;
+    const mois = Number(dureeMois);
+    if (Number.isNaN(mois)) return null;
+    if (mois < 12) return `${mois} mois`;
+    const years = Math.floor(mois / 12);
+    const remainingMonths = mois % 12;
+    const yearsLabel = `${years} an${years > 1 ? "s" : ""}`;
+    if (remainingMonths === 0) return yearsLabel;
+    return `${yearsLabel} ${remainingMonths} mois`;
 };
 
 // ── Badge de statut — même logique que PersonnelDirectory.jsx ligne 23
@@ -292,6 +322,12 @@ export default function StaffProfile({
     const photoUrl = profile?.photo_profil
         ? `${API_BASE}${profile.photo_profil}`
         : null;
+
+    // [AJOUTÉ] Type de personnel — pilote l'affichage conditionnel du profil
+    // Valeurs possibles : "FONCTIONNAIRE" (défaut/référence), "BENEVOLE", "STAGIAIRE"
+    const typePersonnel = profile?.type_personnel;
+    const isStagiaire = typePersonnel === "STAGIAIRE";
+    const isBenevole = typePersonnel === "BENEVOLE";
 
     return (
         <div className={`flex-1 overflow-auto ${bg}`}>
@@ -742,74 +778,112 @@ export default function StaffProfile({
                                     >
                                         {profile.nom} {profile.prenoms}
                                     </h2>
-                                    <p
-                                        className={`text-sm mt-1 flex items-center gap-1.5 ${txtSub}`}
-                                    >
-                                        {/* Icône dossier médical */}
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            className="w-4 h-4"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                            strokeWidth={2}
+
+                                    {/* [AJOUTÉ] Type de personnel (Fonctionnaire / Bénévole / Stagiaire) */}
+                                    {typePersonnel && (
+                                        <p
+                                            className={`text-sm mt-1 flex items-center gap-1.5 ${txtSub}`}
                                         >
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                                            />
-                                        </svg>
-                                        {profile.specialite ||
-                                            profile.service || // Fonction/Titre du poste
-                                            profile.departement || // Département
-                                            "Professionnel de santé"}
-                                    </p>
+                                            {/* Icône mallette / sac */}
+                                            <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                className="w-4 h-4"
+                                                fill="none"
+                                                viewBox="0 0 24 24"
+                                                stroke="currentColor"
+                                                strokeWidth={2}
+                                            >
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    d="M20 7h-3V5a2 2 0 00-2-2H9a2 2 0 00-2 2v2H4a1 1 0 00-1 1v11a2 2 0 002 2h14a2 2 0 002-2V8a1 1 0 00-1-1zM9 5h6v2H9V5z"
+                                                />
+                                            </svg>
+                                            {formatTypePersonnel(typePersonnel)}
+                                        </p>
+                                    )}
 
-                                    {/* 4 stats rapides : Matricule / Poste / Ancienneté / Département */}
-                                    <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                        <div>
-                                            <p
-                                                className={`text-[10px] font-bold uppercase tracking-widest ${txtSub}`}
-                                            >
-                                                Immatricule
-                                            </p>
-                                            <p
-                                                className={`text-sm font-bold font-mono mt-0.5 ${txtTitle}`}
-                                            >
-                                                {profile.matricule
-                                                    ? `IMM-${profile.matricule}`
-                                                    : "—"}
-                                            </p>
-                                        </div>
+                                    {/* Stats rapides — champs affichés selon type_personnel :
+                                        Fonctionnaire : Immatricule / Fonction / Ancienneté / Département
+                                        Bénévole      : Fonction / Ancienneté / Département (sans Immatricule)
+                                        Stagiaire     : Durée de stage / Département (sans Immatricule ni Fonction) */}
+                                    <div
+                                        className={`mt-4 grid grid-cols-2 gap-4 ${
+                                            isStagiaire
+                                                ? "sm:grid-cols-2"
+                                                : isBenevole
+                                                  ? "sm:grid-cols-3"
+                                                  : "sm:grid-cols-4"
+                                        }`}
+                                    >
+                                        {/* Immatricule — retiré pour Stagiaire et Bénévole */}
+                                        {!isStagiaire && !isBenevole && (
+                                            <div>
+                                                <p
+                                                    className={`text-[10px] font-bold uppercase tracking-widest ${txtSub}`}
+                                                >
+                                                    Immatricule
+                                                </p>
+                                                <p
+                                                    className={`text-sm font-bold font-mono mt-0.5 ${txtTitle}`}
+                                                >
+                                                    {profile.matricule
+                                                        ? `IMM-${profile.matricule}`
+                                                        : "—"}
+                                                </p>
+                                            </div>
+                                        )}
 
-                                        <div>
-                                            <p
-                                                className={`text-[10px] font-bold uppercase tracking-widest ${txtSub}`}
-                                            >
-                                                Fonction
-                                            </p>
-                                            <p
-                                                className={`text-sm font-semibold mt-0.5 ${dark ? "text-blue-400" : "text-blue-600"}`}
-                                            >
-                                                {profile.service || "—"}
-                                            </p>
-                                        </div>
+                                        {/* Fonction — retirée pour Stagiaire */}
+                                        {!isStagiaire && (
+                                            <div>
+                                                <p
+                                                    className={`text-[10px] font-bold uppercase tracking-widest ${txtSub}`}
+                                                >
+                                                    Fonction
+                                                </p>
+                                                <p
+                                                    className={`text-sm font-semibold mt-0.5 ${dark ? "text-blue-400" : "text-blue-600"}`}
+                                                >
+                                                    {profile.service || "—"}
+                                                </p>
+                                            </div>
+                                        )}
 
-                                        <div>
-                                            <p
-                                                className={`text-[10px] font-bold uppercase tracking-widest ${txtSub}`}
-                                            >
-                                                Ancienneté
-                                            </p>
-                                            <p
-                                                className={`text-sm font-semibold mt-0.5 ${txtTitle}`}
-                                            >
-                                                {profile.date_entree_admin
-                                                    ? `${getSeniorityLabel(profile.date_entree_admin)} de service`
-                                                    : "—"}
-                                            </p>
-                                        </div>
+                                        {/* Ancienneté (Fonctionnaire/Bénévole) ou Durée de stage (Stagiaire) */}
+                                        {isStagiaire ? (
+                                            <div>
+                                                <p
+                                                    className={`text-[10px] font-bold uppercase tracking-widest ${txtSub}`}
+                                                >
+                                                    Durée de stage
+                                                </p>
+                                                <p
+                                                    className={`text-sm font-semibold mt-0.5 ${txtTitle}`}
+                                                >
+                                                    {formatDureeStage(
+                                                        profile
+                                                            .stagiaire_details
+                                                            ?.duree_mois,
+                                                    ) || "—"}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <p
+                                                    className={`text-[10px] font-bold uppercase tracking-widest ${txtSub}`}
+                                                >
+                                                    Ancienneté
+                                                </p>
+                                                <p
+                                                    className={`text-sm font-semibold mt-0.5 ${txtTitle}`}
+                                                >
+                                                    {profile.date_entree_admin
+                                                        ? `${getSeniorityLabel(profile.date_entree_admin)} de service`
+                                                        : "—"}
+                                                </p>
+                                            </div>
+                                        )}
 
                                         <div>
                                             <p
@@ -820,7 +894,8 @@ export default function StaffProfile({
                                             <p
                                                 className={`text-sm font-semibold mt-0.5 ${txtTitle}`}
                                             >
-                                                {profile.departement || "—"}
+                                                {getDepartementLabel(profile) ||
+                                                    "—"}
                                             </p>
                                         </div>
                                     </div>
@@ -910,24 +985,37 @@ export default function StaffProfile({
                                     </svg>
                                 }
                             >
-                                {/* Diplôme principal : est_principal = true dans le tableau diplomes */}
+                                {/* Diplôme principal : est_principal = true dans le tableau diplomes
+                                    — retiré pour Stagiaire ; conservé (facultatif) pour Bénévole/Fonctionnaire */}
+                                {!isStagiaire && (
+                                    <InfoRow
+                                        dark={dark}
+                                        label="Diplôme principal"
+                                        value={
+                                            profile.diplomes?.find(
+                                                (d) => d.est_principal,
+                                            )?.libelle
+                                        }
+                                    />
+                                )}
+
+                                {/* Spécialisation — retirée pour Stagiaire et Bénévole */}
+                                {!isStagiaire && !isBenevole && (
+                                    <InfoRow
+                                        dark={dark}
+                                        label="Spécialisation"
+                                        value={profile.specialite}
+                                    />
+                                )}
+
+                                {/* Date d'entrée — renommée "Date de début de stage" pour Stagiaire */}
                                 <InfoRow
                                     dark={dark}
-                                    label="Diplôme principal"
-                                    value={
-                                        profile.diplomes?.find(
-                                            (d) => d.est_principal,
-                                        )?.libelle
+                                    label={
+                                        isStagiaire
+                                            ? "Date de début de stage"
+                                            : "Date d'entrée"
                                     }
-                                />
-                                <InfoRow
-                                    dark={dark}
-                                    label="Spécialisation"
-                                    value={profile.specialite}
-                                />
-                                <InfoRow
-                                    dark={dark}
-                                    label="Date d'entrée"
                                     value={profile.date_entree_admin || null}
                                 />
                                 <InfoRow
@@ -935,6 +1023,48 @@ export default function StaffProfile({
                                     label="Date de sortie"
                                     value={profile.date_sortie || null}
                                 />
+
+                                {/* [AJOUTÉ] Champs spécifiques Stagiaire — issus de stagiaire_details */}
+                                {isStagiaire && (
+                                    <>
+                                        <InfoRow
+                                            dark={dark}
+                                            label="Établissement"
+                                            value={
+                                                profile.stagiaire_details
+                                                    ?.etablissement
+                                            }
+                                        />
+                                        <InfoRow
+                                            dark={dark}
+                                            label="Niveau"
+                                            value={
+                                                profile.stagiaire_details
+                                                    ?.niveau
+                                            }
+                                        />
+                                        {profile.stagiaire_details
+                                            ?.filiere_parcours && (
+                                            <InfoRow
+                                                dark={dark}
+                                                label="Filière / Parcours"
+                                                value={
+                                                    profile.stagiaire_details
+                                                        .filiere_parcours
+                                                }
+                                            />
+                                        )}
+                                        <InfoRow
+                                            dark={dark}
+                                            label="Date de fin de stage"
+                                            value={
+                                                profile.stagiaire_details
+                                                    ?.date_fin_stage
+                                            }
+                                        />
+                                    </>
+                                )}
+
                                 <InfoRow
                                     dark={dark}
                                     label="Accès SIH"
@@ -975,40 +1105,50 @@ export default function StaffProfile({
                                     </svg>
                                 }
                             >
-                                <InfoRow
-                                    dark={dark}
-                                    label="Corps"
-                                    value={profile.corps}
-                                />
+                                {/* Corps — retiré pour Stagiaire et Bénévole */}
+                                {!isStagiaire && !isBenevole && (
+                                    <InfoRow
+                                        dark={dark}
+                                        label="Corps"
+                                        value={profile.corps}
+                                    />
+                                )}
                                 <InfoRow
                                     dark={dark}
                                     label="Département"
-                                    value={profile.departement}
+                                    value={getDepartementLabel(profile)}
                                 />
                                 {/* [MODIFIÉ] categorie, echelon, classe viennent maintenant
                                     de l'objet grade_actuel retourné par l'API
                                     Avant : profile.categorie / profile.echelon / profile.classe
-                                    Après : profile.grade_actuel?.categorie / .echelon / .classe */}
-                                <InfoRow
-                                    dark={dark}
-                                    label="Catégorie"
-                                    value={profile.grade_actuel?.categorie}
-                                />
-                                <InfoRow
-                                    dark={dark}
-                                    label="Classe"
-                                    value={formatClasse(
-                                        profile.grade_actuel?.classe,
-                                    )}
-                                />
-
-                                <InfoRow
-                                    dark={dark}
-                                    label="Échelon"
-                                    value={formatEchelon(
-                                        profile.grade_actuel?.echelon,
-                                    )}
-                                />
+                                    Après : profile.grade_actuel?.categorie / .echelon / .classe
+                                    — ces 3 champs sont retirés pour Stagiaire et Bénévole */}
+                                {!isStagiaire && !isBenevole && (
+                                    <>
+                                        <InfoRow
+                                            dark={dark}
+                                            label="Catégorie"
+                                            value={
+                                                profile.grade_actuel
+                                                    ?.categorie
+                                            }
+                                        />
+                                        <InfoRow
+                                            dark={dark}
+                                            label="Classe"
+                                            value={formatClasse(
+                                                profile.grade_actuel?.classe,
+                                            )}
+                                        />
+                                        <InfoRow
+                                            dark={dark}
+                                            label="Échelon"
+                                            value={formatEchelon(
+                                                profile.grade_actuel?.echelon,
+                                            )}
+                                        />
+                                    </>
+                                )}
                                 {/* [AJOUTÉ] Indice — nouveau champ de grade_actuel */}
                                 {profile.grade_actuel?.indice != null && (
                                     <InfoRow
