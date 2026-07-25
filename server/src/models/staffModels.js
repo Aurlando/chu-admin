@@ -627,7 +627,7 @@ async function addPersonnel({
         const dateArrivee = formaterDate(dateEntreeAdmin);
         await tx.ref_audit_log.create({
             data: {
-                action: "AJOUT_EMPLOYE",
+                action: "AJOUT_PERSONNEL",
                 cible_type: "personnel",
                 cible_id: personnelId,
                 fait_par_id: adminId ? BigInt(adminId) : null,
