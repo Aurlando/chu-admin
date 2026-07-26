@@ -109,22 +109,19 @@ async function getAvancementsProches(mois = 3) {
 }
 
 async function getAvancementStatsNotification() {
-    const aujourdhui = new Date();
-    const dateDansUnMois = new Date();
-    dateDansUnMois.setMonth(dateDansUnMois.getMonth() + 1);
-    
-    const dateDansTroisMois = new Date();
-    dateDansTroisMois.setMonth(dateDansTroisMois.getMonth() + 3);
-
     // On récupère tout ce qui est à avancer dans les 3 mois
     const tousProches = await getAvancementsProches(3);
 
     const stats = {
         total_eligible: tousProches.length,
         depasse: 0,
-        tres_proche: 0, // < 1 mois
+        tres_proche: 0, // <= 1 mois (mais pas encore dépassé)
         details: {
+            // depasse_list : jours_restants <= 0
             depasse_list: [],
+            // proche_list : TOUT ce qui n'est pas encore dépassé, jusqu'à 3 mois
+            // (donc de 1 jour à ~90 jours). tres_proche reste un sous-compteur
+            // utile pour signaler l'urgence (<= 30j), mais ne filtre plus la liste.
             proche_list: []
         }
     };
@@ -133,9 +130,11 @@ async function getAvancementStatsNotification() {
         if (p.jours_restants <= 0) {
             stats.depasse++;
             stats.details.depasse_list.push(p);
-        } else if (p.jours_restants <= 30) {
-            stats.tres_proche++;
+        } else {
             stats.details.proche_list.push(p);
+            if (p.jours_restants <= 30) {
+                stats.tres_proche++;
+            }
         }
     });
 
