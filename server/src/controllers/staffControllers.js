@@ -459,6 +459,11 @@ async function updateStaff(req, res) {
         return res.status(404).json({ message: "Personnel introuvable" });
     }
 
+    // Type figé à la création, on l'utilise pour adapter validations/champs
+    const typePersonnel = existant.type_personnel;
+    const estFonctionnaireType = typePersonnel === "FONCTIONNAIRE";
+    const estStagiaireType = typePersonnel === "STAGIAIRE";
+
     // Helper : lit req.body et retourne undifined si le champ est absent/vide
     const body = req.body;
     const ouString = (valeur) =>
@@ -474,35 +479,58 @@ async function updateStaff(req, res) {
     const nom = ouString(body.nom);
     const prenoms = ouString(body.prenoms);
     const date_naissance = ouString(body.date_naissance);
-    const categorie = ouString(body.categorie);
-    const classe = ouString(body.classe);
-    const echelon = ouString(body.echelon);
-    let id_grade_actuel = ouInt(body.id_grade_actuel);
 
-    const estStagiaire = classe?.toUpperCase() === "STAGIAIRE";
-    if (!id_grade_actuel && categorie && classe && (echelon || estStagiaire)) {
+    // Catégorie/classe/échelon/grade : fonctionnaire uniquement, on ignore
+    // silencieusement toute valeur envoyée pour un bénévole/stagiaire
+    const categorie = estFonctionnaireType ? ouString(body.categorie) : undefined;
+    const classe = estFonctionnaireType ? ouString(body.classe) : undefined;
+    const echelon = estFonctionnaireType ? ouString(body.echelon) : undefined;
+    let id_grade_actuel = estFonctionnaireType
+        ? ouInt(body.id_grade_actuel)
+        : undefined;
+
+    const estClasseGradeStagiaire = classe?.toUpperCase() === "STAGIAIRE";
+    if (
+        estFonctionnaireType &&
+        !id_grade_actuel &&
+        categorie &&
+        classe &&
+        (echelon || estClasseGradeStagiaire)
+    ) {
         const gradeFound = await staffModels.trouverGrade({
             categorie,
             classe,
-            echelon: estStagiaire ? null : echelon,
+            echelon: estClasseGradeStagiaire ? null : echelon,
         });
         if (gradeFound) {
             id_grade_actuel = parseInt(gradeFound.id_grade, 10);
         } else {
             validators.supprimerFichierSiExiste(req.file?.path);
             return res.status(400).json({
-                message: estStagiaire
+                message: estClasseGradeStagiaire
                     ? `Grade STAGIAIRE introuvable pour la catégorie ${categorie}. Veuillez vérifier la configuration des grades.`
                     : `Combinaison de grade (catégorie, classe, échelon) invalide`,
             });
         }
     }
-    const specialite = ouString(body.specialite);
-    const corps = ouString(body.corps);
+
+    // Spécialité/corps : pas pour un stagiaire / bénévole-stagiaire selon le cas
+    const specialite = estStagiaireType ? undefined : ouString(body.specialite);
+    const corps = estFonctionnaireType ? ouString(body.corps) : undefined;
     const telephone = ouString(body.telephone);
     const email = ouString(body.email);
-    const service_id = ouInt(body.service_id);
-    const fonction_id = ouInt(body.fonction_id);
+
+    // Service : optionnel pour un stagiaire en "tous les services"
+    const tousLesServicesRaw = body.tous_les_services;
+    const tousLesServicesFourni = estStagiaireType && tousLesServicesRaw !== undefined;
+    const tousLesServices = tousLesServicesFourni
+        ? tousLesServicesRaw === "true"
+        : undefined;
+    const service_id =
+        tousLesServices === true ? undefined : ouInt(body.service_id);
+
+    // Fonction : n'existe pas pour un stagiaire
+    const fonction_id = estStagiaireType ? undefined : ouInt(body.fonction_id);
     const genre_id = ouInt(body.genre_id);
     const statut = ouString(body.statut);
 
@@ -512,13 +540,25 @@ async function updateStaff(req, res) {
         return res.status(400).json({ message });
     };
 
-    if (body.service_id !== undefined && service_id === undefined) {
+    if (
+        !(tousLesServices === true) &&
+        body.service_id !== undefined &&
+        service_id === undefined
+    ) {
         return erreur400("service_id invalide");
     }
-    if (body.fonction_id !== undefined && fonction_id === undefined) {
+    if (
+        !estStagiaireType &&
+        body.fonction_id !== undefined &&
+        fonction_id === undefined
+    ) {
         return erreur400("fonction_id invalide");
     }
-    if (body.id_grade_actuel !== undefined && id_grade_actuel === undefined) {
+    if (
+        estFonctionnaireType &&
+        body.id_grade_actuel !== undefined &&
+        id_grade_actuel === undefined
+    ) {
         return erreur400("id_grade_actuel invalide");
     }
     if (service_id !== undefined && service_id <= 0) {
@@ -576,13 +616,26 @@ async function updateStaff(req, res) {
         }
     }
 
-    // ── 6. Diplômes ───────────────────────────────────────────────
-    const { erreur: erreurDiplomes, diplomes } = validators.normaliserDiplomes(
-        body.diplomes,
-    );
-    if (erreurDiplomes) return erreur400(erreurDiplomes);
+    // ── 6. Diplômes (fonctionnaire + bénévole) OU infos de stage ──
+    let diplomes = [];
+    let stagiaireDetails = null;
+
+    if (!estStagiaireType) {
+        const { erreur: erreurDiplomes, diplomes: diplomesNormalises } =
+            validators.normaliserDiplomes(body.diplomes);
+        if (erreurDiplomes) return erreur400(erreurDiplomes);
+        diplomes = diplomesNormalises;
+    } else if (body.stagiaire_details !== undefined) {
+        const { erreur: erreurStage, details } =
+            validators.normaliserStagiaireDetailsPartiel(
+                body.stagiaire_details,
+            );
+        if (erreurStage) return erreur400(erreurStage);
+        stagiaireDetails = details;
+    }
 
     // ── 7. Photo de profil ────────────────────────────────────────
+    // Pas de matricule pour bénévole/stagiaire -> on nomme le fichier par id
     const matricule = existant.matricule;
 
     const anciennePhoto = existant.photo_profil
@@ -591,7 +644,9 @@ async function updateStaff(req, res) {
     let photo_profil = undefined; // si pas de changement
 
     if (req.file) {
-        const nomFinal = `photo-profil-${matricule.toString().replace(" ", "")}.png`;
+        const nomFinal = matricule
+            ? `photo-profil-${matricule.toString().replace(" ", "")}.png`
+            : `photo-profil-${id}.png`;
         const dossier = path.join(__dirname, "..", "..", "uploads");
         const ancienChemin = path.join(dossier, req.file.filename);
         const nouveauChemin = path.join(dossier, nomFinal);
@@ -608,7 +663,8 @@ async function updateStaff(req, res) {
         }
     }
 
-    // ── 8. Accès SIH ──────────────────────────────────────────────
+    // ── 8. Accès SIH — donne un compte à quelqu'un qui n'en a pas encore,
+    //      ou met à jour le compte existant si username/password fournis ──
     const donner_acces = (body.donner_access ?? body.donner_acces) === "true";
     const aDejaUnCompte = Boolean(existant.a_acces_sih);
 
@@ -621,6 +677,7 @@ async function updateStaff(req, res) {
             password: body.password,
             aDejaUnCompte,
         });
+        if (erreurSIH) return erreur400(erreurSIH);
 
         if (body.password) {
             password_hash = await bcrypt.hash(body.password, 10);
@@ -661,6 +718,8 @@ async function updateStaff(req, res) {
             photo_profil,
             anciennePhoto,
             diplomes,
+            tous_les_services: tousLesServices,
+            stagiaireDetails,
             donner_acces: donner_acces || undefined,
             username: donner_acces ? body.username?.trim() : undefined,
             password_hash,

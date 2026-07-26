@@ -662,6 +662,8 @@ async function updatePersonnel({
     photo_profil,
     anciennePhoto,
     diplomes = [],
+    tous_les_services,
+    stagiaireDetails = null,
     donner_acces,
     username,
     password_hash,
@@ -692,6 +694,12 @@ async function updatePersonnel({
         if (statut !== undefined) dataToUpdate.statut = statut;
         if (photo_profil !== undefined)
             dataToUpdate.photo_profil = photo_profil;
+
+        // Stagiaire en "tous les services" -> pas de service_id précis
+        if (tous_les_services !== undefined) {
+            dataToUpdate.tous_les_services = tous_les_services;
+            if (tous_les_services) dataToUpdate.service_id = null;
+        }
 
         // UPDATE only si un cham a ete modifie
         if (Object.keys(dataToUpdate).length > 0) {
@@ -764,6 +772,39 @@ async function updatePersonnel({
             }
         }
 
+        // upsert des infos de stage (stagiaire uniquement)
+        // date_fin_stage recalculée à partir de la date d'entrée déjà en BDD
+        if (stagiaireDetails) {
+            const personnelActuel = await tx.personnel.findUnique({
+                where: { id: BigInt(id) },
+                select: { date_entree_admin: true },
+            });
+
+            const dateFinStage = new Date(personnelActuel.date_entree_admin);
+            dateFinStage.setMonth(
+                dateFinStage.getMonth() + stagiaireDetails.duree_mois,
+            );
+
+            await tx.stagiaire_details.upsert({
+                where: { personnel_id: BigInt(id) },
+                create: {
+                    personnel_id: BigInt(id),
+                    etablissement: stagiaireDetails.etablissement,
+                    niveau: stagiaireDetails.niveau,
+                    filiere_parcours: stagiaireDetails.filiere_parcours,
+                    duree_mois: stagiaireDetails.duree_mois,
+                    date_fin_stage: dateFinStage,
+                },
+                update: {
+                    etablissement: stagiaireDetails.etablissement,
+                    niveau: stagiaireDetails.niveau,
+                    filiere_parcours: stagiaireDetails.filiere_parcours,
+                    duree_mois: stagiaireDetails.duree_mois,
+                    date_fin_stage: dateFinStage,
+                },
+            });
+        }
+
         // upsert = INSERT si absent, UPDATE si present
         if (donner_acces && username) {
             if (password_hash !== undefined) {
@@ -815,6 +856,9 @@ async function updatePersonnel({
             (c) => c !== "photo_profil",
         ); // la photo n'est pas informative à logguer
         if (diplomes.length > 0) champsModifies.push("diplomes");
+        if (stagiaireDetails) champsModifies.push("stagiaire_details");
+        if (tous_les_services !== undefined)
+            champsModifies.push("tous_les_services");
         if (donner_acces && username) champsModifies.push("acces_sih");
 
         const maintenant = new Date();

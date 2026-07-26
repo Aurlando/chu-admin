@@ -322,6 +322,54 @@ function normaliserStagiaireDetails(raw, dateEntreeAdmin) {
 }
 
 // ------------------------------------------------------------------
+//  verification + normalisation des infos de stage pour une MISE A JOUR
+//  (sans date_entree_admin : le date_fin_stage est recalculé côté modèle
+//   à partir de la date d'entrée déjà enregistrée en BDD)
+// ------------------------------------------------------------------
+function normaliserStagiaireDetailsPartiel(raw) {
+    if (!raw) return { erreur: null, details: null }; // rien à modifier
+
+    try {
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+
+        const etablissement = parsed?.etablissement?.toString().trim() || "";
+        const niveau = parsed?.niveau?.toString().trim() || "";
+        const filiere_parcours =
+            parsed?.filiere_parcours?.toString().trim() || null;
+        const duree_mois = parseInt(parsed?.duree_mois, 10);
+
+        if (!etablissement) {
+            return {
+                erreur: "L'établissement du stagiaire est requis.",
+                details: null,
+            };
+        }
+        if (!niveau) {
+            return {
+                erreur: "Le niveau du stagiaire est requis (ex: L2, L3, M1).",
+                details: null,
+            };
+        }
+        if (!Number.isFinite(duree_mois) || duree_mois <= 0) {
+            return {
+                erreur: "La durée du stage (en mois) est invalide.",
+                details: null,
+            };
+        }
+
+        return {
+            erreur: null,
+            details: { etablissement, niveau, filiere_parcours, duree_mois },
+        };
+    } catch (error) {
+        return {
+            erreur: "Format des informations de stage invalide.",
+            details: null,
+        };
+    }
+}
+
+// ------------------------------------------------------------------
 //  supprimer un fichier du disque si validation echoue
 // ------------------------------------------------------------------
 function supprimerFichierSiExiste(chemin) {
@@ -352,4 +400,5 @@ module.exports = {
     normaliserTypePersonnel,
     validerTypePersonnel,
     normaliserStagiaireDetails,
+    normaliserStagiaireDetailsPartiel,
 };
