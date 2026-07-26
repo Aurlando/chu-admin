@@ -340,8 +340,8 @@ export default function StaffProfile({
                     dark={dark}
                     onClose={() => setShowUpdateModal(false)}
                     onSaved={(success, message) => {
-                        setShowUpdateModal(false);
                         if (success) {
+                            setShowUpdateModal(false);
                             localShowToast(
                                 message || "Profil mis à jour avec succès !",
                             );
@@ -355,8 +355,6 @@ export default function StaffProfile({
                                     "Erreur lors de la mise à jour du profil.",
                                 "error",
                             );
-                            setLoading(true); // Re-fetch to revert to actual state if optimistic update failed
-                            setError(null);
                         }
                     }}
                     // No need to pass showToast to UpdateModal itself, as onSaved handles the toast via parent.

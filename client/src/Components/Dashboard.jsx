@@ -641,7 +641,7 @@ function ChartLegend({ dark }) {
 // ════════════════════════════════════════════════════════════════════
 // AuditLogPanel — Activité système (logs réels depuis /audit-logs)
 // ════════════════════════════════════════════════════════════════════
-function AuditLogPanel({ dark, T, onNavigate, onLogout }) {
+function AuditLogPanel({ dark, T, onNavigate }) {
     const [logs, setLogs] = useState([]);
     const [loadingLogs, setLoadingLogs] = useState(true);
     const [loadError, setLoadError] = useState(null);

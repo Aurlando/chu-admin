@@ -110,8 +110,8 @@ export default function PersonnelDirectory({ dark, onNavigate, refreshNotificati
                     dark={dark}
                     onClose={() => setSelectedIdUpdate(null)}
                     onSaved={(success, message) => {
-                        setSelectedIdUpdate(null);
                         if (success) {
+                            setSelectedIdUpdate(null);
                             showToast(message || "Mise à jour réussie");
                             setRefreshKey((prev) => prev + 1);
                             if (typeof refreshNotifications === "function") refreshNotifications();

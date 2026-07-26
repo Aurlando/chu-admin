@@ -24,6 +24,13 @@ const CLASSES = [
 ];
 const ECHELONS = ["1", "2", "3"];
 const STATUTS = ["En activité", "En absence", "Sortie"];
+// [AJOUT] Rôles SIH — value = valeur brute attendue par auth_user.role, label = libellé affiché
+const ROLES = [
+    { value: "admin", label: "Administrateur" },
+    { value: "medecin", label: "Médecin" },
+    { value: "user", label: "Utilisateur" },
+    { value: "be", label: "Bureau des entrées" },
+];
 const DIPLOME_VIDE = {
     libelle: "",
     etablissement: "",
@@ -114,6 +121,31 @@ const TABS = [
             </svg>
         ),
     },
+    {
+        id: "acces",
+        label: "Accès SIH",
+        icon: (
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 7a2 2 0 012 2m4 0a6 6 0 11-12 0 6 6 0 0112 0zM3 21v-2a4 4 0 014-4h.5"
+                />
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M13 13l6 6m0 0l-2.5-1m2.5 1l-1 2.5"
+                />
+            </svg>
+        ),
+    },
 ];
 
 // ── Sous-composant Field (label + input + erreur)
@@ -167,7 +199,6 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
     const [form, setForm] = useState({
         nom: "",
         prenoms: "",
-        im: "",
         date_naissance: "",
         genre_id: "",
         corps: "", // [NOUVEAU] Corps du personnel
@@ -180,10 +211,28 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
         service_id: "",
         fonction_id: "",
         statut: "En activité",
+        // [AJOUT] Stagiaire — case "Tous les services"
+        tous_les_services: false,
+        // [AJOUT] Stagiaire — infos de stage (remplace les diplômes)
+        etablissement: "",
+        niveau: "",
+        filiere_parcours: "",
+        duree_mois: "",
+        // [AJOUT] Accès SIH — uniquement si le personnel n'a pas encore de compte
+        donner_access: false,
+        username: "",
+        password: "",
+        role: "",
     });
     const [diplomes, setDiplomes] = useState([
         { ...DIPLOME_VIDE, est_principal: true },
     ]);
+
+    // [AJOUT] type_personnel n'est jamais modifiable ici (fixé à la création)
+    // — on le charge simplement pour piloter l'affichage conditionnel des champs.
+    const [typePersonnel, setTypePersonnel] = useState("");
+    // [AJOUT] Indique si le personnel dispose déjà d'un compte SIH
+    const [aAccesSih, setAAccesSih] = useState(false);
     const [photoFile, setPhotoFile] = useState(null); // nouveau fichier (si changé)
     const [photoPreview, setPhotoPreview] = useState(null); // URL d'aperçu (existante ou nouvelle)
 
@@ -238,11 +287,14 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                     dateFormatted = `${year}-${month}-${day}`;
                 }
 
+                // [AJOUT] type_personnel et accès SIH — pilotent l'affichage conditionnel
+                setTypePersonnel(p.type_personnel || "");
+                setAAccesSih(!!p.a_acces_sih);
+
                 // Pré-remplissage de tous les champs avec les données existantes
                 setForm({
                     nom: p.nom || "",
                     prenoms: p.prenoms || "",
-                    im: (p.matricule || "").replace(/\s/g, ""), // la BDD renvoie "matricule" en lecture
                     date_naissance: dateFormatted,
                     genre_id: p.genre_id || "",
                     categorie: p.grade_actuel ? p.grade_actuel.categorie : "",
@@ -255,6 +307,21 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                     service_id: p.service_id || "", // si l'API renvoie l'id FK
                     fonction_id: p.fonction_id || "",
                     statut: p.statut || "En activité",
+                    // [AJOUT] Stagiaire
+                    tous_les_services:
+                        p.tous_les_services === true ||
+                        p.tous_les_services === "true",
+                    etablissement: p.stagiaire_details?.etablissement || "",
+                    niveau: p.stagiaire_details?.niveau || "",
+                    filiere_parcours:
+                        p.stagiaire_details?.filiere_parcours || "",
+                    duree_mois: p.stagiaire_details?.duree_mois || "",
+                    // [AJOUT] Accès SIH — champs vides par défaut, saisis uniquement
+                    // si l'on choisit de créer un compte a posteriori
+                    donner_access: false,
+                    username: "",
+                    password: "",
+                    role: "",
                 });
 
                 // Pré-remplissage des diplômes
@@ -407,12 +474,6 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                 "Seules les lettres, espaces, accents, apostrophes et traits d'union sont autorisés";
         }
 
-        if (!form.im.trim()) {
-            e.im = "Le matricule est requis";
-        } else if (!/^\d+$/.test(form.im.trim())) {
-            e.im = "Le matricule doit contenir uniquement des chiffres";
-        }
-
         if (!form.genre_id) {
             e.genre_id = "Le sexe est requis";
         }
@@ -444,19 +505,45 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                 e.email = "L'adresse email n'est pas valide";
         }
 
-        if (!diplomes[0]?.libelle?.trim())
-            e.diplome0 = "Le diplôme principal est requis";
-
-        // [AJOUT] Explication de l'erreur pour tous les diplômes et établissements
-        diplomes.forEach((d, i) => {
-            if (d.libelle && !noSpecialCharsAlphanumRegex.test(d.libelle))
-                e[`diplome${i}`] = "Pas de caractères spéciaux";
+        // [MODIFIÉ] Diplômes uniquement pour les non-stagiaires ; infos de stage sinon
+        if (typePersonnel !== "STAGIAIRE") {
+            // [MODIFIÉ] Le diplôme principal n'est pas obligatoire pour un Bénévole
+            // (le backend accepte un tableau `diplomes` vide/absent pour ce type)
             if (
-                d.etablissement &&
-                !noSpecialCharsAlphanumRegex.test(d.etablissement)
+                typePersonnel !== "BENEVOLE" &&
+                !diplomes[0]?.libelle?.trim()
             )
-                e[`etab${i}`] = "Pas de caractères spéciaux";
-        });
+                e.diplome0 = "Le diplôme principal est requis";
+
+            // [AJOUT] Explication de l'erreur pour tous les diplômes et établissements
+            diplomes.forEach((d, i) => {
+                if (d.libelle && !noSpecialCharsAlphanumRegex.test(d.libelle))
+                    e[`diplome${i}`] = "Pas de caractères spéciaux";
+                if (
+                    d.etablissement &&
+                    !noSpecialCharsAlphanumRegex.test(d.etablissement)
+                )
+                    e[`etab${i}`] = "Pas de caractères spéciaux";
+            });
+        } else {
+            if (!form.etablissement.trim())
+                e.etablissement = "L'établissement est requis";
+            if (!form.niveau.trim()) e.niveau = "Le niveau est requis";
+            if (!form.filiere_parcours.trim())
+                e.filiere_parcours = "La filière / le parcours est requis";
+            if (!form.duree_mois || Number(form.duree_mois) <= 0)
+                e.duree_mois = "La durée (en mois) est requise";
+        }
+
+        // [AJOUT] Accès SIH — uniquement si on choisit de créer un compte a posteriori
+        if (!aAccesSih && form.donner_access) {
+            if (!form.username.trim())
+                e.username = "Le nom d'utilisateur est requis";
+            if (!form.password || form.password.length < 6)
+                e.password =
+                    "Le mot de passe doit contenir au moins 6 caractères";
+            if (!form.role) e.role = "Le rôle est requis";
+        }
 
         return e;
     };
@@ -468,7 +555,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             setErrors(e);
 
             // [AJOUT] Redirection automatique vers l'onglet contenant la première erreur
-            if (e.nom || e.prenoms || e.im || e.date_naissance)
+            if (e.nom || e.prenoms || e.date_naissance)
                 setActiveTab("identite");
             else if (
                 e.categorie ||
@@ -482,10 +569,17 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                 setActiveTab("affectation");
             else if (
                 Object.keys(e).some(
-                    (k) => k.startsWith("diplome") || k.startsWith("etab"),
+                    (k) =>
+                        k.startsWith("diplome") ||
+                        k.startsWith("etab") ||
+                        k === "niveau" ||
+                        k === "filiere_parcours" ||
+                        k === "duree_mois",
                 )
             )
                 setActiveTab("diplomes");
+            else if (e.username || e.password || e.role)
+                setActiveTab("acces");
 
             return;
         }
@@ -498,20 +592,71 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             if (photoFile) fd.append("photo_profil", photoFile);
             fd.append("nom", form.nom.trim());
             fd.append("prenoms", form.prenoms.trim());
-            fd.append("im", form.im.trim());
             fd.append("date_naissance", form.date_naissance);
             fd.append("genre_id", form.genre_id);
-            fd.append("categorie", form.categorie);
-            if (form.classe) fd.append("classe", form.classe);
-            if (form.echelon) fd.append("echelon", form.echelon);
-            fd.append("specialite", form.specialite.trim());
-            fd.append("corps", form.corps?.trim() || "");
             fd.append("telephone", normalizePhoneForBackend(form.telephone));
             fd.append("email", form.email.trim());
-            fd.append("service_id", form.service_id);
-            fd.append("fonction_id", form.fonction_id);
             fd.append("statut", form.statut);
-            fd.append("diplomes", JSON.stringify(diplomes));
+
+            // [MODIFIÉ] Catégorie/classe/échelon/corps réservés aux fonctionnaires
+            if (typePersonnel === "FONCTIONNAIRE") {
+                fd.append("categorie", form.categorie);
+                if (form.classe) fd.append("classe", form.classe);
+                if (form.echelon) fd.append("echelon", form.echelon);
+                fd.append("corps", form.corps?.trim() || "");
+            }
+
+            // [MODIFIÉ] Spécialité et fonction masquées pour un stagiaire
+            if (typePersonnel !== "STAGIAIRE") {
+                fd.append("specialite", form.specialite.trim());
+                fd.append("fonction_id", form.fonction_id);
+            }
+
+            // [MODIFIÉ] Service — un stagiaire peut cocher "Tous les services"
+            if (typePersonnel === "STAGIAIRE") {
+                fd.append(
+                    "tous_les_services",
+                    form.tous_les_services ? "true" : "false",
+                );
+                if (!form.tous_les_services)
+                    fd.append("service_id", form.service_id);
+            } else {
+                fd.append("service_id", form.service_id);
+            }
+
+            // [MODIFIÉ] Diplômes pour un non-stagiaire, infos de stage sinon
+            if (typePersonnel === "STAGIAIRE") {
+                fd.append(
+                    "stagiaire_details",
+                    JSON.stringify({
+                        etablissement: form.etablissement.trim(),
+                        niveau: form.niveau.trim(),
+                        filiere_parcours: form.filiere_parcours.trim(),
+                        duree_mois: form.duree_mois,
+                    }),
+                );
+            } else {
+                // [MODIFIÉ] On ne garde que les diplômes réellement remplis —
+                // permet d'envoyer un tableau vide pour un Bénévole n'ayant
+                // saisi aucun diplôme (le backend accepte `diplomes: []`)
+                const diplomesRemplis = diplomes.filter((d) =>
+                    d.libelle?.trim(),
+                );
+                fd.append("diplomes", JSON.stringify(diplomesRemplis));
+            }
+
+            // [AJOUT] Accès SIH — uniquement si le personnel n'en a pas déjà un
+            if (!aAccesSih) {
+                fd.append(
+                    "donner_access",
+                    form.donner_access ? "true" : "false",
+                );
+                if (form.donner_access) {
+                    fd.append("username", form.username.trim());
+                    fd.append("password", form.password);
+                    fd.append("role", form.role); // valeur brute, jamais le label
+                }
+            }
 
             const res = await apiFetch(`${API_BASE}/staff/update/${id}`, {
                 method: "PATCH",
@@ -551,10 +696,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
             }
             const msg = err.message.toLowerCase();
             let fieldKey = null;
-            if (msg.includes("matricule") || msg.includes(" im ")) {
-                setActiveTab("identite");
-                fieldKey = "im";
-            } else if (msg.includes("téléphone") || msg.includes("telephone")) {
+            if (msg.includes("téléphone") || msg.includes("telephone")) {
                 setActiveTab("affectation");
                 fieldKey = "telephone";
             } else if (msg.includes("email")) {
@@ -686,7 +828,10 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                             >
                                 {tab.icon}
                                 <span className="hidden sm:inline">
-                                    {tab.label}
+                                    {tab.id === "diplomes" &&
+                                    typePersonnel === "STAGIAIRE"
+                                        ? "Infos de stage"
+                                        : tab.label}
                                 </span>
                             </button>
                         ))}
@@ -991,28 +1136,6 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                 {activeTab === "situation" && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <Field
-                                            label="Matricule"
-                                            required
-                                            dark={dark}
-                                            error={errors.im}
-                                        >
-                                            <input
-                                                type="text"
-                                                value={form.im}
-                                                onChange={(e) =>
-                                                    handleChange(
-                                                        "im",
-                                                        e.target.value.replace(
-                                                            /\s/g,
-                                                            "",
-                                                        ),
-                                                    )
-                                                }
-                                                className={inp("im")}
-                                                placeholder="Ex: 371815"
-                                            />
-                                        </Field>
-                                        <Field
                                             label="Statut"
                                             required
                                             dark={dark}
@@ -1035,193 +1158,272 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                 ))}
                                             </select>
                                         </Field>
-                                        <Field
-                                            label="Corps"
-                                            dark={dark}
-                                            error={errors.corps}
-                                        >
-                                            <input
-                                                type="text"
-                                                value={form.corps || ""}
-                                                onChange={(e) =>
-                                                    handleChange(
-                                                        "corps",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className={inp("corps")}
-                                                placeholder="Ex: Cadre supérieur"
-                                            />
-                                        </Field>
-                                        <Field
-                                            label="Catégorie"
-                                            required
-                                            dark={dark}
-                                            error={errors.categorie}
-                                        >
-                                            <select
-                                                value={form.categorie}
-                                                onChange={(e) =>
-                                                    handleChange(
-                                                        "categorie",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className={selectCls}
-                                            >
-                                                <option value="">
-                                                    Sélectionner
-                                                </option>
-                                                {CATEGORIES.map((c) => (
-                                                    <option key={c} value={c}>
-                                                        {c}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
-                                        <Field
-                                            label="Classe"
-                                            required
-                                            dark={dark}
-                                            error={errors.classe}
-                                        >
-                                            <select
-                                                value={form.classe}
-                                                onChange={(e) =>
-                                                    handleChange(
-                                                        "classe",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className={selectCls}
-                                            >
-                                                <option value="">
-                                                    Sélectionner
-                                                </option>
-                                                {CLASSES.map((c) => (
-                                                    <option
-                                                        key={c.value}
-                                                        value={c.value}
+                                        {/* [MODIFIÉ] Corps/Catégorie/Classe/Échelon réservés aux fonctionnaires */}
+                                        {typePersonnel ===
+                                            "FONCTIONNAIRE" && (
+                                            <>
+                                                <Field
+                                                    label="Corps"
+                                                    dark={dark}
+                                                    error={errors.corps}
+                                                >
+                                                    <input
+                                                        type="text"
+                                                        value={
+                                                            form.corps || ""
+                                                        }
+                                                        onChange={(e) =>
+                                                            handleChange(
+                                                                "corps",
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        className={inp(
+                                                            "corps",
+                                                        )}
+                                                        placeholder="Ex: Cadre supérieur"
+                                                    />
+                                                </Field>
+                                                <Field
+                                                    label="Catégorie"
+                                                    required
+                                                    dark={dark}
+                                                    error={errors.categorie}
+                                                >
+                                                    <select
+                                                        value={form.categorie}
+                                                        onChange={(e) =>
+                                                            handleChange(
+                                                                "categorie",
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        className={selectCls}
                                                     >
-                                                        {c.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
-                                        <Field
-                                            label="Échelon"
-                                            required
-                                            dark={dark}
-                                            error={errors.echelon}
-                                        >
-                                            <select
-                                                value={form.echelon}
-                                                onChange={(e) =>
-                                                    handleChange(
-                                                        "echelon",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className={selectCls}
-                                            >
-                                                <option value="">
-                                                    Sélectionner
-                                                </option>
-                                                {ECHELONS.map((e) => (
-                                                    <option key={e} value={e}>
-                                                        {e}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
+                                                        <option value="">
+                                                            Sélectionner
+                                                        </option>
+                                                        {CATEGORIES.map(
+                                                            (c) => (
+                                                                <option
+                                                                    key={c}
+                                                                    value={c}
+                                                                >
+                                                                    {c}
+                                                                </option>
+                                                            ),
+                                                        )}
+                                                    </select>
+                                                </Field>
+                                                <Field
+                                                    label="Classe"
+                                                    required
+                                                    dark={dark}
+                                                    error={errors.classe}
+                                                >
+                                                    <select
+                                                        value={form.classe}
+                                                        onChange={(e) =>
+                                                            handleChange(
+                                                                "classe",
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        className={selectCls}
+                                                    >
+                                                        <option value="">
+                                                            Sélectionner
+                                                        </option>
+                                                        {CLASSES.map((c) => (
+                                                            <option
+                                                                key={c.value}
+                                                                value={
+                                                                    c.value
+                                                                }
+                                                            >
+                                                                {c.label}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </Field>
+                                                <Field
+                                                    label="Échelon"
+                                                    required
+                                                    dark={dark}
+                                                    error={errors.echelon}
+                                                >
+                                                    <select
+                                                        value={form.echelon}
+                                                        onChange={(e) =>
+                                                            handleChange(
+                                                                "echelon",
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        className={selectCls}
+                                                    >
+                                                        <option value="">
+                                                            Sélectionner
+                                                        </option>
+                                                        {ECHELONS.map((e) => (
+                                                            <option
+                                                                key={e}
+                                                                value={e}
+                                                            >
+                                                                {e}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </Field>
+                                            </>
+                                        )}
                                     </div>
                                 )}
 
                                 {/* ══════ ONGLET 3 : AFFECTATION ══════ */}
                                 {activeTab === "affectation" && (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <Field
-                                            label="Service"
-                                            required
-                                            dark={dark}
-                                            error={errors.service_id}
-                                        >
-                                            <select
-                                                value={form.service_id}
-                                                onChange={(e) =>
-                                                    handleChange(
+                                        {/* [AJOUT] Case "Tous les services" — uniquement pour un stagiaire */}
+                                        {typePersonnel === "STAGIAIRE" && (
+                                            <label
+                                                className={`sm:col-span-2 flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 cursor-pointer transition-all ${
+                                                    dark
+                                                        ? "border-white/10 bg-white/5 text-slate-300"
+                                                        : "border-slate-200 bg-white text-slate-700"
+                                                }`}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={
+                                                        form.tous_les_services
+                                                    }
+                                                    onChange={(e) =>
+                                                        handleChange(
+                                                            "tous_les_services",
+                                                            e.target.checked,
+                                                        )
+                                                    }
+                                                    className="w-4 h-4 rounded cursor-pointer accent-blue-600"
+                                                />
+                                                <span className="text-sm font-medium">
+                                                    Tous les services
+                                                </span>
+                                            </label>
+                                        )}
+
+                                        {/* [MODIFIÉ] Service masqué si stagiaire + "Tous les services" coché */}
+                                        {!(
+                                            typePersonnel === "STAGIAIRE" &&
+                                            form.tous_les_services
+                                        ) && (
+                                            <Field
+                                                label="Service"
+                                                required
+                                                dark={dark}
+                                                error={errors.service_id}
+                                            >
+                                                <select
+                                                    value={form.service_id}
+                                                    onChange={(e) =>
+                                                        handleChange(
+                                                            "service_id",
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    className={sel(
                                                         "service_id",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className={sel("service_id")}
-                                            >
-                                                <option value="">
-                                                    Sélectionner un service
-                                                </option>
-                                                {services.map((s) => (
-                                                    <option
-                                                        key={s.id}
-                                                        value={s.id}
-                                                    >
-                                                        {s.libelle}
+                                                    )}
+                                                >
+                                                    <option value="">
+                                                        Sélectionner un
+                                                        service
                                                     </option>
-                                                ))}
-                                            </select>
-                                        </Field>
-                                        <Field
-                                            label="Fonction"
-                                            required
-                                            dark={dark}
-                                            error={errors.fonction_id}
-                                        >
-                                            <select
-                                                value={form.fonction_id}
-                                                onChange={(e) =>
-                                                    handleChange(
-                                                        "fonction_id",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className={sel("fonction_id")}
-                                            >
-                                                <option value="">
-                                                    Sélectionner une fonction
-                                                </option>
-                                                {fonctions.map((f) => (
-                                                    <option
-                                                        key={f.id}
-                                                        value={f.id}
+                                                    {services.map((s) => (
+                                                        <option
+                                                            key={s.id}
+                                                            value={s.id}
+                                                        >
+                                                            {s.libelle}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </Field>
+                                        )}
+
+                                        {/* [MODIFIÉ] Fonction et Spécialité masquées pour un stagiaire */}
+                                        {typePersonnel !== "STAGIAIRE" && (
+                                            <>
+                                                <Field
+                                                    label="Fonction"
+                                                    required
+                                                    dark={dark}
+                                                    error={errors.fonction_id}
+                                                >
+                                                    <select
+                                                        value={
+                                                            form.fonction_id
+                                                        }
+                                                        onChange={(e) =>
+                                                            handleChange(
+                                                                "fonction_id",
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        className={sel(
+                                                            "fonction_id",
+                                                        )}
                                                     >
-                                                        {f.libelle}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </Field>
-                                        <Field
-                                            label="Spécialité"
-                                            required
-                                            dark={dark}
-                                            error={errors.specialite}
-                                        >
-                                            <input
-                                                type="text"
-                                                value={form.specialite}
-                                                onChange={(e) =>
-                                                    handleChange(
-                                                        "specialite",
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                className={inp("specialite")}
-                                                placeholder="Ex: Médecin spécialiste en chirurgie"
-                                            />
-                                        </Field>
+                                                        <option value="">
+                                                            Sélectionner une
+                                                            fonction
+                                                        </option>
+                                                        {fonctions.map(
+                                                            (f) => (
+                                                                <option
+                                                                    key={f.id}
+                                                                    value={
+                                                                        f.id
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        f.libelle
+                                                                    }
+                                                                </option>
+                                                            ),
+                                                        )}
+                                                    </select>
+                                                </Field>
+                                                <Field
+                                                    label="Spécialité"
+                                                    required
+                                                    dark={dark}
+                                                    error={errors.specialite}
+                                                >
+                                                    <input
+                                                        type="text"
+                                                        value={
+                                                            form.specialite
+                                                        }
+                                                        onChange={(e) =>
+                                                            handleChange(
+                                                                "specialite",
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        className={inp(
+                                                            "specialite",
+                                                        )}
+                                                        placeholder="Ex: Médecin spécialiste en chirurgie"
+                                                    />
+                                                </Field>
+                                            </>
+                                        )}
                                     </div>
                                 )}
 
-                                {/* ══════ ONGLET 4 : DIPLÔMES ══════ */}
-                                {activeTab === "diplomes" && (
+                                {/* ══════ ONGLET 4 : DIPLÔMES (non-stagiaire) ══════ */}
+                                {activeTab === "diplomes" &&
+                                    typePersonnel !== "STAGIAIRE" && (
                                     <div className="space-y-3">
                                         {diplomes.map((diplome, index) => (
                                             <div
@@ -1276,7 +1478,9 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     <Field
                                                         label="Intitulé"
                                                         required={
-                                                            diplome.est_principal
+                                                            diplome.est_principal &&
+                                                            typePersonnel !==
+                                                                "BENEVOLE"
                                                         }
                                                         dark={dark}
                                                         error={
@@ -1388,6 +1592,273 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                         </button>
                                     </div>
                                 )}
+
+                                {/* ══════ ONGLET 4 (bis) : INFOS DE STAGE (stagiaire) ══════ */}
+                                {activeTab === "diplomes" &&
+                                    typePersonnel === "STAGIAIRE" && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <Field
+                                            label="Établissement"
+                                            required
+                                            dark={dark}
+                                            error={errors.etablissement}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={form.etablissement}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "etablissement",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={inp(
+                                                    "etablissement",
+                                                )}
+                                                placeholder="Ex: Université d'Antananarivo"
+                                            />
+                                        </Field>
+                                        <Field
+                                            label="Niveau"
+                                            required
+                                            dark={dark}
+                                            error={errors.niveau}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={form.niveau}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "niveau",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={inp("niveau")}
+                                                placeholder="Ex: Master 2"
+                                            />
+                                        </Field>
+                                        <Field
+                                            label="Filière / Parcours"
+                                            required
+                                            dark={dark}
+                                            error={errors.filiere_parcours}
+                                        >
+                                            <input
+                                                type="text"
+                                                value={form.filiere_parcours}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "filiere_parcours",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={inp(
+                                                    "filiere_parcours",
+                                                )}
+                                                placeholder="Ex: Génie Logiciel"
+                                            />
+                                        </Field>
+                                        <Field
+                                            label="Durée du stage (mois)"
+                                            required
+                                            dark={dark}
+                                            error={errors.duree_mois}
+                                        >
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={form.duree_mois}
+                                                onChange={(e) =>
+                                                    handleChange(
+                                                        "duree_mois",
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className={inp("duree_mois")}
+                                                placeholder="Ex: 4"
+                                            />
+                                        </Field>
+                                        <p
+                                            className={`sm:col-span-2 text-xs ${sub}`}
+                                        >
+                                            La date de fin de stage est
+                                            calculée automatiquement à partir
+                                            de la durée saisie.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* ══════ ONGLET 5 : ACCÈS SIH ══════ */}
+                                {activeTab === "acces" && (
+                                    <div className="space-y-4">
+                                        {aAccesSih ? (
+                                            <div
+                                                className={`rounded-xl border p-4 text-sm flex items-center gap-3 ${dark ? "bg-white/3 border-white/8 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"}`}
+                                            >
+                                                <svg
+                                                    xmlns="http://www.w3.org/2000/svg"
+                                                    className="w-5 h-5 shrink-0"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    strokeWidth={2}
+                                                >
+                                                    <path
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                                    />
+                                                </svg>
+                                                Ce membre du personnel
+                                                dispose déjà d&apos;un accès
+                                                SIH. La gestion de son compte
+                                                (mot de passe, désactivation,
+                                                etc.) se fait depuis un autre
+                                                écran.
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <label
+                                                    className={`flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 cursor-pointer transition-all ${
+                                                        dark
+                                                            ? "border-white/10 bg-white/5 text-slate-300"
+                                                            : "border-slate-200 bg-white text-slate-700"
+                                                    }`}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={
+                                                            form.donner_access
+                                                        }
+                                                        onChange={(e) =>
+                                                            handleChange(
+                                                                "donner_access",
+                                                                e.target
+                                                                    .checked,
+                                                            )
+                                                        }
+                                                        className="w-4 h-4 rounded cursor-pointer accent-blue-600"
+                                                    />
+                                                    <span className="text-sm font-medium">
+                                                        Donner un accès SIH
+                                                    </span>
+                                                </label>
+
+                                                {form.donner_access && (
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                        <Field
+                                                            label="Nom d'utilisateur"
+                                                            required
+                                                            dark={dark}
+                                                            error={
+                                                                errors.username
+                                                            }
+                                                        >
+                                                            <input
+                                                                type="text"
+                                                                value={
+                                                                    form.username
+                                                                }
+                                                                onChange={(
+                                                                    e,
+                                                                ) =>
+                                                                    handleChange(
+                                                                        "username",
+                                                                        e
+                                                                            .target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                className={inp(
+                                                                    "username",
+                                                                )}
+                                                                placeholder="Ex: jrakoto"
+                                                            />
+                                                        </Field>
+                                                        <Field
+                                                            label="Mot de passe"
+                                                            required
+                                                            dark={dark}
+                                                            error={
+                                                                errors.password
+                                                            }
+                                                        >
+                                                            <input
+                                                                type="password"
+                                                                value={
+                                                                    form.password
+                                                                }
+                                                                onChange={(
+                                                                    e,
+                                                                ) =>
+                                                                    handleChange(
+                                                                        "password",
+                                                                        e
+                                                                            .target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                className={inp(
+                                                                    "password",
+                                                                )}
+                                                                placeholder="••••••••"
+                                                            />
+                                                        </Field>
+                                                        {/* [AJOUT] Rôle SIH — envoie value (brut), affiche label */}
+                                                        <Field
+                                                            label="Rôle"
+                                                            required
+                                                            dark={dark}
+                                                            error={
+                                                                errors.role
+                                                            }
+                                                        >
+                                                            <select
+                                                                value={
+                                                                    form.role
+                                                                }
+                                                                onChange={(
+                                                                    e,
+                                                                ) =>
+                                                                    handleChange(
+                                                                        "role",
+                                                                        e
+                                                                            .target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                className={sel(
+                                                                    "role",
+                                                                )}
+                                                            >
+                                                                <option value="">
+                                                                    Sélectionner
+                                                                    un rôle
+                                                                </option>
+                                                                {ROLES.map(
+                                                                    (r) => (
+                                                                        <option
+                                                                            key={
+                                                                                r.value
+                                                                            }
+                                                                            value={
+                                                                                r.value
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                r.label
+                                                                            }
+                                                                        </option>
+                                                                    ),
+                                                                )}
+                                                            </select>
+                                                        </Field>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>
@@ -1414,10 +1885,22 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                 if (Object.keys(e).length > 0) {
                                     setErrors(e);
                                     // [AJOUT] Redirection immédiate vers l'onglet fautif pour gagner du temps
-                                    if (e.nom || e.prenoms || e.im)
+                                    if (e.nom || e.prenoms)
                                         setActiveTab("identite");
-                                    else if (e.diplome0)
+                                    else if (
+                                        e.diplome0 ||
+                                        e.etablissement ||
+                                        e.niveau ||
+                                        e.filiere_parcours ||
+                                        e.duree_mois
+                                    )
                                         setActiveTab("diplomes");
+                                    else if (
+                                        e.username ||
+                                        e.password ||
+                                        e.role
+                                    )
+                                        setActiveTab("acces");
                                     return;
                                 }
                                 setConfirmSave(true);
