@@ -150,21 +150,21 @@ function StatCard({ icon, value, label, colorClass, bgClass, dark }) {
         : "bg-white border-slate-200 shadow-sm";
     return (
         <div
-            className={`rounded-2xl border p-5 flex items-center gap-4 transition-all hover:shadow-md hover:-translate-y-0.5 ${card}`}
+            className={`rounded-2xl border p-4 sm:p-6 flex items-center gap-3 sm:gap-5 transition-all hover:shadow-md hover:-translate-y-0.5 ${card}`}
         >
             <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${bgClass}`}
+                className={`w-11 h-11 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center shrink-0 ${bgClass}`}
             >
                 {icon}
             </div>
             <div>
                 <div
-                    className={`text-2xl font-bold tracking-tight ${colorClass}`}
+                    className={`text-xl sm:text-3xl font-bold tracking-tight ${colorClass}`}
                 >
                     {value}
                 </div>
                 <div
-                    className={`text-xs font-medium mt-0.5 ${dark ? "text-slate-500" : "text-slate-400"}`}
+                    className={`text-xs sm:text-sm font-medium mt-0.5 ${dark ? "text-slate-500" : "text-slate-400"}`}
                 >
                     {label}
                 </div>
@@ -569,14 +569,18 @@ export default function StructureHospitaliere({ dark }) {
     const ttl = dark ? "text-white" : "text-slate-800";
     const sub = dark ? "text-slate-500" : "text-slate-400";
     const thCls = dark
-        ? "sticky top-0 z-20 px-4 py-3 text-[10.5px] font-bold uppercase tracking-widest text-slate-600 bg-[#0d1526] bg-opacity-95 border-b border-white/5 text-center whitespace-nowrap"
-        : "sticky top-0 z-20 px-4 py-3 text-[10.5px] font-bold uppercase tracking-widest text-slate-400 bg-white bg-opacity-95 border-b border-slate-100 text-center whitespace-nowrap";
+        ? "sticky top-0 z-20 px-3 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-[10.5px] font-bold uppercase tracking-widest text-slate-600 bg-[#101b30] border-b-2 border-white/10 text-center whitespace-nowrap"
+        : "sticky top-0 z-20 px-3 sm:px-4 py-2.5 sm:py-3 text-[10px] sm:text-[10.5px] font-bold uppercase tracking-widest text-slate-400 bg-slate-50 border-b-2 border-slate-200 text-center whitespace-nowrap";
     const tdCls = dark
-        ? "px-4 text-center border-b border-white/4"
-        : "px-4 text-center border-b border-slate-100/80";
+        ? "px-3 sm:px-4 text-center border-b border-white/4"
+        : "px-3 sm:px-4 text-center border-b border-slate-100/80";
     const trCls = dark
         ? "transition-colors hover:bg-white/3"
         : "transition-colors hover:bg-blue-50/25";
+    // Colonne "Service" figée pendant le scroll horizontal (mobile)
+    const stickyColBg = dark ? "bg-[#0d1526]" : "bg-white";
+    const stickyHeadBg = dark ? "bg-[#101b30]" : "bg-slate-50";
+    const stickyFootBg = dark ? "bg-[#0a152d]" : "bg-slate-50/95";
 
     const groupes = recap?.groupes ?? [];
     const lignes = recap?.lignes ?? [];
@@ -668,7 +672,7 @@ export default function StructureHospitaliere({ dark }) {
 
                 {/* ══ STAT CARDS — ancien style icône + valeur colorée ══ */}
                 {!loading && !error && recap && (
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                         <StatCard
                             dark={dark}
                             value={totaux.TOTAL ?? "—"}
@@ -719,53 +723,6 @@ export default function StructureHospitaliere({ dark }) {
                                 </svg>
                             }
                         />
-                        {groupes.slice(0, 2).map((g, i) => {
-                            const colors = [
-                                {
-                                    clr: dark
-                                        ? "text-violet-400"
-                                        : "text-violet-700",
-                                    bg: dark
-                                        ? "bg-violet-500/15"
-                                        : "bg-violet-50",
-                                },
-                                {
-                                    clr: dark
-                                        ? "text-amber-400"
-                                        : "text-amber-700",
-                                    bg: dark
-                                        ? "bg-amber-500/15"
-                                        : "bg-amber-50",
-                                },
-                            ];
-                            const c = colors[i] ?? colors[0];
-                            return (
-                                <StatCard
-                                    key={g.id}
-                                    dark={dark}
-                                    value={totaux[g.libelle] ?? "—"}
-                                    label={g.libelle + "s"}
-                                    colorClass={c.clr}
-                                    bgClass={c.bg}
-                                    icon={
-                                        <svg
-                                            className={`w-5 h-5 ${c.clr}`}
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                            strokeWidth={1.7}
-                                        >
-                                            <path d="M12 14l9-5-9-5-9 5 9 5z" />
-                                            <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"
-                                            />
-                                        </svg>
-                                    }
-                                />
-                            );
-                        })}
                     </div>
                 )}
 
@@ -833,11 +790,11 @@ export default function StructureHospitaliere({ dark }) {
                     {!loading && !error && recap && (
                         <div className="overflow-x-auto">
                             <div className="max-h-[62vh] min-h-96 overflow-y-auto">
-                                <table className="w-full border-collapse table-fixed">
+                                <table className="min-w-full border-collapse">
                                     <thead>
                                         <tr>
                                             <th
-                                                className={`${thCls} text-left pl-6 w-48`}
+                                                className={`${thCls} ${stickyHeadBg} sticky left-0 z-30 text-left pl-4 sm:pl-6 min-w-32.5 sm:min-w-48`}
                                             >
                                                 Service
                                             </th>
@@ -849,11 +806,11 @@ export default function StructureHospitaliere({ dark }) {
                                                 return (
                                                     <th
                                                         key={g.id}
-                                                        className={thCls}
+                                                        className={`${thCls} min-w-17 sm:min-w-21`}
                                                     >
                                                         <span className="inline-flex items-center gap-1.5">
                                                             <span
-                                                                className={`w-2 h-2 rounded-full ${pal.dot}`}
+                                                                className={`w-2 h-2 rounded-full ${pal.dot} shrink-0`}
                                                             />
                                                             {g.libelle}
                                                         </span>
@@ -861,7 +818,7 @@ export default function StructureHospitaliere({ dark }) {
                                                 );
                                             })}
                                             <th
-                                                className={`${thCls} ${dark ? "text-slate-400" : "text-slate-500"} font-extrabold`}
+                                                className={`${thCls} min-w-17 sm:min-w-21 ${dark ? "text-slate-400" : "text-slate-500"} font-extrabold`}
                                             >
                                                 Total
                                             </th>
@@ -874,7 +831,7 @@ export default function StructureHospitaliere({ dark }) {
                                                 className={trCls}
                                             >
                                                 <td
-                                                    className={`${tdCls} text-left pl-6 py-3.5`}
+                                                    className={`${tdCls} ${stickyColBg} sticky left-0 z-10 text-left pl-4 sm:pl-6 py-3.5 min-w-32.5 sm:min-w-48`}
                                                 >
                                                     <span
                                                         className={`text-[13px] font-semibold ${dark ? "text-slate-200" : "text-slate-700"}`}
@@ -885,7 +842,7 @@ export default function StructureHospitaliere({ dark }) {
                                                 {groupes.map((g, gi) => (
                                                     <td
                                                         key={g.id}
-                                                        className={`${tdCls} py-3`}
+                                                        className={`${tdCls} py-3 min-w-17 sm:min-w-21`}
                                                     >
                                                         <CellBtn
                                                             value={
@@ -906,7 +863,7 @@ export default function StructureHospitaliere({ dark }) {
                                                     </td>
                                                 ))}
                                                 <td
-                                                    className={`${tdCls} py-3 font-bold text-[13px] ${ligne.TOTAL > 0 ? (dark ? "text-white" : "text-slate-800") : dark ? "text-white/15" : "text-slate-300"}`}
+                                                    className={`${tdCls} py-3 min-w-17 sm:min-w-21 font-bold text-[13px] ${ligne.TOTAL > 0 ? (dark ? "text-white" : "text-slate-800") : dark ? "text-white/15" : "text-slate-300"}`}
                                                 >
                                                     {ligne.TOTAL || "—"}
                                                 </td>
@@ -917,12 +874,12 @@ export default function StructureHospitaliere({ dark }) {
                                         <tr
                                             className={
                                                 dark
-                                                    ? "bg-[#0a152d] border-t border-white/8"
-                                                    : "bg-slate-50/95 border-t border-slate-200/80"
+                                                    ? "bg-[#0a152d] border-t-2 border-white/10"
+                                                    : "bg-slate-50/95 border-t-2 border-slate-200"
                                             }
                                         >
                                             <td
-                                                className={`px-4 py-4 pl-6 text-[10.5px] font-extrabold uppercase tracking-widest ${sub}`}
+                                                className={`${stickyFootBg} sticky left-0 z-10 px-3 sm:px-4 py-4 pl-4 sm:pl-6 min-w-32.5 sm:min-w-48 text-[10px] sm:text-[10.5px] font-extrabold uppercase tracking-widest ${sub}`}
                                             >
                                                 Total général
                                             </td>
@@ -950,7 +907,7 @@ export default function StructureHospitaliere({ dark }) {
                                                 return (
                                                     <td
                                                         key={g.id}
-                                                        className="px-4 py-4 text-center"
+                                                        className="px-3 sm:px-4 py-4 min-w-17 sm:min-w-21 text-center"
                                                     >
                                                         <span
                                                             className={`text-[13px] font-extrabold ${textColor}`}
@@ -963,7 +920,7 @@ export default function StructureHospitaliere({ dark }) {
                                                 );
                                             })}
                                             <td
-                                                className={`px-4 py-4 text-center text-base font-extrabold ${dark ? "text-blue-400" : "text-blue-600"}`}
+                                                className={`px-3 sm:px-4 py-4 min-w-17 sm:min-w-21 text-center text-base font-extrabold ${dark ? "text-blue-400" : "text-blue-600"}`}
                                             >
                                                 {totaux.TOTAL ?? 0}
                                             </td>
