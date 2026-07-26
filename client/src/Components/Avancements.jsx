@@ -321,11 +321,18 @@ export default function Avancements({ dark, refreshNotifications }) {
             .catch(() => {}); // silencieux — la bannière est facultative
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Nombre de mois utilisé pour déterminer les agents "proches" d'un
+    // avancement. Aucun sélecteur dans l'UI pour l'instant : on garde 3
+    // par défaut, comme demandé.
+    const moisFiltre = 3;
+
     const fetchEligible = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await apiFetch(`${API_BASE}/avancements/proches`);
+            const res = await apiFetch(
+                `${API_BASE}/avancements/proches?mois=${moisFiltre}`,
+            );
 
             if (!res.ok) {
                 throw new Error(
@@ -333,8 +340,14 @@ export default function Avancements({ dark, refreshNotifications }) {
                 );
             }
 
-            const data = await res.json();
-            setAgents(data.data || data);
+            const json = await res.json();
+            const list = json.data || json || [];
+            // Les plus en retard (jours_restants le plus négatif) en
+            // premier, puis les plus proches, puis les plus lointains.
+            const sorted = [...list].sort(
+                (a, b) => a.jours_restants - b.jours_restants,
+            );
+            setAgents(sorted);
         } catch (err) {
             setError(err.message || "Une erreur est survenue");
         } finally {
@@ -378,8 +391,8 @@ export default function Avancements({ dark, refreshNotifications }) {
                     Gestion des Avancements
                 </h1>
                 <p className={`text-sm mt-1 ${textSub}`}>
-                    Liste des agents dont la date de prochain avancement est
-                    passée ou proche
+                    Liste des agents dont le prochain avancement est
+                    dépassé ou prévu dans les {moisFiltre} prochains mois
                 </p>
             </div>
 
@@ -422,6 +435,7 @@ export default function Avancements({ dark, refreshNotifications }) {
                                     className={`text-sm font-bold mb-2 ${dark ? "text-amber-300" : "text-amber-800"}`}
                                 >
                                     Avancements nécessitant une attention
+                                    particulière
                                 </p>
                                 {/* 3 compteurs */}
                                 <div className="flex flex-wrap gap-3">
@@ -491,9 +505,10 @@ export default function Avancements({ dark, refreshNotifications }) {
                         Agents éligibles
                     </h2>
                     <span
-                        className={`text-xs font-bold px-2.5 py-1 rounded-full ${dark ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700"}`}
+                        className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${dark ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700"}`}
                     >
-                        {agents.length} agent(s)
+                        <span className="text-sm">{agents.length}</span>
+                        Total éligible{agents.length > 1 ? "s" : ""}
                     </span>
                 </div>
 
@@ -537,13 +552,19 @@ export default function Avancements({ dark, refreshNotifications }) {
                                 <tr
                                     className={`text-[10px] font-bold uppercase tracking-widest ${dark ? "text-slate-500 bg-white/5" : "text-slate-400 bg-slate-50"}`}
                                 >
-                                    <th className="px-5 py-3">Agent</th>
-                                    <th className="px-5 py-3">Service</th>
-                                    <th className="px-5 py-3">Grade Actuel</th>
-                                    <th className="px-5 py-3">
-                                        Prochain Avancement
+                                    <th className="px-3 sm:px-5 py-3">
+                                        Agent
                                     </th>
-                                    <th className="px-5 py-3 text-right">
+                                    <th className="hidden sm:table-cell px-5 py-3">
+                                        Service
+                                    </th>
+                                    <th className="hidden md:table-cell px-5 py-3">
+                                        Grade actuel
+                                    </th>
+                                    <th className="px-3 sm:px-5 py-3">
+                                        Prochain avancement
+                                    </th>
+                                    <th className="px-3 sm:px-5 py-3 text-right">
                                         Action
                                     </th>
                                 </tr>
@@ -552,15 +573,36 @@ export default function Avancements({ dark, refreshNotifications }) {
                                 className={`text-sm divide-y ${dark ? "divide-white/5" : "divide-slate-100"}`}
                             >
                                 {agents.map((a) => {
-                                    const past =
-                                        new Date(a.date_prochain_avancement) <
-                                        new Date();
+                                    const jr = a.jours_restants;
+                                    const dateStr = new Date(
+                                        a.date_prochain_avancement,
+                                    ).toLocaleDateString("fr-FR");
+
+                                    let badgeLabel;
+                                    let badgeCls;
+                                    if (jr <= 0) {
+                                        badgeLabel = "En retard";
+                                        badgeCls = dark
+                                            ? "bg-rose-500/15 text-rose-400"
+                                            : "bg-rose-100 text-rose-700";
+                                    } else if (jr <= 30) {
+                                        badgeLabel = "Urgent";
+                                        badgeCls = dark
+                                            ? "bg-amber-500/15 text-amber-400"
+                                            : "bg-amber-100 text-amber-700";
+                                    } else {
+                                        badgeLabel = `Dans ${jr} j.`;
+                                        badgeCls = dark
+                                            ? "bg-blue-500/15 text-blue-400"
+                                            : "bg-blue-50 text-blue-600";
+                                    }
+
                                     return (
                                         <tr
                                             key={a.personnel_id}
                                             className={`transition-colors ${rowHover}`}
                                         >
-                                            <td className="px-5 py-3.5">
+                                            <td className="px-3 sm:px-5 py-3.5">
                                                 <div
                                                     className={`font-semibold ${textTitle}`}
                                                 >
@@ -571,13 +613,21 @@ export default function Avancements({ dark, refreshNotifications }) {
                                                 >
                                                     IM: {a.im}
                                                 </div>
+                                                {/* Service visible ici sur mobile, où la colonne dédiée est masquée */}
+                                                {a.service && (
+                                                    <div
+                                                        className={`text-xs mt-0.5 sm:hidden ${textSub}`}
+                                                    >
+                                                        {a.service}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td
-                                                className={`px-5 py-3.5 ${textSub}`}
+                                                className={`hidden sm:table-cell px-5 py-3.5 ${textSub}`}
                                             >
                                                 {a.service}
                                             </td>
-                                            <td className="px-5 py-3.5">
+                                            <td className="hidden md:table-cell px-5 py-3.5">
                                                 {a.grade_actuel && (
                                                     <div className={textTitle}>
                                                         {formatGrade(
@@ -586,32 +636,33 @@ export default function Avancements({ dark, refreshNotifications }) {
                                                     </div>
                                                 )}
                                             </td>
-                                            <td className="px-5 py-3.5">
-                                                <span
-                                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
-                                                        past
-                                                            ? dark
-                                                                ? "bg-rose-500/15 text-rose-400"
-                                                                : "bg-rose-100 text-rose-700"
-                                                            : dark
-                                                              ? "bg-amber-500/15 text-amber-400"
-                                                              : "bg-amber-100 text-amber-700"
-                                                    }`}
-                                                >
-                                                    {new Date(
-                                                        a.date_prochain_avancement,
-                                                    ).toLocaleDateString()}
-                                                    {past && " (En retard)"}
-                                                </span>
+                                            <td className="px-3 sm:px-5 py-3.5">
+                                                <div className="flex flex-col gap-1">
+                                                    <span
+                                                        className={`text-xs sm:text-sm ${textSub}`}
+                                                    >
+                                                        {dateStr}
+                                                    </span>
+                                                    <span
+                                                        className={`inline-flex w-fit items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap ${badgeCls}`}
+                                                    >
+                                                        {badgeLabel}
+                                                    </span>
+                                                </div>
                                             </td>
-                                            <td className="px-5 py-3.5 text-right">
+                                            <td className="px-3 sm:px-5 py-3.5 text-right">
                                                 <button
                                                     onClick={() =>
                                                         setSelectedAgent(a)
                                                     }
-                                                    className="px-3 py-1.5 rounded-lg border border-blue-500/30 text-blue-500 hover:bg-blue-500 hover:text-white transition-colors text-xs font-semibold cursor-pointer"
+                                                    className="px-2.5 sm:px-3 py-1.5 rounded-lg border border-blue-500/30 text-blue-500 hover:bg-blue-500 hover:text-white transition-colors text-xs font-semibold cursor-pointer whitespace-nowrap"
                                                 >
-                                                    Historique / Promouvoir
+                                                    <span className="hidden sm:inline">
+                                                        Historique / Promouvoir
+                                                    </span>
+                                                    <span className="sm:hidden">
+                                                        Détails
+                                                    </span>
                                                 </button>
                                             </td>
                                         </tr>
