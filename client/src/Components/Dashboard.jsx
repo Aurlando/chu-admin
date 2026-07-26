@@ -21,6 +21,7 @@ const PALETTE = {
     Paramedical: "#10b981",
     Admin: "#bc4749",
     "Agent d'appui": "#06b6d4",
+    Bénévoles: "#f59e0b",
     Autre: "#94a3b8",
 };
 
@@ -31,6 +32,7 @@ const GROUPES = [
     "Paramédical",
     "Admin",
     "Agent d'appui",
+    "Bénévoles",
     "Autre",
 ];
 
@@ -41,6 +43,7 @@ const PALETTE_API = {
     Paramédical: "#10b981",
     Admin: "#bc4749",
     "Agent d'appui": "#06b6d4",
+    Bénévoles: "#f59e0b",
     Autre: "#94a3b8",
 };
 
@@ -124,6 +127,22 @@ const ICONS = {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 d="M17 20H7a4 4 0 01-4-4v0a4 4 0 014-4h10a4 4 0 014 4v0a4 4 0 01-4 4zM12 3a4 4 0 110 8 4 4 0 010-8z"
+            />
+        </svg>
+    ),
+    Bénévoles: (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-5 h-5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.8}
+        >
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V6a2 2 0 10-2 2h2zm-7 5h14M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6M5 13a2 2 0 01-2-2v-2a2 2 0 012-2h14a2 2 0 012 2v2a2 2 0 01-2 2"
             />
         </svg>
     ),
@@ -480,8 +499,8 @@ function BarChart({ data, filter, dark }) {
     return (
         <div className="overflow-x-auto pb-2">
             <div
-                className="flex items-end gap-2 px-1"
-                style={{ minWidth: `${data.length * 48}px`, height: "170px" }}
+                className="flex items-end gap-2 px-1 pt-6 pb-8"
+                style={{ minWidth: `${data.length * 48}px`, height: "226px" }}
             >
                 {data.map((item, i) => {
                     const val = values[i];
@@ -503,7 +522,7 @@ function BarChart({ data, filter, dark }) {
                             >
                                 {/* Label valeur — apparait au survol AU-DESSUS de la barre */}
                                 <div
-                                    className={`absolute bottom-0 left-1/2 -translate-x-1/2 flex flex-col items-center
+                                    className={`absolute bottom-0 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center
                                     pointer-events-none transition-all duration-200
                                     opacity-0 group-hover:opacity-100`}
                                     style={{ bottom: `${barH + 4}px` }}
@@ -564,14 +583,29 @@ function BarChart({ data, filter, dark }) {
                                 )}
                             </div>
 
-                            <span
-                                className={`text-[9px] lg:text-[10px] text-center leading-tight font-medium
-                                w-full truncate transition-colors group-hover:text-blue-400
-                                ${dark ? "text-slate-500" : "text-slate-400"}`}
-                                title={item.service}
-                            >
-                                {abbr}
-                            </span>
+                            <div className="relative w-full flex justify-center">
+                                <span
+                                    className={`text-[9px] lg:text-[10px] text-center leading-tight font-medium
+                                    max-w-full truncate transition-colors group-hover:text-blue-400
+                                    ${dark ? "text-slate-500" : "text-slate-400"}`}
+                                >
+                                    {abbr}
+                                </span>
+
+                                {/* Tooltip nom complet — sous le label abrégé, au-dessus des autres barres */}
+                                <div
+                                    className={`absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-30
+                                    pointer-events-none transition-all duration-200 whitespace-nowrap
+                                    opacity-0 group-hover:opacity-100`}
+                                >
+                                    <div
+                                        className={`px-2 py-1 rounded-md text-[11px] font-semibold shadow-lg border
+                                        ${dark ? "bg-slate-800 text-white border-white/10" : "bg-white text-slate-700 border-slate-200"}`}
+                                    >
+                                        {item.service}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     );
                 })}
@@ -605,7 +639,7 @@ function ChartLegend({ dark }) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// AuditLogPanel — Activite systeme (logs réels depuis /audit-logs)
+// AuditLogPanel — Activité système (logs réels depuis /audit-logs)
 // ════════════════════════════════════════════════════════════════════
 function AuditLogPanel({ dark, T, onNavigate, onLogout }) {
     const [logs, setLogs] = useState([]);
@@ -630,7 +664,7 @@ function AuditLogPanel({ dark, T, onNavigate, onLogout }) {
 
     return (
         <div
-            className={`xl:col-span-2 rounded-2xl border p-5 flex flex-col ${T.cardBg}`}
+            className={`lg:col-span-2 rounded-2xl border p-5 flex flex-col ${T.cardBg}`}
         >
             <div className="flex items-start justify-between mb-4">
                 <div>
@@ -750,7 +784,7 @@ function AuditLogPanel({ dark, T, onNavigate, onLogout }) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// DashboardHome — page d'accueil avec donnees reelles
+// DashboardHome — page d'accueil avec données réelles
 // ════════════════════════════════════════════════════════════════════
 function DashboardHome({ dark, T, onNavigate, onLogout }) {
     const [data, setData] = useState(null);
@@ -762,7 +796,7 @@ function DashboardHome({ dark, T, onNavigate, onLogout }) {
     useEffect(() => {
         apiFetch(`${API_BASE}/dashboard`)
             .then((res) => {
-                if (!res.ok) throw new Error("Erreur reseau");
+                if (!res.ok) throw new Error("Erreur réseau");
                 return res.json();
             })
             .then((json) => {
@@ -777,7 +811,7 @@ function DashboardHome({ dark, T, onNavigate, onLogout }) {
 
     const hour = new Date().getHours();
     const greeting =
-        hour < 12 ? "Bonjour" : hour < 18 ? "Bon apres-midi" : "Bonsoir";
+        hour < 12 ? "Bonjour" : hour < 18 ? "Bon après-midi" : "Bonsoir";
 
     const totalCard = data?.cards?.find((c) => c.groupe === "Total");
     const groupCards = data?.cards?.filter((c) => c.groupe !== "Total") ?? [];
@@ -803,7 +837,7 @@ function DashboardHome({ dark, T, onNavigate, onLogout }) {
                         {greeting}, Admin 👋
                     </h1>
                     <p className={`text-sm mt-1 ${T.greetSub}`}>
-                        Voici un resume du statut du personnel hospitalier.
+                        Voici un résumé du statut du personnel hospitalier.
                     </p>
                 </div>
                 <button
@@ -861,18 +895,78 @@ function DashboardHome({ dark, T, onNavigate, onLogout }) {
 
             {data && (
                 <div className="space-y-5">
-                    {/* CARDS cliquables — clic filtre le graphe */}
+                    {/* BANNIÈRE Total Personnel — agrégat global, mis en valeur au-dessus des sous-catégories */}
                     {totalCard && (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-                            <div className="col-span-2 sm:col-span-1 lg:col-span-1">
-                                <StatCard
-                                    groupe={totalCard.groupe}
-                                    total={totalCard.total}
-                                    dark={dark}
-                                    isActive={selectedGroup === "Total"}
-                                    onClick={() => handleCardClick("Total")}
-                                />
+                        <div
+                            onClick={() => handleCardClick("Total")}
+                            className={`relative overflow-hidden rounded-2xl border p-5 lg:p-6 cursor-pointer select-none
+                                transition-all duration-300 hover:-translate-y-0.5
+                                ${dark ? "border-blue-500/30" : "border-blue-200 shadow-sm"}`}
+                            style={{
+                                background: dark
+                                    ? "linear-gradient(135deg, #1e3a8a 0%, #1e40af 45%, #1d4ed8 100%)"
+                                    : "linear-gradient(135deg, #eff6ff 0%, #dbeafe 55%, #bfdbfe 100%)",
+                                boxShadow:
+                                    selectedGroup === "Total"
+                                        ? "0 0 0 2px #3b82f660"
+                                        : undefined,
+                            }}
+                        >
+                            <div
+                                className="absolute inset-0 opacity-40 pointer-events-none"
+                                style={{
+                                    background:
+                                        "radial-gradient(circle at 85% 15%, #60a5fa33, transparent 60%)",
+                                }}
+                            />
+                            <div className="relative flex items-center justify-between gap-4 flex-wrap">
+                                <div className="flex items-center gap-4">
+                                    <div
+                                        className={`w-12 h-12 lg:w-14 lg:h-14 rounded-2xl flex items-center justify-center shrink-0
+                                            ${dark ? "bg-white/10 text-blue-300" : "bg-white text-blue-600 shadow-sm"}`}
+                                    >
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            className="w-6 h-6 lg:w-7 lg:h-7"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                            stroke="currentColor"
+                                            strokeWidth={1.8}
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                d="M17 20H7a4 4 0 01-4-4v0a4 4 0 014-4h10a4 4 0 014 4v0a4 4 0 01-4 4zM12 3a4 4 0 110 8 4 4 0 010-8z"
+                                            />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div
+                                            className={`text-3xl lg:text-4xl font-bold font-mono tracking-tight
+                                                ${dark ? "text-white" : "text-slate-800"}`}
+                                        >
+                                            {totalCard.total}
+                                        </div>
+                                        <div
+                                            className={`text-sm font-semibold mt-0.5 ${dark ? "text-blue-200" : "text-blue-700"}`}
+                                        >
+                                            Total Personnel
+                                        </div>
+                                    </div>
+                                </div>
+                                <span
+                                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shrink-0
+                                        ${dark ? "text-blue-200 bg-white/10 border-white/20" : "text-blue-600 bg-white/70 border-blue-200"}`}
+                                >
+                                    CHU
+                                </span>
                             </div>
+                        </div>
+                    )}
+
+                    {/* CARDS cliquables — clic filtre le graphe, une carte par sous-catégorie */}
+                    {groupCards.length > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
                             {groupCards.map((card) => (
                                 <StatCard
                                     key={card.groupe_id ?? card.groupe}
@@ -886,11 +980,11 @@ function DashboardHome({ dark, T, onNavigate, onLogout }) {
                         </div>
                     )}
 
-                    {/* GRAPHIQUE + ACTIVITE SYSTEME */}
-                    <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-                        {/* Graphique avec dropdown — xl:3/5 */}
+                    {/* GRAPHIQUE + ACTIVITÉ SYSTÈME */}
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                        {/* Graphique avec dropdown — lg:3/5 */}
                         <div
-                            className={`xl:col-span-3 rounded-2xl border p-5 ${T.cardBg}`}
+                            className={`lg:col-span-3 rounded-2xl border p-5 ${T.cardBg}`}
                         >
                             {/* Header : titre + dropdown */}
                             <div className="flex items-start justify-between gap-3 mb-4">
@@ -976,12 +1070,12 @@ function DashboardHome({ dark, T, onNavigate, onLogout }) {
                                 <p
                                     className={`text-sm text-center py-10 ${T.cardSub}`}
                                 >
-                                    Aucune donnee
+                                    Aucune donnée
                                 </p>
                             )}
                         </div>
 
-                        {/* Panneau Activite systeme — xl:2/5 */}
+                        {/* Panneau Activité système — lg:2/5 */}
                         <AuditLogPanel
                             dark={dark}
                             T={T}
@@ -1008,10 +1102,10 @@ function DashboardHome({ dark, T, onNavigate, onLogout }) {
                         <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                             <div>
                                 <h3 className="text-base lg:text-lg font-bold text-white">
-                                    Besoin d'agrandir l'equipe medicale ?
+                                    Besoin d'agrandir l'équipe médicale ?
                                 </h3>
                                 <p className="text-blue-200 text-sm mt-1">
-                                    Integrez facilement medecins, sages-femmes
+                                    Intégrez facilement médecins, sages-femmes
                                     et personnel administratif dans le HIS.
                                 </p>
                             </div>
