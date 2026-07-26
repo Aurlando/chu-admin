@@ -1,8 +1,7 @@
-
 const prisma = require('../config/prisma');
 
 async function getDashboardStats() {
-    // on recupere les 6 groupes
+    // on recupere les 6 groupes (uniquement les fonctionnaires)
     const groupes = await prisma.groupe_fonction.findMany({
         orderBy: { id: 'asc' },
         include: {
@@ -10,7 +9,8 @@ async function getDashboardStats() {
                 include: {
                     personnel: {
                         where: {
-                            statut: { not: 'Sortie' }
+                            statut: { not: 'Sortie' },
+                            type_personnel: 'FONCTIONNAIRE',
                         },
                         select: {
                             id: true,
@@ -22,30 +22,55 @@ async function getDashboardStats() {
         }
     });
 
+    // tous les benevoles actifs, indépendamment de leur fonction/groupe
+    const benevoles = await prisma.personnel.findMany({
+        where: {
+            statut: { not: 'Sortie' },
+            type_personnel: 'BENEVOLE',
+        },
+        select: {
+            id: true,
+            service_id: true,
+        }
+    });
+
     // on recupere les services
     const services = await prisma.service.findMany({
         orderBy: { libelle: 'asc' },
         select: { id: true, libelle: true }
     });
 
-    // total des personnels dans chu
+    const LIBELLE_BENEVOLES = 'Bénévoles';
+
+    // total des personnels dans chu (fonctionnaires + benevoles, PAS les stagiaires)
     let totalGeneral = 0;
 
-    // cards : total personnels dans un groupe pour les 6 groupes
+    // cards : total personnels dans un groupe pour les 6 groupes (fonctionnaires uniquement)
     const cards = groupes.map(groupe => {
         const personnelsDuGroupe = groupe.fonction.flatMap(f => f.personnel);
         const total = personnelsDuGroupe.length;
         totalGeneral += total;
 
         return {
+            type: 'groupe',
             groupe_id: groupe.id,
             groupe: groupe.libelle,
             total,
         };
     });
 
+    // card dédiée aux bénévoles : ce n'est pas un groupe_fonction, donc pas de groupe_id
+    totalGeneral += benevoles.length;
+    cards.push({
+        type: 'benevoles',
+        groupe_id: null,
+        groupe: LIBELLE_BENEVOLES,
+        total: benevoles.length,
+    });
+
     // on ajoute une card final pour le total des personnels dans le chu
     cards.push({
+        type: 'total',
         groupe_id: null,
         groupe: 'Total',
         total: totalGeneral,
@@ -55,15 +80,16 @@ async function getDashboardStats() {
     const grapheMap = new Map();
 
     for (const service of services) {
-        // initialisation de chaque groupe a 0
+        // initialisation de chaque groupe a 0 (+ le groupe Bénévoles)
         const entry = { service: service.libelle };
         for (const groupe of groupes) {
             entry[groupe.libelle] = 0;
         }
+        entry[LIBELLE_BENEVOLES] = 0;
         grapheMap.set(service.id, entry);
     }
 
-    // Comptage des personnels par groupes et par serrvice
+    // Comptage des personnels par groupes et par serrvice (fonctionnaires)
     for (const groupe of groupes) {
         const personnelsDuGroupe = groupe.fonction.flatMap(f => f.personnel);
         for (const personnel of personnelsDuGroupe) {
@@ -76,6 +102,15 @@ async function getDashboardStats() {
             }
         }
     };
+
+    // Comptage des benevoles par service
+    for (const personnel of benevoles) {
+        if (personnel.service_id === null) continue;
+        const entry = grapheMap.get(personnel.service_id);
+        if (entry) {
+            entry[LIBELLE_BENEVOLES] = (entry[LIBELLE_BENEVOLES] || 0) + 1;
+        }
+    }
 
     // conversion du Map en tableau pour le JSON
     const graphe = Array.from(grapheMap.values());
