@@ -19,6 +19,7 @@ async function getAccounts(req, res) {
             message: "Comptes récupérés",
             data: result.data,
             pagination: result.pagination,
+            totalComptesActifs: result.totalComptesActifs,
         });
     } catch (error) {
         console.error("[getAccounts] Erreur :", error);

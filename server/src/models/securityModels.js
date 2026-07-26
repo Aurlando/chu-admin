@@ -3,7 +3,14 @@ const bcrypt = require("bcrypt");
 
 // Liste des comptes SIH avec les infos du personnel lié
 async function getAccounts({ search = "", page = 1, limit = 10 } = {}) {
-    const where = search
+    // Exclusion des comptes dont le personnel est "Sortie"
+    // NOT sur la relation : si personnel est null, la condition est considérée
+    // comme non remplie donc le compte est conservé.
+    const statutFilter = {
+        NOT: { personnel: { statut: "Sortie" } },
+    };
+
+    const searchFilter = search
         ? {
               OR: [
                   { username: { contains: search, mode: "insensitive" } },
@@ -21,7 +28,11 @@ async function getAccounts({ search = "", page = 1, limit = 10 } = {}) {
           }
         : {};
 
-    const [accounts, total] = await Promise.all([
+    const where = {
+        AND: [statutFilter, searchFilter],
+    };
+
+    const [accounts, total, totalComptesActifs] = await Promise.all([
         prisma.auth_user.findMany({
             where,
             select: {
@@ -35,6 +46,7 @@ async function getAccounts({ search = "", page = 1, limit = 10 } = {}) {
                         nom: true,
                         prenoms: true,
                         im: true,
+                        statut: true,
                         fonction: { select: { libelle: true } },
                         service: { select: { libelle: true } },
                     },
@@ -45,6 +57,9 @@ async function getAccounts({ search = "", page = 1, limit = 10 } = {}) {
             take: limit,
         }),
         prisma.auth_user.count({ where }),
+        // Total global des comptes actifs (hors Sortie), indépendant de la recherche/pagination
+        // -> c'est CETTE valeur que le front doit afficher dans la card, sans recompter lui-même.
+        prisma.auth_user.count({ where: statutFilter }),
     ]);
 
     return {
@@ -59,6 +74,7 @@ async function getAccounts({ search = "", page = 1, limit = 10 } = {}) {
                       nom: a.personnel.nom,
                       prenoms: a.personnel.prenoms,
                       matricule: a.personnel.im,
+                      statut: a.personnel.statut,
                       fonction: a.personnel.fonction?.libelle || null,
                       service: a.personnel.service?.libelle || null,
                   }
@@ -70,6 +86,7 @@ async function getAccounts({ search = "", page = 1, limit = 10 } = {}) {
             limit,
             totalPages: Math.ceil(total / limit),
         },
+        totalComptesActifs,
     };
 }
 
