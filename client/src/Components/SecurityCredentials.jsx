@@ -86,7 +86,7 @@ function ErrorAlert({ message, onRetry, dark }) {
 function StatCard({ icon, value, label, colorClass, bgClass, dark }) {
     return (
         <div
-            className={`rounded-2xl border p-5 flex items-center gap-4 transition-all
+            className={`rounded-2xl border p-5 flex items-center gap-4 transition-all w-full
       hover:shadow-md hover:-translate-y-0.5
       ${dark ? "bg-[#0d1526] border-white/6" : "bg-white border-slate-200 shadow-sm"}`}
         >
@@ -95,14 +95,14 @@ function StatCard({ icon, value, label, colorClass, bgClass, dark }) {
             >
                 {icon}
             </div>
-            <div>
+            <div className="min-w-0">
                 <div
-                    className={`text-2xl font-bold tracking-tight ${colorClass}`}
+                    className={`text-2xl font-bold tracking-tight truncate ${colorClass}`}
                 >
                     {value}
                 </div>
                 <div
-                    className={`text-[11px] font-semibold uppercase tracking-wide mt-0.5
+                    className={`text-[11px] font-semibold uppercase tracking-wide mt-0.5 truncate
           ${dark ? "text-slate-500" : "text-slate-400"}`}
                 >
                     {label}
@@ -208,7 +208,7 @@ function ResetPasswordModal({
                         </svg>
                     </div>
                     <h3 className={`text-[15px] font-bold ${ttl}`}>
-                        Réinitialiser mot de passe
+                        Réinitialiser le mot de passe
                     </h3>
                     <p className={`text-xs mt-1 ${sub}`}>
                         {staff.nom} {staff.prenoms}
@@ -382,7 +382,6 @@ export default function SecurityCredentials({ dark, onNavigate }) {
     const [total, setTotal] = useState(0);
     const [stats, setStats] = useState({
         actifs: 0,
-        reveals24h: 0,
         encryption: "bcrypt",
     });
     const [loading, setLoading] = useState(true);
@@ -425,8 +424,7 @@ export default function SecurityCredentials({ dark, onNavigate }) {
             setStaff(json.data ?? []);
             setTotal(json.pagination?.total ?? 0);
             setStats({
-                actifs: json.stats?.actifs ?? json.pagination?.total ?? 0,
-                reveals24h: json.stats?.reveals24h ?? 0,
+                actifs: json.totalComptesActifs ?? 0,
                 encryption: json.stats?.encryption ?? "bcrypt",
             });
         } catch (err) {
@@ -643,7 +641,7 @@ export default function SecurityCredentials({ dark, onNavigate }) {
                 </div>
 
                 {/* ══ STAT CARDS ══ */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <StatCard
                         dark={dark}
                         value={stats.actifs || total || "—"}
@@ -662,33 +660,6 @@ export default function SecurityCredentials({ dark, onNavigate }) {
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
                                     d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                                />
-                            </svg>
-                        }
-                    />
-                    <StatCard
-                        dark={dark}
-                        value={stats.reveals24h ?? "—"}
-                        label="Révélations (24h)"
-                        colorClass={dark ? "text-amber-400" : "text-amber-600"}
-                        bgClass={dark ? "bg-amber-500/15" : "bg-amber-50"}
-                        icon={
-                            <svg
-                                className={`w-5 h-5 ${dark ? "text-amber-400" : "text-amber-600"}`}
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={1.7}
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                />
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
                                 />
                             </svg>
                         }
@@ -986,13 +957,13 @@ export default function SecurityCredentials({ dark, onNavigate }) {
                     {/* Pagination */}
                     {!loading && !error && total > 0 && (
                         <div
-                            className={`flex items-center justify-between px-5 py-3.5 border-t ${border}`}
+                            className={`flex items-center justify-between gap-3 flex-wrap px-5 py-3.5 border-t ${border}`}
                         >
                             <p className={`text-xs font-medium ${sub}`}>
                                 Affichage de {startIdx}–{endIdx} sur {total}{" "}
                                 comptes
                             </p>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                                 <button
                                     onClick={() =>
                                         setPage((p) => Math.max(1, p - 1))
