@@ -149,9 +149,12 @@ const TABS = [
 ];
 
 // ── Sous-composant Field (label + input + erreur)
-function Field({ label, required, children, error, dark }) {
+function Field({ label, required, children, error, dark, name }) {
     return (
-        <div className="flex flex-col gap-1.5">
+        <div
+            id={name ? `field-${name}` : undefined}
+            className="flex flex-col gap-1.5 scroll-mt-4"
+        >
             <label
                 className={`text-[11px] font-bold uppercase tracking-widest ${dark ? "text-slate-500" : "text-slate-400"}`}
             >
@@ -452,6 +455,98 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
     const supprimerDiplome = (i) =>
         setDiplomes((prev) => prev.filter((_, idx) => idx !== i));
 
+    // ── Navigation vers le champ en erreur ─────────────────────────
+    // Associe chaque champ à l'onglet où il est réellement affiché
+    // (reflète l'agencement du formulaire ci-dessous, pas une supposition).
+    const FIELD_TABS = {
+        nom: "identite",
+        prenoms: "identite",
+        date_naissance: "identite",
+        genre_id: "identite",
+        telephone: "identite",
+        email: "identite",
+        statut: "situation",
+        corps: "situation",
+        categorie: "situation",
+        classe: "situation",
+        echelon: "situation",
+        service_id: "affectation",
+        fonction_id: "affectation",
+        specialite: "affectation",
+        etablissement: "diplomes",
+        niveau: "diplomes",
+        filiere_parcours: "diplomes",
+        duree_mois: "diplomes",
+        diplome0: "diplomes",
+        username: "acces",
+        password: "acces",
+        role: "acces",
+    };
+    // Ordre d'apparition à l'écran, pour choisir le "premier" champ en
+    // erreur de façon stable quand plusieurs champs sont en erreur.
+    const FIELD_ORDER = [
+        "nom",
+        "prenoms",
+        "date_naissance",
+        "genre_id",
+        "telephone",
+        "email",
+        "statut",
+        "corps",
+        "categorie",
+        "classe",
+        "echelon",
+        "service_id",
+        "fonction_id",
+        "specialite",
+        "etablissement",
+        "niveau",
+        "filiere_parcours",
+        "duree_mois",
+        "diplome0",
+        "username",
+        "password",
+        "role",
+    ];
+
+    const tabForField = (key) => {
+        if (FIELD_TABS[key]) return FIELD_TABS[key];
+        if (key.startsWith("etab")) return "diplomes"; // etab0, etab1, ...
+        return "identite";
+    };
+
+    // Scrolle et place le focus sur le champ fautif une fois l'onglet
+    // affiché (double rAF : laisse React re-render l'onglet avant de
+    // mesurer sa position dans le conteneur scrollable).
+    const scrollToField = (fieldKey) => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                const el = document.getElementById(`field-${fieldKey}`);
+                if (!el) return;
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                const focusable = el.querySelector("input, select, textarea");
+                if (focusable) focusable.focus({ preventScroll: true });
+            });
+        });
+    };
+
+    // Point d'entrée unique : à partir de l'objet d'erreurs, on va
+    // directement sur le premier champ fautif (onglet + scroll + focus)
+    // au lieu de se contenter de changer d'onglet à l'aveugle.
+    const goToFirstError = (e) => {
+        const keys = Object.keys(e).filter((k) => e[k]);
+        if (keys.length === 0) return;
+        const ordered = [
+            ...FIELD_ORDER.filter((k) => keys.includes(k)),
+            ...keys.filter(
+                (k) => k.startsWith("etab") && !FIELD_ORDER.includes(k),
+            ),
+        ];
+        const firstKey = ordered[0] || keys[0];
+        setActiveTab(tabForField(firstKey));
+        scrollToField(firstKey);
+    };
+
     // ── Validation
     const validate = () => {
         const e = {};
@@ -553,34 +648,9 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
         const e = validate();
         if (Object.keys(e).length > 0) {
             setErrors(e);
-
-            // [AJOUT] Redirection automatique vers l'onglet contenant la première erreur
-            if (e.nom || e.prenoms || e.date_naissance)
-                setActiveTab("identite");
-            else if (
-                e.categorie ||
-                e.classe ||
-                e.echelon ||
-                e.statut ||
-                e.specialite
-            )
-                setActiveTab("situation");
-            else if (e.service_id || e.fonction_id || e.telephone || e.email)
-                setActiveTab("affectation");
-            else if (
-                Object.keys(e).some(
-                    (k) =>
-                        k.startsWith("diplome") ||
-                        k.startsWith("etab") ||
-                        k === "niveau" ||
-                        k === "filiere_parcours" ||
-                        k === "duree_mois",
-                )
-            )
-                setActiveTab("diplomes");
-            else if (e.username || e.password || e.role)
-                setActiveTab("acces");
-
+            // Emmène directement l'utilisateur sur le premier champ fautif
+            // (onglet + scroll + focus) plutôt que de bloquer silencieusement.
+            goToFirstError(e);
             return;
         }
 
@@ -673,7 +743,9 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                 if (json.data.corps !== undefined)
                     setForm((prev) => ({ ...prev, corps: json.data.corps }));
                 if (json.data.photo_profil)
-                    setPhotoPreview(json.data.photo_profil);
+                    setPhotoPreview(
+                        `${API_BASE}${json.data.photo_profil}?t=${Date.now()}`,
+                    );
             }
 
             // Succès : fermer le modal et demander au parent de rafraîchir
@@ -1005,7 +1077,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                 label="Nom"
                                                 required
                                                 dark={dark}
-                                                error={errors.nom}
+                                                error={errors.nom} name="nom"
                                             >
                                                 <input
                                                     type="text"
@@ -1025,7 +1097,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                 label="Prénoms"
                                                 required
                                                 dark={dark}
-                                                error={errors.prenoms}
+                                                error={errors.prenoms} name="prenoms"
                                             >
                                                 <input
                                                     type="text"
@@ -1044,7 +1116,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                             <Field
                                                 label="Date de naissance"
                                                 dark={dark}
-                                                error={errors.date_naissance}
+                                                error={errors.date_naissance} name="date_naissance"
                                             >
                                                 <input
                                                     type="date"
@@ -1063,7 +1135,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                 label="Sexe"
                                                 required
                                                 dark={dark}
-                                                error={errors.genre_id}
+                                                error={errors.genre_id} name="genre_id"
                                             >
                                                 <select
                                                     value={form.genre_id}
@@ -1091,7 +1163,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                 label="Téléphone"
                                                 required
                                                 dark={dark}
-                                                error={errors.telephone}
+                                                error={errors.telephone} name="telephone"
                                             >
                                                 <input
                                                     type="tel"
@@ -1113,7 +1185,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                 label="Email"
                                                 required
                                                 dark={dark}
-                                                error={errors.email}
+                                                error={errors.email} name="email"
                                             >
                                                 <input
                                                     type="email"
@@ -1139,7 +1211,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                             label="Statut"
                                             required
                                             dark={dark}
-                                            error={errors.statut}
+                                            error={errors.statut} name="statut"
                                         >
                                             <select
                                                 value={form.statut}
@@ -1165,7 +1237,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                 <Field
                                                     label="Corps"
                                                     dark={dark}
-                                                    error={errors.corps}
+                                                    error={errors.corps} name="corps"
                                                 >
                                                     <input
                                                         type="text"
@@ -1188,7 +1260,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     label="Catégorie"
                                                     required
                                                     dark={dark}
-                                                    error={errors.categorie}
+                                                    error={errors.categorie} name="categorie"
                                                 >
                                                     <select
                                                         value={form.categorie}
@@ -1219,7 +1291,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     label="Classe"
                                                     required
                                                     dark={dark}
-                                                    error={errors.classe}
+                                                    error={errors.classe} name="classe"
                                                 >
                                                     <select
                                                         value={form.classe}
@@ -1250,7 +1322,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     label="Échelon"
                                                     required
                                                     dark={dark}
-                                                    error={errors.echelon}
+                                                    error={errors.echelon} name="echelon"
                                                 >
                                                     <select
                                                         value={form.echelon}
@@ -1320,7 +1392,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                 label="Service"
                                                 required
                                                 dark={dark}
-                                                error={errors.service_id}
+                                                error={errors.service_id} name="service_id"
                                             >
                                                 <select
                                                     value={form.service_id}
@@ -1357,7 +1429,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     label="Fonction"
                                                     required
                                                     dark={dark}
-                                                    error={errors.fonction_id}
+                                                    error={errors.fonction_id} name="fonction_id"
                                                 >
                                                     <select
                                                         value={
@@ -1397,7 +1469,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     label="Spécialité"
                                                     required
                                                     dark={dark}
-                                                    error={errors.specialite}
+                                                    error={errors.specialite} name="specialite"
                                                 >
                                                     <input
                                                         type="text"
@@ -1483,6 +1555,11 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                                 "BENEVOLE"
                                                         }
                                                         dark={dark}
+                                                        name={
+                                                            index === 0
+                                                                ? "diplome0"
+                                                                : undefined
+                                                        }
                                                         error={
                                                             index === 0
                                                                 ? errors.diplome0
@@ -1514,6 +1591,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                     <Field
                                                         label="Établissement"
                                                         dark={dark}
+                                                        name={`etab${index}`}
                                                         // [AJOUT] Liaison avec le message d'erreur
                                                         error={
                                                             errors[
@@ -1601,7 +1679,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                             label="Établissement"
                                             required
                                             dark={dark}
-                                            error={errors.etablissement}
+                                            error={errors.etablissement} name="etablissement"
                                         >
                                             <input
                                                 type="text"
@@ -1622,7 +1700,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                             label="Niveau"
                                             required
                                             dark={dark}
-                                            error={errors.niveau}
+                                            error={errors.niveau} name="niveau"
                                         >
                                             <input
                                                 type="text"
@@ -1641,7 +1719,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                             label="Filière / Parcours"
                                             required
                                             dark={dark}
-                                            error={errors.filiere_parcours}
+                                            error={errors.filiere_parcours} name="filiere_parcours"
                                         >
                                             <input
                                                 type="text"
@@ -1662,7 +1740,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                             label="Durée du stage (mois)"
                                             required
                                             dark={dark}
-                                            error={errors.duree_mois}
+                                            error={errors.duree_mois} name="duree_mois"
                                         >
                                             <input
                                                 type="number"
@@ -1750,6 +1828,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                             label="Nom d'utilisateur"
                                                             required
                                                             dark={dark}
+                                                            name="username"
                                                             error={
                                                                 errors.username
                                                             }
@@ -1779,6 +1858,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                             label="Mot de passe"
                                                             required
                                                             dark={dark}
+                                                            name="password"
                                                             error={
                                                                 errors.password
                                                             }
@@ -1809,6 +1889,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                                             label="Rôle"
                                                             required
                                                             dark={dark}
+                                                            name="role"
                                                             error={
                                                                 errors.role
                                                             }
@@ -1884,23 +1965,8 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                                 const e = validate();
                                 if (Object.keys(e).length > 0) {
                                     setErrors(e);
-                                    // [AJOUT] Redirection immédiate vers l'onglet fautif pour gagner du temps
-                                    if (e.nom || e.prenoms)
-                                        setActiveTab("identite");
-                                    else if (
-                                        e.diplome0 ||
-                                        e.etablissement ||
-                                        e.niveau ||
-                                        e.filiere_parcours ||
-                                        e.duree_mois
-                                    )
-                                        setActiveTab("diplomes");
-                                    else if (
-                                        e.username ||
-                                        e.password ||
-                                        e.role
-                                    )
-                                        setActiveTab("acces");
+                                    // Emmène directement sur le premier champ fautif
+                                    goToFirstError(e);
                                     return;
                                 }
                                 setConfirmSave(true);
