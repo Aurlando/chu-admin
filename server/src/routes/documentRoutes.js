@@ -13,6 +13,11 @@ router.post(
     documentController.generateDocument('attestation_non_interruption_service'),
 );
 
+// POST /documents/attestation-benevolat/:id
+// Génère et télécharge l'attestation de bénévolat pour l'agent :id
+// (réservé aux agents dont type_personnel = 'BENEVOLE', voir documentService.js)
+router.post('/attestation-benevolat/:id', documentController.generateDocument('attestation_benevolat'));
+
 // Pour ajouter un nouveau document à l'avenir :
 //   1. Déposer le template .docx dans server/templates/
 //   2. Ajouter une entrée dans TYPES_DOCUMENTS (documentService.js)

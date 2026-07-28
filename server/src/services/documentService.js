@@ -15,6 +15,13 @@ const prisma = require("../config/prisma");
 // Si `civiliteFixe` est absent, la civilité est déduite du genre de
 // l'agent en base : "Monsieur" ou "Madame" (cas de l'ADAAF, qui peut
 // être un homme ou une femme selon la personne en poste).
+// Valeur de l'enum Prisma `statut_personnel` correspondant à un agent
+// ayant quitté ses fonctions (utilisé par l'attestation de bénévolat
+// pour savoir si {date_sortie} doit afficher une date réelle ou "ce
+// jour"). ⚠️ À VÉRIFIER : ajuster si le nom exact généré par Prisma
+// diffère (ex: si un accent a été sanitisé en "_").
+const STATUT_SORTIE = "Sortie";
+
 const SIGNATAIRE_CONFIG = {
     Directeur: {
         fonction_id: 1,
@@ -66,6 +73,26 @@ const TYPES_DOCUMENTS = {
                 agent.corps && typeof agent.corps === "object"
                     ? agent.corps.libelle || ""
                     : agent.corps || "",
+        }),
+    },
+    attestation_benevolat: {
+        templateFilename: "attestation_de_benevolat.docx",
+        prefixeFichier: "attestation_benevolat",
+        libelle: "Attestation de bénévolat",
+        genreLibelle: "f",
+        // Réservé aux agents dont type_personnel = 'BENEVOLE' (voir
+        // `genererDocument`, qui applique ce contrôle avant génération).
+        typePersonnelRequis: "BENEVOLE",
+        construireChampsSupplementaires: ({ agent }) => ({
+            service: agent.service?.libelle || "",
+            // Si l'agent a déjà quitté (statut = STATUT_SORTIE), on
+            // affiche sa date de sortie réelle ; sinon le bénévolat est
+            // toujours en cours -> "à ce jour". La préposition (au/à)
+            // est incluse ici car le template écrit juste "jusqu'{date_sortie}".
+            date_sortie:
+                agent.statut === STATUT_SORTIE && agent.date_sortie
+                    ? `au ${formaterDateFr(agent.date_sortie)}`
+                    : "à ce jour",
         }),
     },
 };
@@ -262,6 +289,9 @@ function construireDonneesCommunes({
 
     return {
         numero: String(numero).trim(),
+        // "26" pour 2026, "27" pour 2027... dérivé de date_delivrance
+        // (déjà validée au format YYYY-MM-DD par documentValidators.js).
+        annee: String(date_delivrance).slice(2, 4),
         civilite_agent: civiliteAgent(agent.genre?.libelle),
         nom_prenom_agent: nomPrenomAgent,
         matricule: agent.im || "",
@@ -421,6 +451,18 @@ async function genererDocument(
     const { agent, signataireConfig, agentSignataire, notFound } =
         await recupererAgentEtSignataire(personnelId, signataire);
     if (notFound) return { notFound: true };
+
+    // Certains documents sont réservés à un type_personnel précis
+    // (ex: l'attestation de bénévolat -> uniquement 'BENEVOLE').
+    if (
+        config.typePersonnelRequis &&
+        agent.type_personnel !== config.typePersonnelRequis
+    ) {
+        return {
+            typeInvalide: true,
+            typeRequis: config.typePersonnelRequis,
+        };
+    }
 
     const donneesCommunes = construireDonneesCommunes({
         agent,
