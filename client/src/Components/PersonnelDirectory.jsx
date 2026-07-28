@@ -459,7 +459,7 @@ function PersonnelList({ dark, onSelectId, onSelectIdUpdate, onOpenDocModal, onN
                                                     <EditIcon />
                                                     <span className="hidden sm:inline cursor-pointer w-max">Éditer</span>
                                                 </button>
-                                                <DocsDropdown dark={dark} size="sm" onSelect={(type, e) => { e.stopPropagation(); onOpenDocModal(type, p.id); }} />
+                                                <DocsDropdown dark={dark} size="sm" typePersonnel={p.type_personnel} onSelect={(type, e) => { e.stopPropagation(); onOpenDocModal(type, p.id); }} />
                                             </div>
                                         </td>
                                     </tr>

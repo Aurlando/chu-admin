@@ -6,6 +6,16 @@ const { validerDocument } = require('../validators/documentValidators');
 const MESSAGES_ERREUR_PAR_TYPE = {
     certificat_administratif: 'Erreur lors de la génération du certificat.',
     attestation_non_interruption_service: "Erreur lors de la génération de l'attestation.",
+    attestation_benevolat: "Erreur lors de la génération de l'attestation de bénévolat.",
+};
+
+// Libellés lisibles des types_personnel, pour le message d'erreur 400
+// renvoyé quand un document est demandé pour un agent du mauvais type
+// (ex: attestation de bénévolat demandée pour un fonctionnaire).
+const LIBELLES_TYPE_PERSONNEL = {
+    BENEVOLE: 'bénévoles',
+    FONCTIONNAIRE: 'fonctionnaires',
+    STAGIAIRE: 'stagiaires',
 };
 
 /**
@@ -56,6 +66,14 @@ function generateDocument(typeDocument) {
                 return res.status(404).json({
                     status: 'error',
                     message: 'Agent introuvable.',
+                });
+            }
+
+            if (result.typeInvalide) {
+                const libelle = LIBELLES_TYPE_PERSONNEL[result.typeRequis] || result.typeRequis;
+                return res.status(400).json({
+                    status: 'error',
+                    message: `Ce document est réservé aux agents ${libelle}.`,
                 });
             }
 

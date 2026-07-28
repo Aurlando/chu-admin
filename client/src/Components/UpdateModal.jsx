@@ -372,7 +372,7 @@ export default function UpdateModal({ id, dark, onClose, onSaved }) {
                 );
             })
             .catch(() => {});
-    }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [id]); 
 
     // ── Fermer le modal en cliquant sur l'overlay (backdrop)
     const handleBackdropClick = (e) => {

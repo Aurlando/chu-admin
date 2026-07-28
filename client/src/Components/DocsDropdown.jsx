@@ -1,22 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { DOCUMENT_TYPES } from "./documentTypes";
 
-/**
- * DocsDropdown — bouton "Docs ▾" générique : un menu déroulant listant
- * tous les documents disponibles d'après DOCUMENT_TYPES. Ajouter un
- * document dans ce registre suffit à le faire apparaître ici, dans les
- * deux tailles (liste et profil), sans dupliquer de code.
- *
- * Remplace les anciens DocsDropdown (PersonnelDirectory) et
- * ProfileDocsDropdown (Staffprofile), identiques à un habillage près.
- *
- * Props :
- *   dark      {boolean}
- *   onSelect  {function}  — (typeKey, event) => void — appelé au clic sur un document
- *   size      {"sm"|"md"} — "sm" = compact (ligne de tableau), "md" = en-tête profil (défaut)
- */
-export default function DocsDropdown({ dark, onSelect, size = "md" }) {
+export default function DocsDropdown({ dark, onSelect, size = "md", typePersonnel }) {
     const [open, setOpen] = useState(false);
+    const [menuPosition, setMenuPosition] = useState("down");
     const ref = useRef(null);
 
     useEffect(() => {
@@ -24,26 +11,47 @@ export default function DocsDropdown({ dark, onSelect, size = "md" }) {
             if (ref.current && !ref.current.contains(e.target)) setOpen(false);
         };
         document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
+        // On écoute aussi le scroll pour refermer (évite un menu détaché si la page scrolle)
+        document.addEventListener("scroll", handler, true);
+        return () => {
+            document.removeEventListener("mousedown", handler);
+            document.removeEventListener("scroll", handler, true);
+        };
     }, []);
 
     const isSm = size === "sm";
 
-    const triggerCls = isSm
-        ? dark
-            ? "flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-violet-500/25 text-violet-400 hover:bg-violet-500/10 transition-all cursor-pointer"
-            : "flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-violet-200 text-violet-600 hover:bg-violet-50 transition-all cursor-pointer"
-        : dark
-          ? "flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border border-violet-500/30 text-violet-400 hover:bg-violet-500/10 transition-all hover:-translate-y-0.5 cursor-pointer"
-          : "flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border border-violet-200 text-violet-600 hover:bg-violet-50 transition-all hover:-translate-y-0.5 cursor-pointer";
+    const availableDocuments = Object.entries(DOCUMENT_TYPES).filter(([key, config]) => {
+        if (!typePersonnel) return true;
+        if (!config.allowedTypes) return true;
+        return config.allowedTypes.includes(typePersonnel);
+    });
 
-    const menuCls = isSm
+    const isDisabled = availableDocuments.length === 0;
+
+    const baseTriggerCls = isSm
         ? dark
-            ? "absolute right-0 top-full mt-1 w-52 rounded-xl border border-white/10 bg-[#0d1526] shadow-2xl z-30 py-1"
-            : "absolute right-0 top-full mt-1 w-52 rounded-xl border border-slate-200 bg-white shadow-2xl z-30 py-1"
+            ? "flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-violet-500/25 text-violet-400 transition-all "
+            : "flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-violet-200 text-violet-600 transition-all "
         : dark
-          ? "absolute right-0 top-full mt-1.5 w-56 rounded-xl border border-white/10 bg-[#0d1526] shadow-2xl z-30 py-1"
-          : "absolute right-0 top-full mt-1.5 w-56 rounded-xl border border-slate-200 bg-white shadow-2xl z-30 py-1";
+          ? "flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border border-violet-500/30 text-violet-400 transition-all "
+          : "flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border border-violet-200 text-violet-600 transition-all ";
+
+    const triggerCls = baseTriggerCls + (isDisabled 
+        ? "opacity-50 cursor-not-allowed grayscale "
+        : (isSm 
+            ? (dark ? "hover:bg-violet-500/10 cursor-pointer " : "hover:bg-violet-50 cursor-pointer ")
+            : (dark ? "hover:bg-violet-500/10 hover:-translate-y-0.5 cursor-pointer " : "hover:bg-violet-50 hover:-translate-y-0.5 cursor-pointer ")
+        )
+    );
+
+    const positionCls = menuPosition === 'up'
+        ? (isSm ? "bottom-full mb-1" : "bottom-full mb-1.5")
+        : (isSm ? "top-full mt-1" : "top-full mt-1.5");
+
+    const menuCls = `absolute right-0 z-30 py-1 shadow-2xl rounded-xl border ${isSm ? "w-52" : "w-56"} ${positionCls} ${
+        dark ? "border-white/10 bg-[#0d1526]" : "border-slate-200 bg-white"
+    }`;
 
     const itemCls = isSm
         ? dark
@@ -55,16 +63,30 @@ export default function DocsDropdown({ dark, onSelect, size = "md" }) {
 
     const iconCls = isSm ? "w-3.5 h-3.5" : "w-4 h-4";
 
+    const toggleOpen = (e) => {
+        e.stopPropagation();
+        if (isDisabled) return;
+        
+        if (!open && ref.current) {
+            const rect = ref.current.getBoundingClientRect();
+            // Si l'espace restant en bas de l'écran est inférieur à 180px, on ouvre vers le haut
+            if (window.innerHeight - rect.bottom < 180) {
+                setMenuPosition("up");
+            } else {
+                setMenuPosition("down");
+            }
+        }
+        setOpen((o) => !o);
+    };
+
     return (
         <div className="relative" ref={ref}>
             <button
                 type="button"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    setOpen((o) => !o);
-                }}
+                onClick={toggleOpen}
                 className={triggerCls}
-                title="Générer un document"
+                title={isDisabled ? "Aucun document disponible" : "Générer un document"}
+                disabled={isDisabled}
             >
                 <svg
                     className={iconCls}
@@ -95,14 +117,14 @@ export default function DocsDropdown({ dark, onSelect, size = "md" }) {
                 </svg>
             </button>
 
-            {open && (
+            {open && !isDisabled && (
                 <div className={menuCls}>
                     <div
                         className={`px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-widest ${dark ? "text-slate-600" : "text-slate-400"}`}
                     >
                         Documents disponibles
                     </div>
-                    {Object.entries(DOCUMENT_TYPES).map(([key, config]) => (
+                    {availableDocuments.map(([key, config]) => (
                         <button
                             key={key}
                             type="button"

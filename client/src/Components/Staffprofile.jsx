@@ -656,6 +656,7 @@ export default function StaffProfile({
                                 {/* Bouton dropdown "Docs ▾" */}
                                 <DocsDropdown
                                     dark={dark}
+                                    typePersonnel={profile?.type_personnel}
                                     onSelect={(type) => openDocModal(type, id)}
                                 />
 

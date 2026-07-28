@@ -27,6 +27,7 @@ export const DOCUMENT_TYPES = {
         // Champ(s) propre(s) à ce document, rendus après les champs communs
         ExtraFields: CertificatExtraFields,
         extraDefaults: { motif: "" },
+        allowedTypes: ["FONCTIONNAIRE"],
     },
     attestation_non_interruption_service: {
         label: "Attestation de non-interruption de service",
@@ -35,5 +36,14 @@ export const DOCUMENT_TYPES = {
         // Aucun champ en plus de numero/date_delivrance/signataire
         ExtraFields: null,
         extraDefaults: {},
+        allowedTypes: ["FONCTIONNAIRE"],
+    },
+    attestation_benevolat: {
+        label: "Attestation de Bénévolat",
+        endpoint: "attestation-benevolat",
+        filenamePrefix: "attestation_benevolat",
+        ExtraFields: null,
+        extraDefaults: {},
+        allowedTypes: ["BENEVOLE"],
     },
 };
