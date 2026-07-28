@@ -16,6 +16,10 @@ const CHAMPS_SUPPLEMENTAIRES_REQUIS = {
         // Aucun champ supplémentaire requis : corps/poste/grade viennent
         // directement de la fiche de l'agent en base.
     ],
+    attestation_benevolat: [
+        // Aucun champ supplémentaire requis : fonction/service/date_sortie
+        // viennent directement de la fiche de l'agent en base.
+    ],
 };
 
 /**
