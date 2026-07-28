@@ -887,7 +887,13 @@ function supprimerAnciennePhoto(photo_profil, anciennePhoto) {
     if (
         photo_profil &&
         anciennePhoto &&
-        anciennePhoto !== "default-avatar.png"
+        anciennePhoto !== "default-avatar.png" &&
+        // Le nom de fichier est déterministe (basé sur le matricule/id), donc
+        // à partir de la 2e mise à jour, "anciennePhoto" et "photo_profil"
+        // sont IDENTIQUES (le nouveau fichier a déjà remplacé l'ancien sur le
+        // disque via fs.renameSync). Sans cette garde, on supprimait donc la
+        // photo qu'on venait tout juste d'enregistrer.
+        anciennePhoto !== photo_profil
     ) {
         const cheminAncien = path.join(
             __dirname,
