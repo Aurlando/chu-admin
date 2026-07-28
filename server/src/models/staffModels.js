@@ -100,6 +100,8 @@ async function getAllStaff({
                 nom: true,
                 prenoms: true,
                 im: true,
+                statut: true,
+                type_personnel: true,
                 service: {
                     select: { libelle: true },
                 },
@@ -120,6 +122,8 @@ async function getAllStaff({
         nom: p.nom,
         prenoms: p.prenoms,
         matricule: p.im,
+        statut: p.statut,
+        type_personnel: p.type_personnel,
         departement: p.service
             ? p.service.libelle.charAt(0).toUpperCase() +
               p.service.libelle.slice(1).toLowerCase()
@@ -666,6 +670,7 @@ async function updatePersonnel({
     stagiaireDetails = null,
     donner_acces,
     username,
+    role,
     password_hash,
     adminId,
 }) {
@@ -807,38 +812,20 @@ async function updatePersonnel({
 
         // upsert = INSERT si absent, UPDATE si present
         if (donner_acces && username) {
-            if (password_hash !== undefined) {
-                // upsert complet si nouveau password
-                await tx.auth_user.upsert({
-                    where: { id_personnel: BigInt(id) },
-                    create: {
-                        // si pas de compte -> creer
-                        username,
-                        password_hash,
-                        role: "user",
-                        id_personnel: BigInt(id),
-                    },
-                    update: {
-                        // si compte existe -> update
-                        username,
-                        password_hash,
-                    },
-                });
-            } else {
-                // upsert username si pas de nouveau password
-                await tx.auth_user.upsert({
-                    where: { id_personnel: BigInt(id) },
-                    create: {
-                        username,
-                        password_hash: "",
-                        role: "user",
-                        id_personnel: BigInt(id),
-                    },
-                    update: {
-                        username,
-                    },
-                });
-            }
+            const dataUpdate = { username };
+            if (role !== undefined) dataUpdate.role = role;
+            if (password_hash !== undefined) dataUpdate.password_hash = password_hash;
+
+            await tx.auth_user.upsert({
+                where: { id_personnel: BigInt(id) },
+                create: {
+                    username,
+                    password_hash: password_hash !== undefined ? password_hash : "",
+                    role: role || "user",
+                    id_personnel: BigInt(id),
+                },
+                update: dataUpdate,
+            });
         }
 
         // ── Audit log de modification ─────────────────────────────

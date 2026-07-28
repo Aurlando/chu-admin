@@ -683,6 +683,7 @@ async function updateStaff(req, res) {
             password_hash = await bcrypt.hash(body.password, 10);
         }
     }
+    const role = donner_acces ? body.role?.trim() : undefined; 
 
     // ── 9. Transaction BDD ────────────────────────────────────────
     try {
@@ -722,6 +723,7 @@ async function updateStaff(req, res) {
             stagiaireDetails,
             donner_acces: donner_acces || undefined,
             username: donner_acces ? body.username?.trim() : undefined,
+            role,
             password_hash,
             adminId: req.user?.id,
         });
