@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import ToggleMode from "./ToggleMode";
 import { API_BASE, apiFetch } from "../config/api.js";
+import chuLogo from "../assets/chuLOGO.png";
+import chuLogoSombre from "../assets/chuLOGOsombre.png";
+import chuLogoclair from "../assets/chuLOGOclair.png";
 
 export default function Login({ onLoginSuccess }) {
     const [darkMode, setDarkMode] = useState(
@@ -110,31 +113,14 @@ export default function Login({ onLoginSuccess }) {
 
                     {/* Logo + Nom hôpital */}
                     <div className="relative z-10 flex flex-col items-center gap-6">
-                        <div
-                            className={`w-24 h-24 rounded-2xl flex items-center justify-center shadow-lg ${darkMode ? "bg-indigo-700" : "bg-white/20"}`}
-                        >
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="w-14 h-14 text-white"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth={1.5}
-                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-                                />
-                            </svg>
+                        <div className="w-40 h-40 flex items-center justify-center">
+                            <img
+                                src={darkMode ? chuLogoSombre : chuLogoclair}
+                                alt="CHU Anosiala"
+                                className="w-36 h-36 object-contain"
+                            />
                         </div>
                         <div className="text-center">
-                            <h2
-                                className="text-white font-bold text-2xl tracking-wide"
-                                style={{ fontFamily: "'Georgia', serif" }}
-                            >
-                                CHU Anosiala
-                            </h2>
                             <p className="text-white/70 text-sm mt-1">
                                 Portail Administrateur
                             </p>
