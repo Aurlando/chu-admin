@@ -49,6 +49,21 @@ const avatarBg = (id) => AVATAR_BG[id % AVATAR_BG.length];
 const initials = (nom = "", prenoms = "") =>
     ((nom[0] || "") + (prenoms[0] || "")).toUpperCase();
 
+// Normalise le statut renvoyé par le backend en une valeur lisible
+function formatStatut(raw = "") {
+    if (!raw) return "Actif";
+    const normalized = String(raw).replace(/_/g, " ").trim().toLowerCase();
+    if (normalized.includes("activ")) return "Actif";
+    if (normalized.includes("absence") || normalized.includes("cong"))
+        return "Congé";
+    if (normalized.includes("sortie")) return "Sortie";
+    if (normalized.includes("suspend")) return "Suspendu";
+    return normalized
+        .split(/\s+/)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+}
+
 // ════════════════════════════════════════════════════════
 function Spinner({ dark }) {
     return (
@@ -411,52 +426,60 @@ function DetailModal({
                                 </p>
                                 <div className="space-y-2">
                                     {data.personnels?.length ? (
-                                        data.personnels.map((p) => (
-                                            <div
-                                                key={p.id}
-                                                className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border transition-all
+                                        data.personnels.map((p) => {
+                                            const statut = formatStatut(
+                                                p.statut,
+                                            );
+                                            return (
+                                                <div
+                                                    key={p.id}
+                                                    className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border transition-all
                         ${
                             dark
                                 ? "bg-white/3 border-white/6 hover:bg-white/6 hover:border-white/12"
                                 : "bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm"
                         }`}
-                                            >
-                                                <div
-                                                    className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center
-                        text-[11px] font-bold text-white bg-linear-to-br ${avatarBg(p.id)}`}
                                                 >
-                                                    {initials(p.nom, p.prenoms)}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p
-                                                        className={`text-[13px] font-semibold truncate ${ttl}`}
+                                                    <div
+                                                        className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center
+                        text-[11px] font-bold text-white bg-linear-to-br ${avatarBg(p.id)}`}
                                                     >
-                                                        {p.nom} {p.prenoms}
-                                                    </p>
-                                                    <p
-                                                        className={`text-[11px] mt-0.5 truncate ${sub}`}
-                                                    >
-                                                        {p.fonction}
-                                                        <span className="mx-1.5 opacity-30">
-                                                            ·
-                                                        </span>
-                                                        <span className="font-mono opacity-60">
-                                                            {p.matricule}
-                                                        </span>
-                                                    </p>
-                                                </div>
-                                                <span
-                                                    className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg border
+                                                        {initials(
+                                                            p.nom,
+                                                            p.prenoms,
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p
+                                                            className={`text-[13px] font-semibold truncate ${ttl}`}
+                                                        >
+                                                            {p.nom} {p.prenoms}
+                                                        </p>
+                                                        <p
+                                                            className={`text-[11px] mt-0.5 truncate ${sub}`}
+                                                        >
+                                                            {p.fonction}
+                                                            <span className="mx-1.5 opacity-30">
+                                                                ·
+                                                            </span>
+                                                            <span className="font-mono opacity-60">
+                                                                {p.matricule}
+                                                            </span>
+                                                        </p>
+                                                    </div>
+                                                    <span
+                                                        className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded-lg border
                         ${
-                            p.statut === "En activité"
+                            statut === "Actif"
                                 ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
                                 : "bg-amber-500/10 text-amber-500 border-amber-500/20"
                         }`}
-                                                >
-                                                    {p.statut}
-                                                </span>
-                                            </div>
-                                        ))
+                                                    >
+                                                        {statut}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })
                                     ) : (
                                         <p
                                             className={`text-sm text-center py-8 ${sub}`}

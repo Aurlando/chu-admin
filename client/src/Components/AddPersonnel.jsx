@@ -1,7 +1,7 @@
 import { Component, useEffect, useRef, useState } from "react";
 import "../App.css";
-import ComfirmModal from "./ConfirModal";
 import { API_BASE, apiFetch } from "../config/api.js";
+import ComfirmModal from "./ConfirModal";
 
 // ── Error Boundary : capture les erreurs de rendu et affiche un message clair
 // au lieu d'une page blanche
@@ -77,6 +77,12 @@ const CLASSES = [
 ];
 const ECHELONS = ["1", "2", "3"];
 const STATUTS = ["En activité", "En absence", "Sortie"];
+const ROLES = [
+    { value: "admin", label: "Administrateur" },
+    { value: "medecin", label: "Médecin" },
+    { value: "user", label: "Utilisateur" },
+    { value: "be", label: "Bureau des entrées" },
+];
 const DIPLOME_VIDE = {
     libelle: "",
     etablissement: "",
@@ -1145,10 +1151,7 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                 <div className={`rounded-2xl border ${card}`}>
                     {/* ── ÉTAPE 1 : IDENTITÉ ── */}
                     {currentStep === 1 && (
-                        <div
-                            key="step-1"
-                            className="p-5 lg:p-6 space-y-5"
-                        >
+                        <div key="step-1" className="p-5 lg:p-6 space-y-5">
                             <div
                                 className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}
                             >
@@ -1465,10 +1468,7 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
 
                     {/* ── ÉTAPE 2 : SITUATION ADMINISTRATIVE ── */}
                     {currentStep === 2 && (
-                        <div
-                            key="step-2"
-                            className="p-5 lg:p-6 space-y-5"
-                        >
+                        <div key="step-2" className="p-5 lg:p-6 space-y-5">
                             <div
                                 className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}
                             >
@@ -1531,10 +1531,7 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                                         className={sel("statut")}
                                     >
                                         {STATUTS.map((s) => (
-                                            <option
-                                                key={s}
-                                                value={s}
-                                            >
+                                            <option key={s} value={s}>
                                                 {s}
                                             </option>
                                         ))}
@@ -1709,10 +1706,7 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                                                 Sélectionner
                                             </option>
                                             {ECHELONS.map((e) => (
-                                                <option
-                                                    key={e}
-                                                    value={e}
-                                                >
+                                                <option key={e} value={e}>
                                                     {e}
                                                 </option>
                                             ))}
@@ -1794,10 +1788,7 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                                                 Sélectionner un service
                                             </option>
                                             {services.map((s) => (
-                                                <option
-                                                    key={s.id}
-                                                    value={s.id}
-                                                >
+                                                <option key={s.id} value={s.id}>
                                                     {s.libelle}
                                                 </option>
                                             ))}
@@ -1826,10 +1817,7 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                                                 Sélectionner une fonction
                                             </option>
                                             {fonctions.map((f) => (
-                                                <option
-                                                    key={f.id}
-                                                    value={f.id}
-                                                >
+                                                <option key={f.id} value={f.id}>
                                                     {f.libelle}
                                                 </option>
                                             ))}
@@ -1864,10 +1852,7 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
 
                     {/* ── ÉTAPE 4 : DIPLÔMES ── */}
                     {currentStep === 4 && (
-                        <div
-                            key="step-4"
-                            className="p-5 lg:p-6 space-y-5"
-                        >
+                        <div key="step-4" className="p-5 lg:p-6 space-y-5">
                             <div
                                 className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}
                             >
@@ -2164,10 +2149,7 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
 
                     {/* ── ÉTAPE 5 : COMPTE + RÉCAPITULATIF ── */}
                     {currentStep === 5 && (
-                        <div
-                            key="step-5"
-                            className="p-5 lg:p-6 space-y-5"
-                        >
+                        <div key="step-5" className="p-5 lg:p-6 space-y-5">
                             <div
                                 className={`flex items-center gap-2 pb-4 border-b ${dark ? "border-white/8" : "border-slate-100"}`}
                             >
@@ -2364,18 +2346,14 @@ export function AddPersonnelInner({ dark, onAnnuler, refreshNotifications }) {
                                                 }
                                                 className={sel("role")}
                                             >
-                                                <option value="user">
-                                                    Utilisateur (user)
-                                                </option>
-                                                <option value="admin">
-                                                    Administrateur (admin)
-                                                </option>
-                                                <option value="medecin">
-                                                    Médecin (medecin)
-                                                </option>
-                                                <option value="rh">
-                                                    Ressources Humaines (rh)
-                                                </option>
+                                                {ROLES.map((role) => (
+                                                    <option
+                                                        key={role.value}
+                                                        value={role.value}
+                                                    >
+                                                        {role.label}
+                                                    </option>
+                                                ))}
                                             </select>
                                         </Field>
                                     </div>
