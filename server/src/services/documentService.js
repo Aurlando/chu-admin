@@ -296,6 +296,7 @@ function construireDonneesCommunes({
         nom_prenom_agent: nomPrenomAgent,
         matricule: agent.im || "",
         fonction: agent.fonction?.libelle || "",
+        service: agent.service?.libelle || "",
         // Prioriser `fonction.libelle`. Si absent, fallback sur `service.libelle`.
         poste:
             agent.fonction && agent.fonction.libelle
